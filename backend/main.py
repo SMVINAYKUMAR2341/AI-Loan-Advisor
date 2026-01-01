@@ -40,18 +40,16 @@ class LoanPredictionResponse(BaseModel):
     recommendation: str
 
 # Configure CORS
-origins = [
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://ai-loan-advisor-three.vercel.app",  # Production frontend
-    "https://ai-loan-advisor-three-git-main-smvinayakumar2341s-projects.vercel.app", # Vercel preview
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://ai-loan-advisor-three.vercel.app",
+    ],
+    allow_origin_regex="https://ai-loan-advisor-.*\.vercel\.app", # Allow all vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -241,84 +239,70 @@ async def login(
             )
     
     # ===== SUCCESS - Create Session and Log =====
-    
-    # Get device info
-    user_agent = request.headers.get("User-Agent", "")
-    ip = device_utils.get_client_ip(request)
-    device_info = device_utils.parse_user_agent(user_agent)
-    device_hash = device_utils.generate_device_hash(user_agent, ip)
-    location = device_utils.get_location_from_ip(ip)
-    
-    # Check if new device or location
-    is_new_device = await device_utils.check_new_device(db, user.id, device_hash)
-    is_new_location = await device_utils.check_new_location(db, user.id, location.get("city"))
-    
-    # Create session record
-    import uuid
-    session_id = uuid.uuid4()
-    token_hash = device_utils.hash_ip(str(session_id))  # Hash for reference
-    
-    new_session = models.UserSession(
-        id=session_id,
-        user_id=user.id,
-        device_type=device_info.get("device_type"),
-        browser=device_info.get("browser"),
-        os=device_info.get("os"),
-        device_hash=device_hash,
-        ip_hash=device_utils.hash_ip(ip),
-        location_city=location.get("city"),
-        location_country=location.get("country"),
-        is_new_device=is_new_device,
-        is_new_location=is_new_location,
-        token_hash=token_hash
-    )
-    db.add(new_session)
-    
-    # Log successful login
-    await log_audit(
-        db, user.id,
-        models.AuditAction.LOGIN_SUCCESS,
-        description="User logged in successfully",
-        request=request,
-        session_id=session_id
-    )
-    
-    # Log new device alert if applicable
-    if is_new_device:
+    try:
+        # Get device info
+        user_agent = request.headers.get("User-Agent", "")
+        ip = device_utils.get_client_ip(request)
+        device_info = device_utils.parse_user_agent(user_agent)
+        device_hash = device_utils.generate_device_hash(user_agent, ip)
+        location = device_utils.get_location_from_ip(ip)
+        
+        # Check if new device or location
+        is_new_device = await device_utils.check_new_device(db, user.id, device_hash)
+        is_new_location = await device_utils.check_new_location(db, user.id, location.get("city"))
+        
+        # Create session record
+        import uuid
+        session_id = uuid.uuid4()
+        token_hash = device_utils.hash_ip(str(session_id))
+        
+        new_session = models.UserSession(
+            id=session_id,
+            user_id=user.id,
+            device_type=device_info.get("device_type"),
+            browser=device_info.get("browser"),
+            os=device_info.get("os"),
+            device_hash=device_hash,
+            ip_hash=device_utils.hash_ip(ip),
+            location_city=location.get("city"),
+            location_country=location.get("country"),
+            is_new_device=is_new_device,
+            is_new_location=is_new_location,
+            token_hash=token_hash
+        )
+        db.add(new_session)
+        
+        # Log successful login
         await log_audit(
             db, user.id,
-            models.AuditAction.NEW_DEVICE_LOGIN,
-            description=f"Login from new device: {device_info.get('device_type')} - {device_info.get('browser')}",
+            models.AuditAction.LOGIN_SUCCESS,
+            description="User logged in successfully",
             request=request,
             session_id=session_id
         )
-    
-    # Log new location alert if applicable
-    if is_new_location:
-        await log_audit(
-            db, user.id,
-            models.AuditAction.NEW_LOCATION_LOGIN,
-            description=f"Login from new location: {location.get('city')}, {location.get('country')}",
-            request=request,
-            session_id=session_id
-        )
-    
-    await db.commit()
-    
-    # Create JWT token with user_id, role, and session_id
+        await db.commit()
+    except Exception as audit_error:
+        print(f"Audit/Session Error: {audit_error}")
+        # Don't crash login for auditing errors
+        await db.rollback()
+        session_id = None
+
+    # Generate token
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"user_id": str(user.id), "role": user.role, "session_id": str(session_id)}
+        data={"sub": user.mobile_number, "role": user.role},
+        expires_delta=access_token_expires
     )
     
-    return schemas.LoginResponse(
-        message="Login successful",
-        user_id=str(user.id),
-        customer_id=user.customer_id,
-        first_name=user.first_name,
-        role=user.role,
-        access_token=access_token,
-        token_type="bearer"
-    )
+    return {
+        "message": "Login successful",
+        "user_id": str(user.id),
+        "customer_id": user.customer_id,
+        "first_name": user.first_name,
+        "role": user.role,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 @app.get("/user/me", response_model=schemas.UserResponse)
 async def read_users_me(current_user: models.User = Depends(auth.get_current_active_user)):
@@ -974,72 +958,68 @@ async def log_audit(
     entity_id = None,
     description: str = None,
     metadata: dict = None,
-    request = None,  # FastAPI Request object for device info
+    request = None,
     session_id = None
 ):
-    """
-    Enhanced audit logging with device tracking and event categorization.
-    RBI-compliant immutable logging.
-    """
-    import device_utils
-    
-    # Get device info from request if provided
-    device_type = None
-    browser = None
-    os_name = None
-    ip_hash = None
-    ip_address = None
-    location_city = None
-    location_country = None
-    user_agent = None
-    
-    if request:
-        user_agent = request.headers.get("User-Agent", "")
-        ip = device_utils.get_client_ip(request)
+    try:
+        import device_utils
         
-        # Parse device info
-        device_info = device_utils.parse_user_agent(user_agent)
-        device_type = device_info.get("device_type")
-        browser = device_info.get("browser")
-        os_name = device_info.get("os")
+        # Get device info from request if provided
+        device_type = None
+        browser = None
+        os_name = None
+        ip_hash = None
+        ip_address = None
+        location_city = None
+        location_country = None
+        user_agent = None
         
-        # Hash IP for privacy
-        ip_hash = device_utils.hash_ip(ip)
-        ip_address = device_utils.mask_ip(ip)  # Masked for display
+        if request:
+            user_agent = request.headers.get("User-Agent", "")
+            ip = device_utils.get_client_ip(request)
+            
+            device_info = device_utils.parse_user_agent(user_agent)
+            device_type = device_info.get("device_type")
+            browser = device_info.get("browser")
+            os_name = device_info.get("os")
+            
+            ip_hash = device_utils.hash_ip(ip)
+            ip_address = device_utils.mask_ip(ip)
+            
+            location = device_utils.get_location_from_ip(ip)
+            location_city = location.get("city")
+            location_country = location.get("country")
         
-        # Get location (city-level only)
-        location = device_utils.get_location_from_ip(ip)
-        location_city = location.get("city")
-        location_country = location.get("country")
-    
-    # Get event category and severity
-    event_category = models.AuditAction.get_category(action)
-    severity = models.AuditAction.get_severity(action)
-    
-    # Auto-generate description if not provided
-    if not description:
-        description = device_utils.format_event_description(action, metadata) if request else action
-    
-    audit_entry = models.AuditLog(
-        user_id=user_id,
-        action=action,
-        event_category=event_category,
-        severity=severity,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        description=description,
-        extra_data=metadata,
-        session_id=session_id,
-        device_type=device_type,
-        browser=browser,
-        os=os_name,
-        ip_hash=ip_hash,
-        ip_address=ip_address,
-        location_city=location_city,
-        location_country=location_country,
-        user_agent=user_agent
-    )
-    db.add(audit_entry)
+        event_category = models.AuditAction.get_category(action)
+        severity = models.AuditAction.get_severity(action)
+        
+        if not description:
+            description = device_utils.format_event_description(action, metadata) if request else action
+        
+        audit_entry = models.AuditLog(
+            user_id=user_id,
+            action=action,
+            event_category=event_category,
+            severity=severity,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            description=description,
+            extra_data=metadata,
+            session_id=session_id,
+            device_type=device_type,
+            browser=browser,
+            os=os_name,
+            ip_hash=ip_hash,
+            ip_address=ip_address,
+            location_city=location_city,
+            location_country=location_country,
+            user_agent=user_agent
+        )
+        db.add(audit_entry)
+        # We don't commit here, it's the caller's responsibility
+    except Exception as e:
+        print(f"Error in log_audit: {e}")
+        # Audit logging should never crash the main application
     # Don't commit here - let the calling function handle transaction
 
 
