@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Bot, User } from 'lucide-react';
+import { API_BASE_URL } from '../services/api';
 
 interface Message {
     id: string;
