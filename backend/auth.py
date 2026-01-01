@@ -27,7 +27,7 @@ from database import get_db
 # JWT Settings - In production, use environment variables
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-super-secret-key-change-in-production-32chars")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours - extended for better UX
+ACCESS_TOKEN_EXPIRE_MINUTES = 2880  # 48 hours - further extended for UX
 
 # Password hashing - using pbkdf2_sha256 (no password length limit, unlike bcrypt)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")

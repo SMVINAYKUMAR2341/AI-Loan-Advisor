@@ -353,9 +353,14 @@ async def login(
         "token_type": "bearer"
     }
 
-@app.get("/user/me", response_model=schemas.UserResponse)
-async def read_users_me(current_user: models.User = Depends(auth.get_current_active_user)):
-    """Get current user profile"""
+@app.get("/user/me")
+async def read_users_me(current_user: Optional[models.User] = Depends(auth.get_optional_user)):
+    """Get current user profile - returns null if not logged in"""
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not logged in"
+        )
     return current_user
 
 @app.get("/user/{user_id}", response_model=schemas.UserResponse)
@@ -1082,13 +1087,21 @@ async def log_audit(
 
 @app.get("/credit-score", response_model=schemas.CreditScoreDisplayResponse)
 async def get_credit_score(
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
-    Get customer's credit score display based on latest loan prediction.
-    Data comes from ML model output - no mock data.
+    Get customer's credit score display - returns default if not logged in
     """
+    if current_user is None:
+        return schemas.CreditScoreDisplayResponse(
+            score_band="Login Required",
+            rating="Please Login",
+            factors=[{"factor": "Session expired", "impact": "neutral", "description": "Please login to see your actual credit score"}],
+            last_updated=datetime.now(),
+            eligibility_amount=0,
+            eligibility_products=[]
+        )
     # Get latest prediction for user
     query = select(models.LoanPrediction).join(
         models.LoanApplication,
@@ -1123,10 +1136,20 @@ async def get_credit_score(
 
 @app.get("/eligibility", response_model=schemas.EligibilityResponse)
 async def get_eligibility(
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
-    """Get customer's loan eligibility based on ML prediction"""
+    """Get customer's loan eligibility - returns default if not logged in"""
+    if current_user is None:
+        return schemas.EligibilityResponse(
+            has_application=False,
+            pre_approved_amount=0,
+            max_eligible_amount=0,
+            eligible_products=[],
+            approval_probability=0,
+            recommendation="Please login to check eligibility",
+            factors=[]
+        )
     
     # Get latest application and prediction
     query = select(models.LoanApplication).where(
@@ -1223,10 +1246,12 @@ def generate_emi_schedule(
 @app.get("/repayments/{application_id}", response_model=schemas.EMIScheduleResponse)
 async def get_emi_schedule(
     application_id: str,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
-    """Get EMI schedule for a loan application"""
+    """Get EMI schedule for a loan application - returns empty if not logged in"""
+    if current_user is None:
+        return {"application_id": application_id, "amount": 0, "interest_rate": 0, "tenure_months": 0, "schedule": []}
     from uuid import UUID as PyUUID
     
     try:
@@ -1380,10 +1405,12 @@ async def make_payment(
 
 @app.get("/repayments/upcoming", response_model=List[schemas.UpcomingEMIResponse])
 async def get_upcoming_emis(
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
-    """Get upcoming EMIs for current user"""
+    """Get upcoming EMIs for current user - returns empty if not logged in"""
+    if current_user is None:
+        return []
     from datetime import date as date_type
     
     # Get all applications for user
@@ -1577,10 +1604,12 @@ async def verify_document(
 @app.get("/activity", response_model=schemas.ActivityTimelineResponse)
 async def get_activity_log(
     limit: int = 50,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
-    """Get user's activity log"""
+    """Get user's activity log - returns empty if not logged in"""
+    if current_user is None:
+        return schemas.ActivityTimelineResponse(total_events=0, events=[])
     
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id
@@ -1751,13 +1780,15 @@ async def change_pin(
 async def get_activity_all(
     limit: int = 50,
     offset: int = 0,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
     Get all activity for current user.
     Returns categorized events with device info.
     """
+    if current_user is None:
+        return {"total_events": 0, "events": []}
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id
     ).order_by(models.AuditLog.created_at.desc()).limit(limit).offset(offset)
@@ -1795,10 +1826,12 @@ async def get_activity_all(
 @app.get("/activity/security")
 async def get_security_activity(
     limit: int = 20,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get security-related activity (logins, password changes, sessions)"""
+    if current_user is None:
+        return {"category": "Security", "events": []}
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id,
         models.AuditLog.event_category == models.EventCategory.SECURITY
@@ -1828,10 +1861,12 @@ async def get_security_activity(
 @app.get("/activity/loans")
 async def get_loan_activity(
     limit: int = 20,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get loan-related activity (applications, decisions, reviews)"""
+    if current_user is None:
+        return {"category": "Loan Applications", "events": []}
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id,
         models.AuditLog.event_category == models.EventCategory.LOAN
@@ -1860,10 +1895,12 @@ async def get_loan_activity(
 @app.get("/activity/kyc")
 async def get_kyc_activity(
     limit: int = 20,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get KYC-related activity (document uploads, verifications)"""
+    if current_user is None:
+        return {"category": "KYC & Documents", "events": []}
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id,
         models.AuditLog.event_category == models.EventCategory.KYC
@@ -1892,10 +1929,12 @@ async def get_kyc_activity(
 @app.get("/activity/payments")
 async def get_payment_activity(
     limit: int = 20,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get payment-related activity (EMI payments, schedules)"""
+    if current_user is None:
+        return {"category": "Payments & EMI", "events": []}
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id,
         models.AuditLog.event_category == models.EventCategory.PAYMENT
@@ -1924,10 +1963,12 @@ async def get_payment_activity(
 @app.get("/activity/profile")
 async def get_profile_activity(
     limit: int = 20,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get profile-related activity (updates, preferences, consents)"""
+    if current_user is None:
+        return {"category": "Profile & Settings", "events": []}
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id,
         models.AuditLog.event_category == models.EventCategory.PROFILE
@@ -1953,13 +1994,15 @@ async def get_profile_activity(
 
 @app.get("/activity/dashboard")
 async def get_activity_dashboard(
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
     Get activity dashboard with categorized recent events.
     Shows overview of all activity categories.
     """
+    if current_user is None:
+        return []
     categories = [
         models.EventCategory.SECURITY,
         models.EventCategory.LOAN,
