@@ -39,15 +39,19 @@ class LoanPredictionResponse(BaseModel):
     decision_factors: List[Dict[str, str]]
     recommendation: str
 
-# Allow CORS for local development
+# Configure CORS
+origins = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://ai-loan-advisor-three.vercel.app",  # Production frontend
+    "https://ai-loan-advisor-three-git-main-smvinayakumar2341s-projects.vercel.app", # Vercel preview
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "http://localhost:5173", # Vite default
-        "http://127.0.0.1:5173", # Vite default
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
