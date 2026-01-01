@@ -49,7 +49,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "https://ai-loan-advisor-three.vercel.app",
     ],
-    allow_origin_regex="https://ai-loan-advisor-.*\.vercel\.app", # Allow all vercel previews
+    allow_origin_regex=r"https://ai-loan-advisor-.*\.vercel\.app", # Allow all vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

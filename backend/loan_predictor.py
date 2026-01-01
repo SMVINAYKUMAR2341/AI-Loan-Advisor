@@ -40,7 +40,11 @@ class LoanPredictor:
             raise FileNotFoundError(f"Model not found at {MODEL_PATH}. Run train_model.py first.")
         
         if os.path.exists(SCALER_PATH):
-            self.scaler = joblib.load(SCALER_PATH)
+            scaler_data = joblib.load(SCALER_PATH)
+            if isinstance(scaler_data, dict):
+                self.scaler = scaler_data.get('scaler')
+            else:
+                self.scaler = scaler_data
         
         if os.path.exists(ENCODER_PATH):
             self.encoders = joblib.load(ENCODER_PATH)
