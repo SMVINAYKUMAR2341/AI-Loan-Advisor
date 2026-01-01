@@ -5,6 +5,7 @@ asyncpg
 passlib[bcrypt]
 pydantic
 pydantic-settings
+email-validator
 python-multipart
 python-jose[cryptography]
 fpdf2
