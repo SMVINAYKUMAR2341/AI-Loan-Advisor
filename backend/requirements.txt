@@ -17,4 +17,5 @@ scikit-learn
 qrcode[pil]
 requests
 Pillow
+matplotlib
 httpx

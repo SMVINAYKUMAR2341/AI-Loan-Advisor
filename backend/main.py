@@ -2751,19 +2751,22 @@ async def get_report_qr_code(application_id: str, db: AsyncSession = Depends(dat
             "expiry": expiry
         }
         
-        # Create shareable URL - Use network IP instead of localhost for mobile access
-        # Get the host from request headers or use network IP
-        import socket
-        try:
-            # Get local IP address
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            s.close()
-            shareable_url = f"http://{local_ip}:8000/shared-report/{token}"
-        except:
-            # Fallback to localhost if IP detection fails
-            shareable_url = f"http://localhost:8000/shared-report/{token}"
+        # Create shareable URL - Use RENDER_EXTERNAL_URL if available, otherwise fallback to local/detected IP
+        backend_base_url = os.getenv("RENDER_EXTERNAL_URL")
+        
+        if not backend_base_url:
+            import socket
+            try:
+                # Get local IP address for local network testing
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+                s.close()
+                backend_base_url = f"http://{local_ip}:8000"
+            except:
+                backend_base_url = "http://localhost:8000"
+        
+        shareable_url = f"{backend_base_url}/shared-report/{token}"
         
         # Generate QR code
         qr = qrcode.QRCode(

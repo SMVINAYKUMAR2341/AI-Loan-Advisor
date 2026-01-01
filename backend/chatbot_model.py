@@ -54,7 +54,7 @@ def generate_response(user_message: str, conversation_history: Optional[List[Dic
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:8000",
+                "HTTP-Referer": os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000"),
                 "X-Title": "AI Credit Advisor"
             },
             json={
