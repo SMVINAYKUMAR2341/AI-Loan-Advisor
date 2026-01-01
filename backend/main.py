@@ -376,11 +376,11 @@ async def get_user(user_id: str, db: AsyncSession = Depends(database.get_db)):
     
     return user
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"message": "Loan Advisor API is running", "version": "1.0.0"}
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health_check():
     return {"status": "healthy"}
 
@@ -624,30 +624,15 @@ async def submit_loan_application(
     3. Store ML outputs in loan_predictions table
     4. Return comprehensive response
     
-    Role: Authentication is optional - demos work without login
+    Role: Authentication required for personalized reports
     """
-    # If no authenticated user, create or use a demo user
+    # Require authentication for loan applications
     if current_user is None:
-        # Try to find existing demo user
-        demo_query = select(models.User).where(models.User.mobile_number == "0000000000")
-        demo_result = await db.execute(demo_query)
-        demo_user = demo_result.scalars().first()
-        
-        if demo_user is None:
-            # Create demo user for anonymous submissions
-            demo_user = models.User(
-                mobile_number="0000000000",
-                password_hash=auth.get_password_hash("demo_password"),
-                first_name="Demo",
-                last_name="User",
-                customer_id="DEMO-USER",
-                role="customer",
-                is_active=True
-            )
-            db.add(demo_user)
-            await db.flush()
-        
-        current_user = demo_user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please log in to submit a loan application. Your session may have expired.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
     
     try:
         from loan_advisor import get_advisor
@@ -2975,7 +2960,6 @@ async def get_shared_report(token: str, db: AsyncSession = Depends(database.get_
         pdf_bytes = report_generator.generate_loan_report_pdf(app_context, analysis_result)
         
         # Generate filename with timestamp for uniqueness
-        from datetime import datetime
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Loan_Report_{application.user.customer_id}_{timestamp}.pdf"
         
