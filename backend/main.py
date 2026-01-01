@@ -614,7 +614,7 @@ async def comprehensive_loan_analysis(request: LoanAdvisorRequest):
 async def submit_loan_application(
     application: schemas.LoanApplicationCreate,
     db: AsyncSession = Depends(database.get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: Optional[models.User] = Depends(auth.get_optional_user)
 ):
     """
     Submit a loan application - ML-First Flow with Database Persistence
@@ -624,14 +624,30 @@ async def submit_loan_application(
     3. Store ML outputs in loan_predictions table
     4. Return comprehensive response
     
-    Role: customer only (authentication required but handled gracefully)
+    Role: Authentication is optional - demos work without login
     """
-    # Skip role check - user is already authenticated to access dashboard
-    # if current_user.role != "customer":
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="Only customers can submit loan applications"
-    #     )
+    # If no authenticated user, create or use a demo user
+    if current_user is None:
+        # Try to find existing demo user
+        demo_query = select(models.User).where(models.User.mobile_number == "0000000000")
+        demo_result = await db.execute(demo_query)
+        demo_user = demo_result.scalars().first()
+        
+        if demo_user is None:
+            # Create demo user for anonymous submissions
+            demo_user = models.User(
+                mobile_number="0000000000",
+                password_hash=auth.get_password_hash("demo_password"),
+                first_name="Demo",
+                last_name="User",
+                customer_id="DEMO-USER",
+                role="customer",
+                is_active=True
+            )
+            db.add(demo_user)
+            await db.flush()
+        
+        current_user = demo_user
     
     try:
         from loan_advisor import get_advisor
@@ -735,13 +751,16 @@ async def submit_loan_application(
 
 @app.get("/my-applications", response_model=List[schemas.ApplicationListItem])
 async def get_my_applications(
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
     Get all loan applications for the current customer.
-    Role: customer only
+    Returns empty list if not logged in.
     """
+    if current_user is None:
+        return []  # Return empty if not logged in
+    
     if current_user.role != "customer":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
