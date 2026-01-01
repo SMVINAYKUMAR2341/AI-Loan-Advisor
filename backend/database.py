@@ -10,6 +10,10 @@ load_dotenv()
 # Format: postgresql+asyncpg://user:password@host:port/dbname
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Fix for asyncpg: convert sslmode to ssl parameter
+if DATABASE_URL and "sslmode=" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
+
 engine = create_async_engine(DATABASE_URL, echo=True)
 
 AsyncSessionLocal = sessionmaker(
