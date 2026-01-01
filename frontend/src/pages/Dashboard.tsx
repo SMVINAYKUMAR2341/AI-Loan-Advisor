@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { SmokeyBackground } from "@/components/ui/login-form";
 
@@ -220,7 +221,7 @@ export default function Dashboard() {
         setAccountLoading(true);
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch('http://localhost:8000/user/me', {
+            const response = await fetch(`${API_BASE_URL}/user/me`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -258,7 +259,7 @@ export default function Dashboard() {
         }
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch('http://localhost:8000/user/password', {
+            const response = await fetch(`${API_BASE_URL}/user/password`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -294,7 +295,7 @@ export default function Dashboard() {
         }
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch('http://localhost:8000/user/pin', {
+            const response = await fetch(`${API_BASE_URL}/user/pin`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -330,7 +331,7 @@ export default function Dashboard() {
             const endpoint = category === "all" ? "/activity" :
                 category === "sessions" ? "/sessions" :
                     `/activity/${category}`;
-            const response = await fetch(`http://localhost:8000${endpoint}`, {
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -356,7 +357,7 @@ export default function Dashboard() {
         setKycLoading(true);
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/kyc/${appId}/status`, {
+            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/status`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -381,7 +382,7 @@ export default function Dashboard() {
         try {
             const token = localStorage.getItem('access_token');
             const response = await fetch(
-                `http://localhost:8000/kyc/${appId}/documents?document_type=${docType}&document_category=${docCategory}`,
+                `${API_BASE_URL}/kyc/${appId}/documents?document_type=${docType}&document_category=${docCategory}`,
                 {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -407,7 +408,7 @@ export default function Dashboard() {
         }
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/kyc/${appId}/bank-details`, {
+            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/bank-details`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -431,7 +432,7 @@ export default function Dashboard() {
     const fetchAgreement = async (appId: string) => {
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/kyc/${appId}/agreement`, {
+            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/agreement`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -451,7 +452,7 @@ export default function Dashboard() {
         }
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/kyc/${appId}/agreement/sign`, {
+            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/agreement/sign`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -479,7 +480,7 @@ export default function Dashboard() {
         setKycError('');
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/kyc/${appId}/complete`, {
+            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/complete`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -829,7 +830,7 @@ export default function Dashboard() {
             const token = localStorage.getItem('access_token');
 
             // Call /loan-application which saves to database and returns application_id
-            const response = await fetch('http://localhost:8000/loan-application', {
+            const response = await fetch(`${API_BASE_URL}/loan-application`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -924,7 +925,7 @@ export default function Dashboard() {
         if (!appId) return;
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/loan-application/${appId}/report`, {
+            const response = await fetch(`${API_BASE_URL}/loan-application/${appId}/report`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -953,7 +954,7 @@ export default function Dashboard() {
         if (!appId) return;
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch(`http://localhost:8000/loan-application/${appId}/report-qr`, {
+            const response = await fetch(`${API_BASE_URL}/loan-application/${appId}/report-qr`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -1497,9 +1498,9 @@ export default function Dashboard() {
                         {showQrCode && qrCodeUrl && (
                             <div className="flex flex-col items-center justify-center py-6 space-y-4">
                                 <div className="p-4 bg-white rounded-2xl shadow-2xl">
-                                    <img 
-                                        src={qrCodeUrl} 
-                                        alt="QR Code for Report Download" 
+                                    <img
+                                        src={qrCodeUrl}
+                                        alt="QR Code for Report Download"
                                         className="w-48 h-48"
                                     />
                                 </div>
@@ -2262,7 +2263,7 @@ export default function Dashboard() {
     };
 
     const handleBankSelect = (bank: string) => {
-        setPaymentData({...paymentData, bankName: bank});
+        setPaymentData({ ...paymentData, bankName: bank });
         setNetBankingStep('login');
     };
 
@@ -2317,7 +2318,7 @@ export default function Dashboard() {
                         <p className="text-teal-400 text-sm mt-1">per annum</p>
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={handlePayNow}
                     className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
                 >
@@ -2345,7 +2346,7 @@ export default function Dashboard() {
                             {paymentStep === 'method' && (
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-white mb-4">Choose Payment Method</h3>
-                                    
+
                                     {/* Credit/Debit Card */}
                                     <button
                                         onClick={() => handlePaymentMethodSelect('card')}
@@ -2368,7 +2369,7 @@ export default function Dashboard() {
                                     >
                                         <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
                                             <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
                                             </svg>
                                         </div>
                                         <div className="flex-1 text-left">
@@ -2417,7 +2418,7 @@ export default function Dashboard() {
                                         ← Back to payment methods
                                     </button>
                                     <h3 className="text-lg font-semibold text-white mb-4">Enter Card Details</h3>
-                                    
+
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-300 mb-2">Card Number</label>
@@ -2426,7 +2427,7 @@ export default function Dashboard() {
                                                 placeholder="1234 5678 9012 3456"
                                                 maxLength={19}
                                                 value={paymentData.cardNumber}
-                                                onChange={(e) => setPaymentData({...paymentData, cardNumber: e.target.value})}
+                                                onChange={(e) => setPaymentData({ ...paymentData, cardNumber: e.target.value })}
                                                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                             />
                                         </div>
@@ -2436,7 +2437,7 @@ export default function Dashboard() {
                                                 type="text"
                                                 placeholder="JOHN DOE"
                                                 value={paymentData.cardName}
-                                                onChange={(e) => setPaymentData({...paymentData, cardName: e.target.value})}
+                                                onChange={(e) => setPaymentData({ ...paymentData, cardName: e.target.value })}
                                                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                             />
                                         </div>
@@ -2448,7 +2449,7 @@ export default function Dashboard() {
                                                     placeholder="MM"
                                                     maxLength={2}
                                                     value={paymentData.expiryMonth}
-                                                    onChange={(e) => setPaymentData({...paymentData, expiryMonth: e.target.value})}
+                                                    onChange={(e) => setPaymentData({ ...paymentData, expiryMonth: e.target.value })}
                                                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                                 />
                                             </div>
@@ -2459,7 +2460,7 @@ export default function Dashboard() {
                                                     placeholder="YY"
                                                     maxLength={2}
                                                     value={paymentData.expiryYear}
-                                                    onChange={(e) => setPaymentData({...paymentData, expiryYear: e.target.value})}
+                                                    onChange={(e) => setPaymentData({ ...paymentData, expiryYear: e.target.value })}
                                                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                                 />
                                             </div>
@@ -2470,7 +2471,7 @@ export default function Dashboard() {
                                                     placeholder="123"
                                                     maxLength={3}
                                                     value={paymentData.cvv}
-                                                    onChange={(e) => setPaymentData({...paymentData, cvv: e.target.value})}
+                                                    onChange={(e) => setPaymentData({ ...paymentData, cvv: e.target.value })}
                                                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                                 />
                                             </div>
@@ -2491,7 +2492,7 @@ export default function Dashboard() {
                                         ← Back to payment methods
                                     </button>
                                     <h3 className="text-lg font-semibold text-white mb-4">Enter UPI ID</h3>
-                                    
+
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-300 mb-2">UPI ID</label>
@@ -2499,7 +2500,7 @@ export default function Dashboard() {
                                                 type="text"
                                                 placeholder="yourname@paytm"
                                                 value={paymentData.upiId}
-                                                onChange={(e) => setPaymentData({...paymentData, upiId: e.target.value})}
+                                                onChange={(e) => setPaymentData({ ...paymentData, upiId: e.target.value })}
                                                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                             />
                                             <p className="text-gray-400 text-xs mt-2">Enter your UPI ID (e.g., name@gpay, name@paytm)</p>
@@ -2522,7 +2523,7 @@ export default function Dashboard() {
                                     <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
                                         ← Back to payment methods
                                     </button>
-                                    
+
                                     {netBankingStep === 'select' ? (
                                         <>
                                             <h3 className="text-lg font-semibold text-white mb-4">Select Your Bank</h3>
@@ -2554,8 +2555,8 @@ export default function Dashboard() {
                                         </>
                                     ) : (
                                         <>
-                                            <button 
-                                                onClick={() => setNetBankingStep('select')} 
+                                            <button
+                                                onClick={() => setNetBankingStep('select')}
                                                 className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4"
                                             >
                                                 ← Change Bank
@@ -2569,9 +2570,9 @@ export default function Dashboard() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             <h3 className="text-lg font-semibold text-white mb-4">Login to Complete Payment</h3>
-                                            
+
                                             <div className="space-y-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-300 mb-2">User ID / Customer ID</label>
@@ -2579,7 +2580,7 @@ export default function Dashboard() {
                                                         type="text"
                                                         placeholder="Enter your User ID"
                                                         value={paymentData.bankUserId}
-                                                        onChange={(e) => setPaymentData({...paymentData, bankUserId: e.target.value})}
+                                                        onChange={(e) => setPaymentData({ ...paymentData, bankUserId: e.target.value })}
                                                         className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                                     />
                                                 </div>
@@ -2589,11 +2590,11 @@ export default function Dashboard() {
                                                         type="password"
                                                         placeholder="Enter your password"
                                                         value={paymentData.bankPassword}
-                                                        onChange={(e) => setPaymentData({...paymentData, bankPassword: e.target.value})}
+                                                        onChange={(e) => setPaymentData({ ...paymentData, bankPassword: e.target.value })}
                                                         className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
                                                     />
                                                 </div>
-                                                
+
                                                 <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
                                                     <div className="flex gap-2">
                                                         <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
@@ -2616,7 +2617,7 @@ export default function Dashboard() {
                                                         <span className="text-white">Secure Identity Hub</span>
                                                     </div>
                                                 </div>
-                                                
+
                                                 <button
                                                     onClick={processPayment}
                                                     disabled={!paymentData.bankUserId || !paymentData.bankPassword}
@@ -2641,13 +2642,13 @@ export default function Dashboard() {
                                         ← Back to payment methods
                                     </button>
                                     <h3 className="text-lg font-semibold text-white mb-4">Select Digital Wallet</h3>
-                                    
+
                                     <div className="space-y-3">
                                         {['Paytm Wallet', 'PhonePe Wallet', 'Amazon Pay', 'Mobikwik', 'Freecharge'].map((wallet) => (
                                             <button
                                                 key={wallet}
                                                 onClick={() => {
-                                                    setPaymentData({...paymentData, walletType: wallet});
+                                                    setPaymentData({ ...paymentData, walletType: wallet });
                                                     processPayment();
                                                 }}
                                                 className="w-full p-3 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl text-left text-white transition"
@@ -3014,7 +3015,7 @@ export default function Dashboard() {
     const terminateSession = async (sessionId: string) => {
         try {
             const token = localStorage.getItem('access_token');
-            await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+            await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

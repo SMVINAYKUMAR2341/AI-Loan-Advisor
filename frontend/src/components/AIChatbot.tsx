@@ -47,7 +47,7 @@ export function AIChatbot() {
 
         try {
             // Call backend AI chatbot API
-            const response = await fetch('http://localhost:8000/chat', {
+            const response = await fetch(`${API_BASE_URL}/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
