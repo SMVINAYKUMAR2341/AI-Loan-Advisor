@@ -14,7 +14,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and "sslmode=" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(DATABASE_URL, echo=False)
 
 AsyncSessionLocal = sessionmaker(
     bind=engine,

@@ -339,7 +339,7 @@ async def login(
     # Generate token
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.mobile_number, "role": user.role},
+        data={"sub": user.mobile_number, "user_id": str(user.id), "role": user.role},
         expires_delta=access_token_expires
     )
     
