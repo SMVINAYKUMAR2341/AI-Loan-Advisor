@@ -16,7 +16,14 @@ if not DATABASE_URL:
 if DATABASE_URL and "sslmode=" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=10
+)
 
 AsyncSessionLocal = sessionmaker(
     bind=engine,
