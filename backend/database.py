@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database URL from environment variable
-# Format: postgresql+asyncpg://user:password@host:port/dbname
+# Fallback to Neon DB for deployment support
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_4qNVJct3Bwio@ep-ancient-smoke-a1z5yh5g-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 
 # Fix for asyncpg: convert sslmode to ssl parameter
 if DATABASE_URL and "sslmode=" in DATABASE_URL:
