@@ -91,7 +91,7 @@ The frontend will be available at `http://localhost:5173`.
 - Real-time status updates
 
 ### 3. Apply for Loan
-![Apply for Loan](screenshots/apply-loan.png)
+![Apply for Loan](screenshots/loan-analysis.png)
 - AI-Powered Loan Eligibility Advisor
 - Personal & Employment information
 - Financial details with automatic calculations
@@ -100,7 +100,7 @@ The frontend will be available at `http://localhost:5173`.
 - Instant eligibility assessment
 
 ### 4. Loan Analysis Results
-![Loan Analysis](screenshots/loan-analysis.png)
+![Loan Analysis](screenshots/apply-loan.png)
 - Comprehensive approval decision (95% approval score)
 - Credit score range prediction (710-760)
 - Interest rate analysis (12.75%)
