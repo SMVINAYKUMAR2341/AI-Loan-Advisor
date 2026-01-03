@@ -117,7 +117,7 @@ The frontend will be available at `http://localhost:5173`.
 ### 5. Security & Profile Settings
 ![Profile Settings](screenshots/profile-settings.png)
 - Complete account information
-- Customer ID: LA26253834
+- Customer ID: LA20253834
 - Email verification status
 - Mobile number & address details
 - KYC status tracking
