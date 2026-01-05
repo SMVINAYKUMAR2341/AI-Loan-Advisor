@@ -1056,6 +1056,121 @@ export default function Dashboard() {
                         </div>
                     </div>
 
+                    {/* CIBIL Score Comparison Section */}
+                    <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl border border-cyan-500/30">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
+                                <TrendingUp className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h4 className="text-lg font-semibold text-white">Credit Score Methodology</h4>
+                                <p className="text-gray-400 text-sm">How our AI score compares to Real CIBIL</p>
+                            </div>
+                        </div>
+
+                        {/* Comparison Chart */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            {/* Factor Weights Comparison */}
+                            <div className="bg-gray-800/50 rounded-xl p-4">
+                                <p className="text-cyan-400 text-sm font-medium mb-3 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
+                                    Factor Weights Comparison
+                                </p>
+                                <div className="space-y-3">
+                                    {[
+                                        { factor: 'Payment History', cibil: 35, ours: 35, match: true },
+                                        { factor: 'Credit Utilization', cibil: 30, ours: 30, match: true },
+                                        { factor: 'Credit History Length', cibil: 15, ours: 15, match: true },
+                                        { factor: 'Credit Mix', cibil: 10, ours: 10, match: true },
+                                        { factor: 'New Credit/Employment', cibil: 10, ours: 10, match: true },
+                                    ].map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-3">
+                                            <div className="w-32 text-gray-300 text-xs truncate">{item.factor}</div>
+                                            <div className="flex-1 flex gap-1">
+                                                {/* CIBIL Bar */}
+                                                <div className="flex-1 h-4 bg-gray-700/50 rounded overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded"
+                                                        style={{ width: `${item.cibil * 2.5}%` }}
+                                                    />
+                                                </div>
+                                                {/* Our Bar */}
+                                                <div className="flex-1 h-4 bg-gray-700/50 rounded overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-gradient-to-r from-cyan-500 to-blue-400 rounded"
+                                                        style={{ width: `${item.ours * 2.5}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="w-16 text-right">
+                                                {item.match ? (
+                                                    <span className="text-green-400 text-xs font-medium">✓ Match</span>
+                                                ) : (
+                                                    <span className="text-yellow-400 text-xs">{item.cibil}% vs {item.ours}%</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-4 mt-3 pt-3 border-t border-gray-700/50">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded bg-gradient-to-r from-orange-500 to-amber-400"></div>
+                                        <span className="text-gray-400 text-xs">Real CIBIL</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded bg-gradient-to-r from-cyan-500 to-blue-400"></div>
+                                        <span className="text-gray-400 text-xs">Our AI Score</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Score Range Comparison */}
+                            <div className="bg-gray-800/50 rounded-xl p-4">
+                                <p className="text-cyan-400 text-sm font-medium mb-3 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
+                                    Score Range & Ratings
+                                </p>
+                                <div className="space-y-2">
+                                    {[
+                                        { rating: 'Excellent', range: '800-900', color: 'from-green-500 to-emerald-400' },
+                                        { rating: 'Very Good', range: '750-799', color: 'from-teal-500 to-cyan-400' },
+                                        { rating: 'Good', range: '700-749', color: 'from-blue-500 to-blue-400' },
+                                        { rating: 'Fair', range: '650-699', color: 'from-yellow-500 to-amber-400' },
+                                        { rating: 'Poor', range: '550-649', color: 'from-orange-500 to-orange-400' },
+                                        { rating: 'Very Poor', range: '300-549', color: 'from-red-500 to-red-400' },
+                                    ].map((item, idx) => {
+                                        const isCurrentRating = advisorResult.credit_score.rating === item.rating ||
+                                            (advisorResult.credit_score.rating === 'Excellent' && item.rating === 'Excellent') ||
+                                            (advisorResult.credit_score.rating === 'Very Good' && item.rating === 'Very Good');
+                                        return (
+                                            <div key={idx} className={`flex items-center gap-3 p-2 rounded-lg ${isCurrentRating ? 'bg-cyan-500/10 border border-cyan-500/30' : ''}`}>
+                                                <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${item.color}`}></div>
+                                                <span className={`flex-1 text-sm ${isCurrentRating ? 'text-white font-medium' : 'text-gray-300'}`}>{item.rating}</span>
+                                                <span className={`text-sm font-mono ${isCurrentRating ? 'text-cyan-400 font-bold' : 'text-gray-500'}`}>{item.range}</span>
+                                                {isCurrentRating && <span className="text-cyan-400 text-xs">← Your Score</span>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Disclaimer */}
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="text-amber-300 font-medium text-sm">Simulated Credit Score</p>
+                                    <p className="text-gray-400 text-xs mt-1">
+                                        This credit score is an AI-estimated value based on your financial profile, using CIBIL-standard methodology (300-900 range, 5 weighted factors).
+                                        Your actual CIBIL score may differ as it's based on real credit history from banks.
+                                        For official credit score, visit <a href="https://www.cibil.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">www.cibil.com</a>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Loan & Income Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="p-6 bg-gray-900 rounded-2xl border-2 border-gray-700">
