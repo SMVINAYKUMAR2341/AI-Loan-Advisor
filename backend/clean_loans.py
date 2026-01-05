@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:admin@localhost:5432/loan_advisor")
+
+# Fix for asyncpg: convert sslmode to ssl parameter
+if DATABASE_URL and "sslmode=" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
+
 async_engine = create_async_engine(DATABASE_URL)
 
 async def clean_loans():

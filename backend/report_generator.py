@@ -787,97 +787,123 @@ class RBICompliantLoanReport(FPDF):
         
         self.add_info_box(interpretation.get(rating, 'Credit assessment in progress.'), 
                          'success' if rating in ['Excellent', 'Good'] else 'warning')
-        
         self.ln(5)
         
         # Add CIBIL Methodology Comparison Section
-        self.subsection_title('Credit Score Methodology: Real CIBIL vs Our AI')
+        self.section_title('Credit Score Methodology: Real CIBIL vs Our AI', '')
+        
+        self.add_info_box(
+            'The following tables provide a transparent comparison between real-world CIBIL scoring '
+            'and our AI-estimated simulation. This section details exactly how factors are weighted '
+            'and what profile proxies are used in place of bank records.',
+            'info'
+        )
         
         self.ln(2)
         
-        # Factor Weights Comparison Table
+        # 1. Factor Weights & Official Banking Standards
+        self.subsection_title('1. Factor Weights & Official Banking Standards (SBI/RBI)')
         self.set_font('Arial', 'B', 8)
         self.set_fill_color(0, 51, 102)
         self.set_text_color(255, 255, 255)
-        self.cell(70, 7, '  Factor', 1, 0, 'L', True)
-        self.cell(30, 7, 'Real CIBIL', 1, 0, 'C', True)
-        self.cell(30, 7, 'Our AI', 1, 0, 'C', True)
-        self.cell(60, 7, 'Status', 1, 1, 'C', True)
+        self.cell(35, 7, '  Factor', 1, 0, 'L', True)
+        self.cell(25, 7, 'Real Weight', 1, 0, 'C', True)
+        self.cell(25, 7, 'AI Weight', 1, 0, 'C', True)
+        self.cell(55, 7, 'Real Bank Source (SBI/RBI)', 1, 0, 'C', True)
+        self.cell(50, 7, 'Our AI Data Source (Proxy)', 1, 1, 'C', True)
         
-        self.set_font('Arial', '', 8)
+        self.set_font('Arial', '', 7)
         self.set_text_color(30, 30, 30)
         
         factors = [
-            ('Payment History', '35%', '35%', 'Match'),
-            ('Credit Utilization', '30%', '30%', 'Match'),
-            ('Credit History Length', '15%', '15%', 'Match'),
-            ('Credit Mix', '10%', '10%', 'Match'),
-            ('New Credit Inquiries', '10%', '10%', 'Match'),
+            ('Payment History', '35%', '35%', 'Past bank repayment records', 'Job tenure + Experience'),
+            ('Credit Utilization', '30%', '30%', 'Credit card usage vs limits', 'Debt-to-Income ratio'),
+            ('Credit History Length', '15%', '15%', 'Years since first loan/card', 'Age + Experience'),
+            ('Credit Mix', '10%', '10%', 'Balanced secured/unsecured', 'Home ownership + Education'),
+            ('New Credit', '10%', '10%', 'Recent hard credit inquiries', 'Employment type + Income'),
         ]
         
-        for i, (factor, cibil, ours, status) in enumerate(factors):
+        for i, (factor, cibil, ours, real_src, ai_src) in enumerate(factors):
             if i % 2 == 0:
                 self.set_fill_color(248, 250, 252)
             else:
                 self.set_fill_color(255, 255, 255)
-            self.cell(70, 6, f'  {factor}', 1, 0, 'L', True)
-            self.cell(30, 6, cibil, 1, 0, 'C', True)
-            self.cell(30, 6, ours, 1, 0, 'C', True)
-            self.set_text_color(22, 163, 74)  # Green for match
-            self.cell(60, 6, status, 1, 1, 'C', True)
-            self.set_text_color(30, 30, 30)
+            self.cell(35, 6, f'  {factor}', 1, 0, 'L', True)
+            self.cell(25, 6, cibil, 1, 0, 'C', True)
+            self.cell(25, 6, ours, 1, 0, 'C', True)
+            self.cell(55, 6, f' {real_src}', 1, 0, 'L', True)
+            self.cell(50, 6, f' {ai_src}', 1, 1, 'L', True)
         
         self.ln(5)
         
-        # Data Sources Comparison
-        self.subsection_title('Data Sources Comparison')
-        
-        self.ln(2)
-        
-        # Two column layout
+        # 2. Data Gap: Real CIBIL vs Our AI
+        self.subsection_title("2. Data Gap: Real CIBIL vs Our AI")
         self.set_font('Arial', 'B', 8)
-        self.set_fill_color(245, 158, 11)  # Orange for CIBIL
+        self.set_fill_color(245, 158, 11)  # Amber for warning-style table
         self.set_text_color(255, 255, 255)
-        self.cell(95, 6, '  REAL CIBIL USES', 0, 0, 'L', True)
-        self.set_fill_color(0, 150, 200)  # Cyan for Our AI
-        self.cell(95, 6, '  OUR AI USES (SIMULATED)', 0, 1, 'L', True)
+        self.cell(95, 7, '  Real CIBIL Data Point', 1, 0, 'L', True)
+        self.cell(95, 7, '  Our AI Proxy Alternative', 1, 1, 'L', True)
         
-        self.set_font('Arial', '', 7)
-        self.set_text_color(60, 60, 60)
+        self.set_font('Arial', '', 8)
+        self.set_text_color(30, 30, 30)
         
-        cibil_sources = [
-            'Actual loan repayment history',
-            'Credit card payment records',
-            'Number of active loans & cards',
-            'Credit inquiries (last 6 months)',
-            'Bankruptcy & default records',
-            'Credit utilization ratio',
+        gap_analysis = [
+            ('Actual loan repayment history', 'Simulated from job stability'),
+            ('Credit card usage %', 'DTI ratio as proxy'),
+            ('Number of active loans', 'Not collected (Profile data only)'),
+            ('Loan defaults/write-offs', 'Not collected'),
+            ('Bankruptcy records', 'Not collected'),
+            ('Number of credit inquiries', 'Not collected'),
         ]
         
-        our_sources = [
-            'Job tenure & experience',
-            'Debt-to-Income ratio',
-            'Age + experience',
-            'Home ownership + education',
-            'Employment type + income',
-            '(No bank data access)',
+        for i, (real, alt) in enumerate(gap_analysis):
+            if i % 2 == 0:
+                self.set_fill_color(255, 248, 235)
+            else:
+                self.set_fill_color(255, 255, 255)
+            self.cell(95, 6, f'  {real}', 1, 0, 'L', True)
+            self.cell(95, 6, f'  {alt}', 1, 1, 'L', True)
+            
+        self.ln(5)
+        
+        # 3. What Matches Real Banks Table
+        self.subsection_title('3. What Matches Real Banks')
+        self.set_font('Arial', 'B', 8)
+        self.set_fill_color(34, 197, 94)  # Green for matches
+        self.set_text_color(255, 255, 255)
+        self.cell(110, 7, '  Banking Standard Feature', 1, 0, 'L', True)
+        self.cell(80, 7, '  Our AI Alignment', 1, 1, 'L', True)
+        
+        self.set_font('Arial', '', 8)
+        self.set_text_color(30, 30, 30)
+        
+        matches = [
+            ('Score range 300-900', 'Identical Scale'),
+            ('5 weighted factors', 'Identical Weights'),
+            ('Rating bands (6 levels)', 'Identical Bands'),
+            ('Interest rate tied to score', 'RBI-compliant Risk Pricing'),
+            ('EMI calculation formula', 'Standard Annuity Formula'),
         ]
         
-        for i in range(len(cibil_sources)):
-            self.set_fill_color(255, 248, 235)  # Light orange
-            self.cell(95, 5, f'  - {cibil_sources[i]}', 0, 0, 'L', True)
-            self.set_fill_color(235, 248, 255)  # Light cyan
-            self.cell(95, 5, f'  - {our_sources[i]}', 0, 1, 'L', True)
+        for i, (feat, status) in enumerate(matches):
+            if i % 2 == 0:
+                self.set_fill_color(240, 253, 244)
+            else:
+                self.set_fill_color(255, 255, 255)
+            self.cell(110, 6, f'  {feat}', 1, 0, 'L', True)
+            self.cell(80, 6, f'  {status}', 1, 1, 'L', True)
         
         self.ln(5)
         
-        # Disclaimer
+        # Mandatory Disclaimer
         self.add_info_box(
-            'IMPORTANT: This credit score is AI-estimated using CIBIL-standard methodology with profile-based data. '
-            'Real CIBIL scores are based on actual bank records. Your actual CIBIL score may differ. '
-            'For official credit score, visit www.cibil.com',
+            'MANDATORY DISCLAIMER: This credit score is a mathematical simulation using CIBIL-standard weights applied to '
+            'your reported income, debt and stability metrics. Real CIBIL scores require access to your PAN-linked bank '
+            'records from the past 3-10 years which we do not collect. For your official credit report, visit www.cibil.com.',
             'warning'
         )
+        
+        self.ln(5)
         
         self.ln(5)
         
