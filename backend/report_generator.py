@@ -790,6 +790,97 @@ class RBICompliantLoanReport(FPDF):
         
         self.ln(5)
         
+        # Add CIBIL Methodology Comparison Section
+        self.subsection_title('Credit Score Methodology: Real CIBIL vs Our AI')
+        
+        self.ln(2)
+        
+        # Factor Weights Comparison Table
+        self.set_font('Arial', 'B', 8)
+        self.set_fill_color(0, 51, 102)
+        self.set_text_color(255, 255, 255)
+        self.cell(70, 7, '  Factor', 1, 0, 'L', True)
+        self.cell(30, 7, 'Real CIBIL', 1, 0, 'C', True)
+        self.cell(30, 7, 'Our AI', 1, 0, 'C', True)
+        self.cell(60, 7, 'Status', 1, 1, 'C', True)
+        
+        self.set_font('Arial', '', 8)
+        self.set_text_color(30, 30, 30)
+        
+        factors = [
+            ('Payment History', '35%', '35%', 'Match'),
+            ('Credit Utilization', '30%', '30%', 'Match'),
+            ('Credit History Length', '15%', '15%', 'Match'),
+            ('Credit Mix', '10%', '10%', 'Match'),
+            ('New Credit Inquiries', '10%', '10%', 'Match'),
+        ]
+        
+        for i, (factor, cibil, ours, status) in enumerate(factors):
+            if i % 2 == 0:
+                self.set_fill_color(248, 250, 252)
+            else:
+                self.set_fill_color(255, 255, 255)
+            self.cell(70, 6, f'  {factor}', 1, 0, 'L', True)
+            self.cell(30, 6, cibil, 1, 0, 'C', True)
+            self.cell(30, 6, ours, 1, 0, 'C', True)
+            self.set_text_color(22, 163, 74)  # Green for match
+            self.cell(60, 6, status, 1, 1, 'C', True)
+            self.set_text_color(30, 30, 30)
+        
+        self.ln(5)
+        
+        # Data Sources Comparison
+        self.subsection_title('Data Sources Comparison')
+        
+        self.ln(2)
+        
+        # Two column layout
+        self.set_font('Arial', 'B', 8)
+        self.set_fill_color(245, 158, 11)  # Orange for CIBIL
+        self.set_text_color(255, 255, 255)
+        self.cell(95, 6, '  REAL CIBIL USES', 0, 0, 'L', True)
+        self.set_fill_color(0, 150, 200)  # Cyan for Our AI
+        self.cell(95, 6, '  OUR AI USES (SIMULATED)', 0, 1, 'L', True)
+        
+        self.set_font('Arial', '', 7)
+        self.set_text_color(60, 60, 60)
+        
+        cibil_sources = [
+            'Actual loan repayment history',
+            'Credit card payment records',
+            'Number of active loans & cards',
+            'Credit inquiries (last 6 months)',
+            'Bankruptcy & default records',
+            'Credit utilization ratio',
+        ]
+        
+        our_sources = [
+            'Job tenure & experience',
+            'Debt-to-Income ratio',
+            'Age + experience',
+            'Home ownership + education',
+            'Employment type + income',
+            '(No bank data access)',
+        ]
+        
+        for i in range(len(cibil_sources)):
+            self.set_fill_color(255, 248, 235)  # Light orange
+            self.cell(95, 5, f'  - {cibil_sources[i]}', 0, 0, 'L', True)
+            self.set_fill_color(235, 248, 255)  # Light cyan
+            self.cell(95, 5, f'  - {our_sources[i]}', 0, 1, 'L', True)
+        
+        self.ln(5)
+        
+        # Disclaimer
+        self.add_info_box(
+            'IMPORTANT: This credit score is AI-estimated using CIBIL-standard methodology with profile-based data. '
+            'Real CIBIL scores are based on actual bank records. Your actual CIBIL score may differ. '
+            'For official credit score, visit www.cibil.com',
+            'warning'
+        )
+        
+        self.ln(5)
+        
     def add_loan_cost_breakdown_section(self, analysis_result):
         """Add loan cost breakdown with visual representation"""
         self.section_title('Loan Cost Breakdown', '')
