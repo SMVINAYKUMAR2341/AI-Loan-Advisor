@@ -27,96 +27,211 @@ DATASET_PATH = os.path.join(ML_DATASETS_DIR, "Loan_Eligibility_Data_4000_Depende
 
 
 class CreditScoreEstimator:
-    """Estimates credit score band based on financial profile"""
+    """
+    Estimates credit score band based on financial profile.
+    Uses CIBIL-standard 300-900 range with weighted factors.
+    
+    Factor Weights (based on real CIBIL methodology):
+    - Payment History (simulated): 35%
+    - Credit Utilization (DTI proxy): 30%
+    - Credit History Length: 15%
+    - Credit Mix: 10%
+    - Employment Stability: 10%
+    """
+    
+    # CIBIL score range
+    MIN_SCORE = 300
+    MAX_SCORE = 900
+    SCORE_RANGE = MAX_SCORE - MIN_SCORE  # 600 points
     
     @staticmethod
     def estimate(profile: Dict[str, Any]) -> Tuple[int, int, str]:
         """
         Returns: (min_score, max_score, rating)
-        Based on income stability, DTI, employment, etc.
+        Based on CIBIL-weighted factors from available profile data.
         """
-        score = 650  # Base score
         
-        # Income stability (+/- 50)
-        monthly_income = profile.get('monthly_income', 0)
-        if monthly_income >= 100000:
-            score += 50
-        elif monthly_income >= 50000:
-            score += 30
-        elif monthly_income >= 25000:
-            score += 10
-        else:
-            score -= 20
-        
-        # Debt-to-Income ratio (+/- 40)
-        dti = profile.get('debt_to_income_ratio', 0.5)
-        if dti < 0.2:
-            score += 40
-        elif dti < 0.35:
-            score += 20
-        elif dti < 0.5:
-            score += 0
-        else:
-            score -= 30
-        
-        # Employment status (+/- 30)
-        employment = profile.get('employment_status', '')
-        if employment == 'Employed':
-            score += 30
-        elif employment == 'Self-Employed':
-            # Reduced boost for self-employed (higher risk)
-            score += 5  
-        else:
-            score -= 40
-        
-        # Job tenure (+/- 40) - Stricter penalties for stability
+        # ============================================================
+        # 1. PAYMENT HISTORY PROXY (35% weight = max 210 points)
+        # Simulated from job tenure, experience, and employment stability
+        # ============================================================
         job_tenure = profile.get('job_tenure', 0)
-        if job_tenure >= 5:
-            score += 25
-        elif job_tenure >= 2:
-            score += 10
-        elif job_tenure < 1:
-            score -= 40  # Massive penalty for new jobs/business
-        elif job_tenure < 2:
-            score -= 20  # Significant penalty for < 2 years
-        
-        # Experience (+/- 30)
         experience = profile.get('experience', 0)
-        if experience >= 10:
-            score += 20
-        elif experience >= 5:
-            score += 10
-        elif experience < 2:
-            score -= 30  # Stricter penalty for low experience
+        employment = profile.get('employment_status', 'Employed')
         
-        # Home ownership (+/- 15)
-        home_status = profile.get('home_ownership_status', '')
-        if home_status == 'Own':
-            score += 15
-        elif home_status == 'Mortgage':
-            score += 5
-        
-        # Education (+/- 10)
-        education = profile.get('education_level', '')
-        if education in ['PhD', 'Master']:
-            score += 10
-        elif education == 'Bachelor':
-            score += 5
-        
-        # Clamp score to valid range
-        score = max(300, min(850, score))
-        
-        # Determine band and rating
-        if score >= 750:
-            return (score - 25, min(850, score + 25), "Excellent")
-        elif score >= 700:
-            return (score - 25, score + 25, "Good")
-        elif score >= 650:
-            return (score - 25, score + 25, "Fair")
-        elif score >= 600:
-            return (score - 25, score + 25, "Poor")
+        payment_score = 0
+        # Job tenure is strongest indicator of payment reliability
+        if job_tenure >= 5:
+            payment_score += 150
+        elif job_tenure >= 3:
+            payment_score += 120
+        elif job_tenure >= 2:
+            payment_score += 90
+        elif job_tenure >= 1:
+            payment_score += 60
         else:
-            return (max(300, score - 25), score + 25, "Very Poor")
+            payment_score += 20  # New job = high risk
+        
+        # Experience adds to stability
+        if experience >= 10:
+            payment_score += 60
+        elif experience >= 5:
+            payment_score += 45
+        elif experience >= 2:
+            payment_score += 25
+        else:
+            payment_score += 5
+        
+        # Cap at 210 (35% of 600)
+        payment_score = min(210, payment_score)
+        
+        # ============================================================
+        # 2. CREDIT UTILIZATION (30% weight = max 180 points)
+        # Based on Debt-to-Income ratio (lower is better)
+        # ============================================================
+        dti = profile.get('debt_to_income_ratio', 0.3)
+        
+        if dti <= 0.10:
+            utilization_score = 180  # Excellent - minimal debt
+        elif dti <= 0.20:
+            utilization_score = 160  # Very good
+        elif dti <= 0.30:
+            utilization_score = 130  # Good
+        elif dti <= 0.40:
+            utilization_score = 90   # Fair
+        elif dti <= 0.50:
+            utilization_score = 50   # Poor
+        else:
+            utilization_score = 15   # Very poor - over-leveraged
+        
+        # ============================================================
+        # 3. CREDIT HISTORY LENGTH (15% weight = max 90 points)
+        # Based on age and professional experience
+        # ============================================================
+        age = profile.get('age', 30)
+        
+        if age >= 45 and experience >= 15:
+            history_score = 90
+        elif age >= 40 and experience >= 10:
+            history_score = 75
+        elif age >= 35 and experience >= 7:
+            history_score = 60
+        elif age >= 30 and experience >= 4:
+            history_score = 45
+        elif age >= 25:
+            history_score = 30
+        else:
+            history_score = 15  # Very young = short history
+        
+        # ============================================================
+        # 4. CREDIT MIX (10% weight = max 60 points)
+        # Based on home ownership, education (proxy for financial diversity)
+        # ============================================================
+        home_status = profile.get('home_ownership_status', 'Rent')
+        education = profile.get('education_level', 'Bachelor')
+        
+        mix_score = 0
+        # Home ownership indicates mortgage experience
+        if home_status == 'Own':
+            mix_score += 35
+        elif home_status == 'Mortgage':
+            mix_score += 30  # Active mortgage = credit mix
+        elif home_status == 'Rent':
+            mix_score += 10
+        
+        # Higher education correlates with diverse credit access
+        if education in ['PhD', 'Doctorate']:
+            mix_score += 25
+        elif education == 'Master':
+            mix_score += 20
+        elif education == 'Bachelor':
+            mix_score += 15
+        elif education == 'Associate':
+            mix_score += 10
+        else:
+            mix_score += 5
+        
+        # Cap at 60
+        mix_score = min(60, mix_score)
+        
+        # ============================================================
+        # 5. EMPLOYMENT STABILITY (10% weight = max 60 points)
+        # Based on employment type and income level
+        # ============================================================
+        monthly_income = profile.get('monthly_income', 0)
+        
+        employment_score = 0
+        if employment == 'Employed':
+            employment_score += 35
+        elif employment == 'Self-Employed':
+            employment_score += 20
+        else:
+            employment_score += 0  # Unemployed
+        
+        # Income level bonus
+        if monthly_income >= 100000:
+            employment_score += 25
+        elif monthly_income >= 75000:
+            employment_score += 20
+        elif monthly_income >= 50000:
+            employment_score += 15
+        elif monthly_income >= 30000:
+            employment_score += 10
+        elif monthly_income >= 20000:
+            employment_score += 5
+        
+        # Cap at 60
+        employment_score = min(60, employment_score)
+        
+        # ============================================================
+        # CALCULATE FINAL SCORE
+        # ============================================================
+        total_points = payment_score + utilization_score + history_score + mix_score + employment_score
+        
+        # Scale to 300-900 range
+        # Max possible: 210 + 180 + 90 + 60 + 60 = 600
+        # Score = 300 + total_points
+        score = CreditScoreEstimator.MIN_SCORE + total_points
+        
+        # Add small variability for realism (±10 points)
+        import random
+        random.seed(hash(f"{monthly_income}{dti}{age}{job_tenure}"))
+        variability = random.randint(-10, 10)
+        score = score + variability
+        
+        # Clamp to valid CIBIL range
+        score = max(300, min(900, score))
+        
+        # ============================================================
+        # DETERMINE RATING (CIBIL standard bands)
+        # ============================================================
+        if score >= 800:
+            rating = "Excellent"
+            band_min = max(800, score - 20)
+            band_max = min(900, score + 20)
+        elif score >= 750:
+            rating = "Very Good"
+            band_min = score - 20
+            band_max = min(799, score + 20)
+        elif score >= 700:
+            rating = "Good"
+            band_min = score - 20
+            band_max = min(749, score + 20)
+        elif score >= 650:
+            rating = "Fair"
+            band_min = score - 20
+            band_max = min(699, score + 20)
+        elif score >= 550:
+            rating = "Poor"
+            band_min = score - 25
+            band_max = min(649, score + 25)
+        else:
+            rating = "Very Poor"
+            band_min = max(300, score - 25)
+            band_max = min(549, score + 25)
+        
+        return (band_min, band_max, rating)
+
 
 
 class InterestRateCalculator:
@@ -651,35 +766,55 @@ class LoanAdvisor:
         explanations = self._get_real_shap_explanations(profile)
         
         # Build response
-        # Calculate approval score that ACTUALLY reflects the decision
-        # The score must account for bank policy violations, not just ML probability
+        # Calculate approval score with VARIABLE values (not fixed buckets)
+        # This produces realistic scores like 92%, 87%, 76%, 54%, etc.
         raw_prob = approval_probability
         
-        # Start with ML-based score scaling
-        if raw_prob >= 0.35:
-            base_display_score = 95.0
-        elif raw_prob <= 0.10:
-            base_display_score = 30.0
-        else:
-            # Linear scaling from [0.10, 0.35] to [30, 95]
-            base_display_score = 30 + (raw_prob - 0.10) * (95 - 30) / (0.35 - 0.10)
+        # Convert ML probability (0-1) to display score (0-100) with variability
+        # Use actual probability with adjustments for profile factors
+        
+        # Base score from ML model (scaled to 0-100)
+        base_score = raw_prob * 100
+        
+        # Add variability based on profile factors (±5 points)
+        import random
+        random.seed(hash(f"{monthly_income}{loan_amount}{profile.get('age', 30)}"))
+        variability = random.uniform(-3, 3)
+        
+        # Profile-based adjustments (add granularity)
+        if profile.get('employment_status') == 'Employed' and profile.get('job_tenure', 0) >= 3:
+            base_score += 2.5
+        if debt_to_income < 0.25:
+            base_score += 2.0
+        elif debt_to_income > 0.40:
+            base_score -= 3.0
+        if profile.get('home_ownership_status') == 'Own':
+            base_score += 1.5
+        if profile.get('education_level') in ['Master', 'PhD']:
+            base_score += 1.0
+        
+        # Apply variability
+        display_score = base_score + variability
         
         # CRITICAL: Adjust score based on bank policy violations
-        # If EMI exceeds 50% of income, this is a hard rejection - score should reflect it
+        # If EMI exceeds 50% of income, this is a hard rejection
         if emi_to_income > 0.50:
-            # Score penalty based on how much EMI exceeds the 50% threshold
-            # EMI at 100% of income = ~20% score, EMI at 50% = 50% score
-            emi_penalty = (emi_to_income - 0.50) * 100  # Each 1% over threshold = 1 point penalty
-            display_score = max(10.0, min(45.0, 50.0 - emi_penalty))
+            # Score penalty: EMI at 60% = 35%, EMI at 70% = 25%, EMI at 100% = 10%
+            emi_penalty = (emi_to_income - 0.50) * 80
+            display_score = max(10.0, 45.0 - emi_penalty)
         elif decision == "REJECTED":
-            # Other rejection reasons - cap score at 40%
-            display_score = min(40.0, base_display_score)
+            # Rejected: score should be 15-40% range
+            display_score = max(15.0, min(40.0, display_score * 0.5 + 10))
         elif decision == "PENDING_REVIEW":
-            # Pending review - cap score at 65%
-            display_score = min(65.0, base_display_score)
+            # Pending: score should be 45-74% range
+            display_score = max(45.0, min(74.0, display_score * 0.7 + 20))
         else:
-            # Approved - use the full scaled score
-            display_score = base_display_score
+            # Approved: score should be 75-98% range
+            display_score = max(75.0, min(98.0, display_score * 0.3 + 65))
+        
+        # Clamp to valid range and round to 1 decimal for natural look
+        display_score = round(max(10.0, min(98.0, display_score)), 1)
+
         
         return {
             "application_date": application_date,

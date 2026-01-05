@@ -2727,19 +2727,24 @@ async def get_loan_report(application_id: str, db: AsyncSession = Depends(databa
         emi_to_income = (pred.emi / monthly_income * 100) if monthly_income > 0 and pred.emi else 0
         debt_to_income = ((monthly_debt + (pred.emi or 0)) / monthly_income * 100) if monthly_income > 0 else 0
         
-        # Determine credit score rating from approval probability
-        if pred.approval_probability >= 75:
-            credit_rating = "Excellent"
-            credit_score = 780
-        elif pred.approval_probability >= 60:
-            credit_rating = "Good"
-            credit_score = 720
-        elif pred.approval_probability >= 40:
-            credit_rating = "Fair"
-            credit_score = 650
-        else:
-            credit_rating = "Poor"
-            credit_score = 550
+        # Calculate credit score using CIBIL-standard weighted factors
+        # This matches the CreditScoreEstimator in loan_advisor.py
+        from loan_advisor import CreditScoreEstimator
+        
+        # Build profile for credit score calculation
+        credit_profile = {
+            'monthly_income': monthly_income,
+            'debt_to_income_ratio': monthly_debt / monthly_income if monthly_income > 0 else 0.5,
+            'employment_status': application.employment_status or 'Employed',
+            'job_tenure': application.job_tenure or 2,
+            'experience': application.experience or 5,
+            'age': application.age or 30,
+            'home_ownership_status': application.home_ownership_status or 'Rent',
+            'education_level': application.education_level or 'Bachelor',
+        }
+        
+        credit_min, credit_max, credit_rating = CreditScoreEstimator.estimate(credit_profile)
+        credit_score = (credit_min + credit_max) // 2  # Use midpoint for display
         
         # Helper to safely get nested dicts if stored as such, or reconstruct
         analysis_result = {
@@ -2937,18 +2942,24 @@ async def get_shared_report(token: str, db: AsyncSession = Depends(database.get_
         emi_to_income = (pred.emi / monthly_income * 100) if monthly_income > 0 and pred.emi else 0
         debt_to_income = ((monthly_debt + (pred.emi or 0)) / monthly_income * 100) if monthly_income > 0 else 0
         
-        if pred.approval_probability >= 75:
-            credit_rating = "Excellent"
-            credit_score = 780
-        elif pred.approval_probability >= 60:
-            credit_rating = "Good"
-            credit_score = 720
-        elif pred.approval_probability >= 40:
-            credit_rating = "Fair"
-            credit_score = 650
-        else:
-            credit_rating = "Poor"
-            credit_score = 550
+        # Calculate credit score using CIBIL-standard weighted factors
+        # This matches the CreditScoreEstimator in loan_advisor.py
+        from loan_advisor import CreditScoreEstimator
+        
+        # Build profile for credit score calculation
+        credit_profile = {
+            'monthly_income': monthly_income,
+            'debt_to_income_ratio': monthly_debt / monthly_income if monthly_income > 0 else 0.5,
+            'employment_status': application.employment_status or 'Employed',
+            'job_tenure': application.job_tenure or 2,
+            'experience': application.experience or 5,
+            'age': application.age or 30,
+            'home_ownership_status': application.home_ownership_status or 'Rent',
+            'education_level': application.education_level or 'Bachelor',
+        }
+        
+        credit_min, credit_max, credit_rating = CreditScoreEstimator.estimate(credit_profile)
+        credit_score = (credit_min + credit_max) // 2  # Use midpoint for display
         
         analysis_result = {
             "decision": pred.decision,
