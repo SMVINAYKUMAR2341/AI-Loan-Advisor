@@ -188,14 +188,18 @@ class LoanPredictor:
         """Generate human-readable decision factors"""
         factors = []
         
-        # Credit Score
+        # Credit Score (CIBIL-standard thresholds)
         credit_score = loan_data.get('credit_score', 700)
-        if credit_score >= 750:
+        if credit_score >= 800:
             factors.append({"factor": "Credit Score", "impact": "positive", "description": f"Excellent credit score ({credit_score})"})
-        elif credit_score >= 650:
+        elif credit_score >= 750:
+            factors.append({"factor": "Credit Score", "impact": "positive", "description": f"Very good credit score ({credit_score})"})
+        elif credit_score >= 700:
             factors.append({"factor": "Credit Score", "impact": "positive", "description": f"Good credit score ({credit_score})"})
+        elif credit_score >= 650:
+            factors.append({"factor": "Credit Score", "impact": "neutral", "description": f"Fair credit score ({credit_score})"})
         else:
-            factors.append({"factor": "Credit Score", "impact": "negative", "description": f"Low credit score ({credit_score})"})
+            factors.append({"factor": "Credit Score", "impact": "negative", "description": f"Low credit score ({credit_score}) - consider improving before applying"})
         
         # Debt to Income
         dti = loan_data.get('debt_to_income_ratio', 0.3)
