@@ -19,11 +19,11 @@ import os
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 
-# Paths - Using XGBoost model from ml datasets ss folder
+# Paths - Using XGBoost model from PR_Dset folder (new dataset)
 BASE_DIR = os.path.dirname(__file__)
-ML_DATASETS_DIR = os.path.join(BASE_DIR, "ml datasets ss")
-MODEL_PATH = os.path.join(ML_DATASETS_DIR, "xgboost_best_model.joblib")
-DATASET_PATH = os.path.join(ML_DATASETS_DIR, "Loan_Eligibility_Data_4000_Dependents_0_2 for shap.csv")
+PR_DSET_DIR = os.path.join(BASE_DIR, "PR_Dset")
+MODEL_PATH = os.path.join(PR_DSET_DIR, "finalModel.json")
+DATASET_PATH = os.path.join(PR_DSET_DIR, "loan_dataS.csv")
 
 
 class CreditScoreEstimator:
@@ -49,7 +49,42 @@ class CreditScoreEstimator:
         """
         Returns: (min_score, max_score, rating)
         Based on CIBIL-weighted factors from available profile data.
+        If cibil_score is provided in profile, use it directly.
         """
+        
+        # Check if manual CIBIL score is provided
+        manual_score = profile.get('cibil_score')
+        if manual_score is not None and 300 <= manual_score <= 900:
+            # Use the manually entered CIBIL score directly
+            score = manual_score
+            
+            # Determine rating based on the manual score
+            if score >= 800:
+                rating = "Excellent"
+                band_min = max(800, score - 20)
+                band_max = min(900, score + 20)
+            elif score >= 750:
+                rating = "Very Good"
+                band_min = score - 20
+                band_max = min(799, score + 20)
+            elif score >= 700:
+                rating = "Good"
+                band_min = score - 20
+                band_max = min(749, score + 20)
+            elif score >= 650:
+                rating = "Fair"
+                band_min = score - 20
+                band_max = min(699, score + 20)
+            elif score >= 550:
+                rating = "Poor"
+                band_min = score - 25
+                band_max = min(649, score + 25)
+            else:
+                rating = "Very Poor"
+                band_min = max(300, score - 25)
+                band_max = min(549, score + 25)
+            
+            return (band_min, band_max, rating)
         
         # ============================================================
         # 1. PAYMENT HISTORY PROXY (35% weight = max 210 points)
@@ -618,38 +653,34 @@ class LoanAdvisor:
         self.explainer = SHAPExplainer()
     
     def _load_model(self):
-        """Load XGBoost model and build preprocessor"""
+        """Load XGBoost model and build preprocessor for new PR_Dset dataset"""
         try:
+            import xgboost as xgb
+            
             if os.path.exists(MODEL_PATH):
                 import warnings
                 warnings.filterwarnings('ignore')
-                self.model = joblib.load(MODEL_PATH)
-                self.feature_names = self.model.get_booster().feature_names
-                print(f"✔ XGBoost model loaded with {len(self.feature_names)} features")
+                self.model = xgb.XGBClassifier()
+                self.model.load_model(MODEL_PATH)
+                print(f"✔ XGBoost model loaded from {MODEL_PATH}")
             
             # Load reference dataset for preprocessing
             if os.path.exists(DATASET_PATH):
                 df = pd.read_csv(DATASET_PATH)
-                # Remove target and ID columns
-                target_cols = ["Loan Status (Target)", "Loan Status", "Loan_Status"]
-                df = df.drop(columns=[c for c in target_cols if c in df.columns], errors="ignore")
-                df = df.drop(columns=[c for c in df.columns if "id" in c.lower()], errors="ignore")
+                # Remove target column
+                df = df.drop(columns=["loan_status"], errors="ignore")
                 self.df_reference = df
                 
-                # Build preprocessor matching model features
-                cat_cols = df.select_dtypes(include="object").columns.tolist()
-                num_cols = df.select_dtypes(include=["int", "float"]).columns.tolist()
+                # New dataset columns (without target):
+                # person_age, person_education, person_income, person_emp_exp, 
+                # person_home_ownership, loan_amnt, loan_intent, loan_percent_income,
+                # cb_person_cred_hist_length, credit_score, previous_loan_defaults_on_file
                 
-                self.preprocessor = ColumnTransformer(
-                    transformers=[
-                        ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
-                        ("num", StandardScaler(), num_cols),
-                    ]
-                )
-                self.preprocessor.fit(df)
-                self.cat_cols = cat_cols
-                self.num_cols = num_cols
-                print(f"✔ Preprocessor built with {len(cat_cols)} categorical + {len(num_cols)} numerical features")
+                self.cat_cols = ['person_education', 'person_home_ownership', 'loan_intent', 'previous_loan_defaults_on_file']
+                self.num_cols = ['person_age', 'person_income', 'person_emp_exp', 'loan_amnt', 
+                                 'loan_percent_income', 'cb_person_cred_hist_length', 'credit_score']
+                
+                print(f"✔ Dataset loaded with {len(self.cat_cols)} categorical + {len(self.num_cols)} numerical features")
                 
                 # Try to load SHAP
                 try:
@@ -707,7 +738,8 @@ class LoanAdvisor:
             'number_of_dependents': user_input.get('number_of_dependents', 0),
             'home_ownership_status': user_input.get('home_ownership_status', 'Rent'),
             'property_area': user_input.get('property_area', 'Urban'),
-            'coapplicant_income': user_input.get('coapplicant_income', 0)
+            'coapplicant_income': user_input.get('coapplicant_income', 0),
+            'cibil_score': user_input.get('cibil_score'),  # Manual CIBIL score
         }
         
         # 2. Credit score estimation
@@ -861,151 +893,127 @@ class LoanAdvisor:
     def _predict(self, profile: Dict[str, Any]) -> float:
         """
         Get approval probability using the XGBoost model.
-        Maps user input to features matching the shap.py structure.
+        Maps user input to features matching the PR_Dset loan_dataS.csv structure.
+        
+        Model features (new dataset):
+        - person_age, person_education, person_income, person_emp_exp
+        - person_home_ownership, loan_amnt, loan_intent
+        - loan_percent_income, cb_person_cred_hist_length, credit_score
+        - previous_loan_defaults_on_file
+        
+        IMPORTANT: In this dataset, loan_status 0 = Approved, 1 = Rejected
+        So we return 1 - probability(class 1) as approval probability
         """
-        if self.model is None or self.preprocessor is None:
+        if self.model is None:
             return self._rule_based_score(profile)
         
         try:
-            # Map user input to model features (matching shap.py user_input structure)
-            # Model expects: Gender, Married, Dependents, Education, Employment Type,
-            # Applicant Income, Co-applicant Income, Loan Amount, Loan Amount Term,
-            # Credit History, Property Area
-            
-            # Map frontend values to dataset values
-            gender_map = {
-                'Male': 'Male', 'Female': 'Female', 'male': 'Male', 'female': 'Female'
-            }
-            married_map = {
-                'Married': 'Yes', 'Single': 'No', 'Divorced': 'No', 'Widowed': 'No',
-                'Yes': 'Yes', 'No': 'No'
-            }
+            # Map education levels to dataset format
             education_map = {
-                'Graduate': 'Graduate', 'Bachelor': 'Graduate', 'Master': 'Graduate',
-                'PhD': 'Graduate', 'Doctorate': 'Graduate',
-                'Not Graduate': 'Not Graduate', 'High School': 'Not Graduate',
-                'Associate': 'Not Graduate'
-            }
-            employment_map = {
-                'Employed': 'Salaried', 'Salaried': 'Salaried',
-                'Self-Employed': 'Self-Employed', 'Self Employed': 'Self-Employed',
-                'Unemployed': 'Self-Employed'  # Fallback
-            }
-            property_map = {
-                'Urban': 'Urban', 'Semi-Urban': 'Semiurban', 'Semi Urban': 'Semiurban',
-                'Semiurban': 'Semiurban', 'Rural': 'Rural'
+                'High School': 'HighSchool', 'HighSchool': 'HighSchool',
+                'Associate': 'Associate',
+                'Bachelor': 'Bachelor', 'Graduate': 'Bachelor',
+                'Master': 'Master',
+                'PhD': 'Doctorate', 'Doctorate': 'Doctorate'
             }
             
-            # Extract and map values
-            gender = gender_map.get(profile.get('gender', 'Male'), 'Male')
-            married = married_map.get(profile.get('marital_status', 'Single'), 'No')
-            dependents = int(profile.get('number_of_dependents', 0))
-            education = education_map.get(profile.get('education_level', 'Graduate'), 'Graduate')
-            employment = employment_map.get(profile.get('employment_status', 'Employed'), 'Salaried')
+            # Map home ownership to dataset format (uppercase)
+            home_map = {
+                'Rent': 'RENT', 'RENT': 'RENT',
+                'Own': 'OWN', 'OWN': 'OWN',
+                'Mortgage': 'MORTGAGE', 'MORTGAGE': 'MORTGAGE',
+                'Other': 'OTHER', 'OTHER': 'OTHER'
+            }
             
-            # Income: convert monthly to annual (dataset uses annual values)
-            monthly_income = profile.get('monthly_income', 0)
-            applicant_income = monthly_income  # Dataset uses monthly values in thousands
-            coapplicant_income = profile.get('coapplicant_income', 0)
+            # Map loan purpose to dataset format (uppercase)
+            intent_map = {
+                'Personal': 'PERSONAL', 'PERSONAL': 'PERSONAL',
+                'Education': 'EDUCATION', 'EDUCATION': 'EDUCATION',
+                'Medical': 'MEDICAL', 'MEDICAL': 'MEDICAL',
+                'Venture': 'VENTURE', 'VENTURE': 'VENTURE', 'Business': 'VENTURE',
+                'Home': 'HOMEIMPROVEMENT', 'HOMEIMPROVEMENT': 'HOMEIMPROVEMENT', 'Home Improvement': 'HOMEIMPROVEMENT',
+                'Debt Consolidation': 'DEBTCONSOLIDATION', 'DEBTCONSOLIDATION': 'DEBTCONSOLIDATION', 'Auto': 'PERSONAL'
+            }
             
-            # Loan: convert to thousands (dataset uses thousands)
-            loan_amount = profile.get('loan_amount', 0) / 1000
-            loan_term = profile.get('loan_duration', 60) * 6  # 60 months = 360 days term
+            # Extract values from profile
+            person_age = float(profile.get('age', 30))
+            person_education = education_map.get(profile.get('education_level', 'Bachelor'), 'Bachelor')
             
-            # Credit history: Calculate based on ACTUAL risk factors, not just employment
-            # This is critical for realistic decisions
-            credit_history = 1.0  # Start with good credit
+            # Income: frontend uses monthly, dataset uses annual
+            monthly_income = float(profile.get('monthly_income', 0))
+            person_income = monthly_income * 12  # Convert to annual
             
-            # Risk factor 1: Loan-to-Income ratio
-            annual_income = monthly_income * 12
-            lti_ratio = profile.get('loan_amount', 0) / annual_income if annual_income > 0 else 10
-            if lti_ratio > 5:
-                credit_history = 0.0  # Very risky - loan is 5x+ annual income
-            elif lti_ratio > 4:
-                credit_history = 0.3  # High risk
-            elif lti_ratio > 3:
-                credit_history = 0.6  # Moderate risk
+            person_emp_exp = int(profile.get('experience', 0))
+            person_home_ownership = home_map.get(profile.get('home_ownership_status', 'Rent'), 'RENT')
             
-            # Risk factor 2: Employment stability
-            job_tenure = profile.get('job_tenure', 0)
-            experience = profile.get('experience', 0)
-            if profile.get('employment_status') == 'Unemployed':
-                credit_history = 0.0  # No income source
-            elif profile.get('employment_status') == 'Self-Employed':
-                if job_tenure < 2 or experience < 2:
-                    credit_history = min(credit_history, 0.5)  # Self-employed with short tenure is risky
+            loan_amnt = float(profile.get('loan_amount', 0))
+            loan_intent = intent_map.get(profile.get('loan_purpose', 'Personal'), 'PERSONAL')
             
-            # Risk factor 3: Education + Experience mismatch
-            if profile.get('education_level') in ['High School', 'Not Graduate']:
-                if monthly_income > 50000:  # Unlikely scenario
-                    credit_history = min(credit_history, 0.7)
+            # Calculate loan_percent_income (loan amount / annual income)
+            loan_percent_income = loan_amnt / person_income if person_income > 0 else 1.0
             
-            property_area = property_map.get(profile.get('property_area', 'Urban'), 'Urban')
+            # Credit history length: derive from experience/age if not provided
+            cb_person_cred_hist_length = max(2.0, min(person_age - 18, person_emp_exp + 2))
             
-            # Build user input matching shap.py structure
+            # Credit score: use manual entry if provided
+            credit_score = int(profile.get('cibil_score', 650))
+            
+            # Previous loan defaults: default to "No"
+            previous_loan_defaults = profile.get('previous_loan_defaults', 'No')
+            
+            # Build input matching model's expected format
             user_input = {
-                "Gender": gender,
-                "Married": married,
-                "Dependents": dependents,
-                "Education": education,
-                "Employment Type": employment,
-                "Applicant Income": applicant_income,
-                "Co-applicant Income": coapplicant_income,
-                "Loan Amount": loan_amount,
-                "Loan Amount Term": loan_term,
-                "Credit History": credit_history,
-                "Property Area": property_area
+                'person_age': person_age,
+                'person_education': person_education,
+                'person_income': person_income,
+                'person_emp_exp': person_emp_exp,
+                'person_home_ownership': person_home_ownership,
+                'loan_amnt': loan_amnt,
+                'loan_intent': loan_intent,
+                'loan_percent_income': loan_percent_income,
+                'cb_person_cred_hist_length': cb_person_cred_hist_length,
+                'credit_score': credit_score,
+                'previous_loan_defaults_on_file': previous_loan_defaults
             }
             
+            # Create DataFrame with correct column order matching training
             user_df = pd.DataFrame([user_input])
             
-            # Align with reference dataset columns
-            for col in self.df_reference.columns:
-                if col not in user_df.columns:
-                    user_df[col] = self.df_reference[col].mode()[0]
-            user_df = user_df[self.df_reference.columns]
-            
-            # Preprocess
-            user_pre_full = self.preprocessor.transform(user_df)
-            
-            # Get feature names from preprocessor
-            ohe = self.preprocessor.named_transformers_["cat"]
-            encoded_cat_names = ohe.get_feature_names_out(self.cat_cols)
-            generated_features = list(encoded_cat_names) + self.num_cols
-            
-            # Convert to DataFrame
-            user_pre_df = pd.DataFrame(
-                user_pre_full.toarray() if hasattr(user_pre_full, "toarray") else user_pre_full,
-                columns=generated_features
-            )
-            
-            # Align to model's expected feature order
-            user_pre_final = user_pre_df.reindex(columns=self.feature_names, fill_value=0)
+            # Convert categorical columns to category dtype (as done in training)
+            cat_cols_indices = [1, 4, 6, 10]  # person_education, person_home_ownership, loan_intent, previous_loan_defaults
+            cols = list(user_df.columns)
+            for idx in cat_cols_indices:
+                if idx < len(cols):
+                    user_df[cols[idx]] = user_df[cols[idx]].astype('category')
             
             # Store for SHAP analysis
-            self._last_processed_input = user_pre_final
             self._last_raw_input = user_input
             
             # Get prediction probability
-            proba = self.model.predict_proba(user_pre_final)[0][1]
-            prediction = self.model.predict(user_pre_final)[0]
+            proba = self.model.predict_proba(user_df)[0]
+            prediction = self.model.predict(user_df)[0]
+            
+            # IMPORTANT: In this dataset, 0 = Approved, 1 = Rejected
+            # proba[0] = probability of class 0 (Approved)
+            # proba[1] = probability of class 1 (Rejected)
+            approval_probability = float(proba[0])  # Probability of approval (class 0)
             
             # ==== DETAILED ML LOGGING ====
             print("\n" + "="*70)
-            print("🤖 XGBOOST ML PREDICTION LOG")
+            print("🤖 XGBOOST ML PREDICTION LOG (PR_Dset Model)")
             print("="*70)
-            print(f"📊 Model: XGBoost Classifier from 'ml datasets ss' folder")
-            print(f"📈 Features used: {len(self.feature_names)}")
+            print(f"📊 Model: XGBoost from PR_Dset/finalModel.json")
             print(f"\n🔢 INPUT FEATURES:")
             for key, val in user_input.items():
                 print(f"   • {key}: {val}")
             print(f"\n🎯 RAW ML OUTPUT:")
-            print(f"   • Prediction: {'APPROVED (1)' if prediction == 1 else 'REJECTED (0)'}")
-            print(f"   • Probability of Approval: {proba*100:.2f}%")
-            print(f"   • Probability of Rejection: {(1-proba)*100:.2f}%")
+            print(f"   • Raw Prediction Class: {prediction} (0=Approved, 1=Rejected)")
+            print(f"   • Probability of Approval (Class 0): {proba[0]*100:.2f}%")
+            print(f"   • Probability of Rejection (Class 1): {proba[1]*100:.2f}%")
+            print(f"   • Using Approval Probability: {approval_probability*100:.2f}%")
             print("="*70 + "\n")
             
-            return float(proba)
+            return approval_probability
             
         except Exception as e:
             print(f"XGBoost Prediction error: {e}")

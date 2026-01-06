@@ -26,7 +26,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, RadialBarChart, RadialBar, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart, Line, CartesianGrid, ReferenceLine } from 'recharts';
 
 // Section Types
-type SectionKey = "home" | "loans" | "apply" | "credit" | "repayments" | "documents" | "security" | "activity" | "support";
+type SectionKey = "home" | "loans" | "apply" | "repayments" | "documents" | "security" | "activity" | "support";
 
 interface NavItem {
     key: SectionKey;
@@ -39,7 +39,6 @@ const navItems: NavItem[] = [
     { key: "home", label: "Home", icon: Home, description: "Dashboard overview" },
     { key: "loans", label: "My Loans", icon: Wallet, description: "View your loans" },
     { key: "apply", label: "Apply for Loan", icon: FileText, description: "New loan application" },
-    { key: "credit", label: "Credit Score & Eligibility", icon: TrendingUp, description: "Check your score" },
     { key: "repayments", label: "Repayments & EMIs", icon: CreditCard, description: "Payment schedule" },
     { key: "documents", label: "Documents", icon: FolderOpen, description: "Upload & manage" },
     { key: "security", label: "Security & Settings", icon: Shield, description: "Profile & security" },
@@ -101,14 +100,16 @@ export default function Dashboard() {
         monthly_debt_payments: '',
         loan_amount: '',
         loan_duration: 60,
-        loan_purpose: 'Personal',
+        loan_purpose: 'PERSONAL',
         marital_status: 'Single',
         number_of_dependents: 0,
         home_ownership_status: 'Rent',
         property_area: 'Urban',
         coapplicant_income: '',
         coapplicant_employment: '',
-        coapplicant_relationship: ''
+        coapplicant_relationship: '',
+        cibil_score: '',
+        previous_loan_defaults: 'No'
     });
 
     interface LoanAdvisorResult {
@@ -789,7 +790,7 @@ export default function Dashboard() {
         const numericFields = [
             'age', 'experience', 'job_tenure', 'monthly_income',
             'monthly_debt_payments', 'loan_amount', 'number_of_dependents',
-            'coapplicant_income'
+            'coapplicant_income', 'cibil_score'
         ];
 
         if (numericFields.includes(field)) {
@@ -819,6 +820,15 @@ export default function Dashboard() {
         }
         if (!loanFormData.loan_amount || parseFloat(loanFormData.loan_amount) <= 0) {
             setFormError('Please enter the loan amount');
+            return;
+        }
+        if (!loanFormData.cibil_score) {
+            setFormError('Please enter your CIBIL score');
+            return;
+        }
+        const cibilScore = parseInt(loanFormData.cibil_score);
+        if (isNaN(cibilScore) || cibilScore < 300 || cibilScore > 900) {
+            setFormError('CIBIL score must be between 300 and 900');
             return;
         }
 
@@ -855,7 +865,9 @@ export default function Dashboard() {
                     property_area: loanFormData.property_area,
                     coapplicant_income: parseFloat(loanFormData.coapplicant_income) || 0,
                     coapplicant_employment: loanFormData.coapplicant_employment || null,
-                    coapplicant_relationship: loanFormData.coapplicant_relationship || null
+                    coapplicant_relationship: loanFormData.coapplicant_relationship || null,
+                    cibil_score: loanFormData.cibil_score ? parseInt(loanFormData.cibil_score) : null,
+                    previous_loan_defaults: loanFormData.previous_loan_defaults
                 })
             });
 
@@ -1082,23 +1094,21 @@ export default function Dashboard() {
                                     <thead>
                                         <tr className="border-b border-gray-700">
                                             <th className="py-2 text-gray-400 font-medium">Factor</th>
-                                            <th className="py-2 text-gray-400 font-medium text-center">Real Weight</th>
-                                            <th className="py-2 text-gray-400 font-medium text-center">Our AI Weight</th>
+                                            <th className="py-2 text-gray-400 font-medium text-center">Weight</th>
                                             <th className="py-2 text-gray-400 font-medium">Real Bank Source (SBI/RBI)</th>
                                             <th className="py-2 text-gray-400 font-medium">Our AI Data Source (Proxy)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {[
-                                            { factor: 'Payment History', cibil: '35%', ours: '35%', realSource: 'Past bank repayment records', source: 'Job tenure + Experience', icon: 'check' },
-                                            { factor: 'Credit Utilization', cibil: '30%', ours: '30%', realSource: 'Credit card usage vs limits', source: 'Debt-to-Income ratio', icon: 'check' },
-                                            { factor: 'Credit History Length', cibil: '15%', ours: '15%', realSource: 'Years since first loan/card', source: 'Age + Experience', icon: 'check' },
-                                            { factor: 'Credit Mix', cibil: '10%', ours: '10%', realSource: 'Balanced secured/unsecured loans', source: 'Home ownership + Education', icon: 'check' },
-                                            { factor: 'New Credit Inquiries', cibil: '10%', ours: '10%', realSource: 'Recent hard credit inquiries', source: 'Employment type + Income', icon: 'warn' },
+                                            { factor: 'Payment History', weight: '35%', realSource: 'Past bank repayment records', source: 'Job tenure + Experience', icon: 'check' },
+                                            { factor: 'Credit Utilization', weight: '30%', realSource: 'Credit card usage vs limits', source: 'Debt-to-Income ratio', icon: 'check' },
+                                            { factor: 'Credit History Length', weight: '15%', realSource: 'Years since first loan/card', source: 'Age + Experience', icon: 'check' },
+                                            { factor: 'Credit Mix', weight: '10%', realSource: 'Balanced secured/unsecured loans', source: 'Home ownership + Education', icon: 'check' },
+                                            { factor: 'New Credit Inquiries', weight: '10%', realSource: 'Recent hard credit inquiries', source: 'Employment type + Income', icon: 'warn' },
                                         ].map((row, i) => (
                                             <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                                                 <td className="py-3 text-cyan-400 font-medium">{row.factor}</td>
-                                                <td className="py-3 text-gray-500 text-center">{row.cibil}</td>
                                                 <td className="py-3 text-center">
                                                     <div className="flex items-center justify-center gap-2">
                                                         {row.icon === 'check' ? (
@@ -1106,7 +1116,7 @@ export default function Dashboard() {
                                                         ) : (
                                                             <AlertTriangle className="w-3 h-3 text-amber-500" />
                                                         )}
-                                                        <span className={row.icon === 'check' ? 'text-green-500' : 'text-amber-500'}>{row.ours}</span>
+                                                        <span className={row.icon === 'check' ? 'text-green-500' : 'text-amber-500'}>{row.weight}</span>
                                                     </div>
                                                 </td>
                                                 <td className="py-3 text-gray-500">{row.realSource}</td>
@@ -1865,7 +1875,7 @@ export default function Dashboard() {
                         <h4 className="text-white font-medium mb-4 flex items-center gap-2">
                             <IndianRupee className="w-4 h-4" /> Financial Details
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-gray-300 mb-2 text-sm">Monthly Income (₹) *</label>
                                 <div className="relative">
@@ -1897,6 +1907,24 @@ export default function Dashboard() {
                                         className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
                                     />
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-2 text-sm">CIBIL Score *</label>
+                                <div className="relative">
+                                    <TrendingUp className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="number"
+                                        min="300"
+                                        max="900"
+                                        value={loanFormData.cibil_score}
+                                        onChange={(e) => handleLoanFormChange('cibil_score', e.target.value)}
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        placeholder="e.g., 750 (300-900)"
+                                        style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Enter your CIBIL score (300-900)</p>
                             </div>
                         </div>
                     </div>
@@ -1949,11 +1977,24 @@ export default function Dashboard() {
                                     style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
                                     className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
                                 >
-                                    <option value="Personal">Personal</option>
-                                    <option value="Home">Home</option>
-                                    <option value="Auto">Auto</option>
-                                    <option value="Education">Education</option>
-                                    <option value="Business">Business</option>
+                                    <option value="PERSONAL">Personal</option>
+                                    <option value="EDUCATION">Education</option>
+                                    <option value="MEDICAL">Medical</option>
+                                    <option value="VENTURE">Business / Venture</option>
+                                    <option value="HOMEIMPROVEMENT">Home Improvement</option>
+                                    <option value="DEBTCONSOLIDATION">Debt Consolidation</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-2 text-sm">Previous Loan Defaults?</label>
+                                <select
+                                    value={loanFormData.previous_loan_defaults}
+                                    onChange={(e) => handleLoanFormChange('previous_loan_defaults', e.target.value)}
+                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
+                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
+                                >
+                                    <option value="No">No - Never Defaulted</option>
+                                    <option value="Yes">Yes - Has Previous Defaults</option>
                                 </select>
                             </div>
                         </div>
@@ -2064,7 +2105,7 @@ export default function Dashboard() {
                     <div className="p-4 bg-gray-800 border-2 border-teal-500 rounded-xl mb-6">
                         <p className="text-teal-400 text-sm font-medium mb-1">✓ We Automatically Calculate</p>
                         <p className="text-gray-400 text-xs">
-                            Annual Income, Debt-to-Income Ratio, Credit Score Estimate, Risk Score - You don't need to provide these!
+                            Annual Income, Debt-to-Income Ratio, Risk Score - You don't need to provide these!
                         </p>
                     </div>
 
@@ -2389,241 +2430,7 @@ export default function Dashboard() {
         );
     };
 
-    // CREDIT SCORE SECTION
-    const renderCreditSection = () => (
-        <div className="space-y-6">
-            <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
-                <h3 className="text-xl font-semibold text-white mb-6">Credit Score & Eligibility</h3>
-                <div className="flex flex-col md:flex-row items-center gap-8">
-                    <div className="relative w-40 h-40">
-                        <svg className="w-40 h-40 transform -rotate-90">
-                            <circle cx="80" cy="80" r="70" stroke="#374151" strokeWidth="12" fill="none" />
-                            <circle
-                                cx="80" cy="80" r="70"
-                                stroke="url(#creditGradient)"
-                                strokeWidth="12"
-                                fill="none"
-                                strokeLinecap="round"
-                                strokeDasharray={`${(mockDashboardData.creditScore.score / mockDashboardData.creditScore.maxScore) * 440} 440`}
-                            />
-                            <defs>
-                                <linearGradient id="creditGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stopColor="#14b8a6" />
-                                    <stop offset="100%" stopColor="#22d3ee" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-4xl font-bold text-white">{mockDashboardData.creditScore.score}</span>
-                            <span className="text-sm text-gray-400">out of {mockDashboardData.creditScore.maxScore}</span>
-                        </div>
-                    </div>
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="px-4 py-2 bg-green-500/20 text-green-400 rounded-full font-semibold">
-                                {mockDashboardData.creditScore.rating}
-                            </span>
-                            <ArrowUpRight className="w-5 h-5 text-green-400" />
-                            <span className="text-green-400 text-sm">+12 from last month</span>
-                        </div>
-                        <p className="text-gray-300 mb-4">
-                            Your credit score is in excellent standing. You're eligible for premium loan products with competitive interest rates.
-                        </p>
-                        <p className="text-gray-500 text-sm">Last updated: {mockDashboardData.creditScore.lastUpdated}</p>
-                    </div>
-                </div>
-            </div>
 
-            {/* CIBIL Score Comparison Section - Enhanced Methodology */}
-            <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl border border-cyan-500/30">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
-                        <TrendingUp className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                        <h4 className="text-lg font-semibold text-white">Real CIBIL vs Our AI Score</h4>
-                        <p className="text-gray-400 text-sm">Detailed data source and methodology comparison</p>
-                    </div>
-                </div>
-
-                {/* Table 1: Factor Weights Comparison (Mockup Style) */}
-                <div className="mb-8">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-5 h-5 bg-blue-500/20 rounded flex items-center justify-center">
-                            <Activity className="w-3 h-3 text-blue-400" />
-                        </div>
-                        <h5 className="text-white text-sm font-semibold">Factor Weights Comparison</h5>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead>
-                                <tr className="border-b border-gray-700">
-                                    <th className="py-2 text-gray-400 font-medium">Factor</th>
-                                    <th className="py-2 text-gray-400 font-medium text-center">Real Weight</th>
-                                    <th className="py-2 text-gray-400 font-medium text-center">Our AI Weight</th>
-                                    <th className="py-2 text-gray-400 font-medium">Real Bank Source (SBI/RBI)</th>
-                                    <th className="py-2 text-gray-400 font-medium">Our AI Data Source (Proxy)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[
-                                    { factor: 'Payment History', cibil: '35%', ours: '35%', realSource: 'Past bank repayment records', source: 'Job tenure + Experience', icon: 'check' },
-                                    { factor: 'Credit Utilization', cibil: '30%', ours: '30%', realSource: 'Credit card usage vs limits', source: 'Debt-to-Income ratio', icon: 'check' },
-                                    { factor: 'Credit History Length', cibil: '15%', ours: '15%', realSource: 'Years since first loan/card', source: 'Age + Experience', icon: 'check' },
-                                    { factor: 'Credit Mix', cibil: '10%', ours: '10%', realSource: 'Balanced secured/unsecured loans', source: 'Home ownership + Education', icon: 'check' },
-                                    { factor: 'New Credit Inquiries', cibil: '10%', ours: '10%', realSource: 'Recent hard credit inquiries', source: 'Employment type + Income', icon: 'warn' },
-                                ].map((row, i) => (
-                                    <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                                        <td className="py-3 text-cyan-400 font-medium">{row.factor}</td>
-                                        <td className="py-3 text-gray-500 text-center">{row.cibil}</td>
-                                        <td className="py-3 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                {row.icon === 'check' ? (
-                                                    <CheckCircle className="w-3 h-3 text-green-500" />
-                                                ) : (
-                                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                                )}
-                                                <span className={row.icon === 'check' ? 'text-green-500' : 'text-amber-500'}>{row.ours}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 text-gray-500">{row.realSource}</td>
-                                        <td className="py-3 text-gray-400">{row.source}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    {/* Table 2: What Real CIBIL Has (That You Don't) */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-5 h-5 bg-purple-500/20 rounded flex items-center justify-center">
-                                <Search className="w-3 h-3 text-purple-400" />
-                            </div>
-                            <h5 className="text-white text-sm font-semibold">Data Gap: Real CIBIL vs Our AI</h5>
-                        </div>
-                        <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700/50">
-                            <table className="w-full text-left text-xs">
-                                <thead className="bg-gray-800/50">
-                                    <tr>
-                                        <th className="p-3 text-gray-400 font-medium">Real CIBIL Data</th>
-                                        <th className="p-3 text-gray-400 font-medium">Our AI Proxy</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[
-                                        { real: 'Actual loan repayment history', alt: 'Simulated from job stability', status: 'warn' },
-                                        { real: 'Credit card usage %', alt: 'DTI ratio as proxy', status: 'warn' },
-                                        { real: 'Number of active loans', alt: 'Not collected', status: 'fail' },
-                                        { real: 'Loan defaults/write-offs', alt: 'Not collected', status: 'fail' },
-                                        { real: 'Bankruptcy records', alt: 'Not collected', status: 'fail' },
-                                        { real: 'Number of credit inquiries', alt: 'Not collected', status: 'fail' },
-                                    ].map((row, i) => (
-                                        <tr key={i} className="border-b border-gray-800 last:border-0">
-                                            <td className="p-3 text-gray-500">{row.real}</td>
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-2">
-                                                    {row.status === 'warn' ? (
-                                                        <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                                    ) : (
-                                                        <X className="w-3 h-3 text-red-500" />
-                                                    )}
-                                                    <span className={row.status === 'warn' ? 'text-amber-500' : 'text-red-400'}>{row.alt}</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Table 3: What Matches Real Banks */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-5 h-5 bg-green-500/20 rounded flex items-center justify-center">
-                                <CheckCircle className="w-3 h-3 text-green-400" />
-                            </div>
-                            <h5 className="text-white text-sm font-semibold">What Matches Real Banks</h5>
-                        </div>
-                        <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700/50">
-                            <table className="w-full text-left text-xs">
-                                <thead className="bg-gray-800/50">
-                                    <tr>
-                                        <th className="p-3 text-gray-400 font-medium">Feature</th>
-                                        <th className="p-3 text-gray-400 font-medium">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[
-                                        { feat: 'Score range 300-900', status: 'Identical' },
-                                        { feat: '5 weighted factors', status: 'Identical weights' },
-                                        { feat: 'Rating bands (6 levels)', status: 'Identical' },
-                                        { feat: 'Interest rate tied to score', status: 'RBI-compliant rates' },
-                                        { feat: 'EMI calculation formula', status: 'Standard banking formula' },
-                                    ].map((row, i) => (
-                                        <tr key={i} className="border-b border-gray-800 last:border-0">
-                                            <td className="p-3 text-gray-500">{row.feat}</td>
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-2 text-green-500">
-                                                    <CheckSquare className="w-3 h-3" />
-                                                    <span>{row.status}</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Score Range & Band Legend */}
-                <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
-                    <p className="text-cyan-400 text-sm font-medium mb-3 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
-                        Score Range & Ratings (AI-Estimated)
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {[
-                            { rating: 'Excellent', range: '800-900', color: 'from-green-500 to-emerald-400', active: mockDashboardData.creditScore.score >= 800 },
-                            { rating: 'Very Good', range: '750-799', color: 'from-teal-500 to-cyan-400', active: mockDashboardData.creditScore.score >= 750 && mockDashboardData.creditScore.score < 800 },
-                            { rating: 'Good', range: '700-749', color: 'from-blue-500 to-blue-400', active: mockDashboardData.creditScore.score >= 700 && mockDashboardData.creditScore.score < 750 },
-                            { rating: 'Fair', range: '650-699', color: 'from-yellow-500 to-amber-400', active: mockDashboardData.creditScore.score >= 650 && mockDashboardData.creditScore.score < 700 },
-                            { rating: 'Poor', range: '550-649', color: 'from-orange-500 to-orange-400', active: mockDashboardData.creditScore.score >= 550 && mockDashboardData.creditScore.score < 650 },
-                            { rating: 'Very Poor', range: '300-549', color: 'from-red-500 to-red-400', active: mockDashboardData.creditScore.score < 550 },
-                        ].map((item, idx) => (
-                            <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg ${item.active ? 'bg-cyan-500/20 border border-cyan-500/50' : 'bg-gray-700/30'}`}>
-                                <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${item.color}`}></div>
-                                <div className="flex-1">
-                                    <div className={`text-xs font-medium ${item.active ? 'text-white' : 'text-gray-400'}`}>{item.rating}</div>
-                                    <div className={`text-[10px] font-mono ${item.active ? 'text-cyan-400' : 'text-gray-500'}`}>{item.range}</div>
-                                </div>
-                                {item.active && <span className="text-cyan-400 text-[10px]">You</span>}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Disclaimer */}
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                            <p className="text-amber-300 font-medium text-sm">Mandatory Disclaimer</p>
-                            <p className="text-gray-400 text-xs mt-1">
-                                This credit score is a mathematical simulation using CIBIL-standard weights applied to your reported income, debt and stability metrics.
-                                Real CIBIL scores require access to your PAN-linked bank records from the past 3-10 years which we do not collect.
-                                For your official credit report, please visit <a href="https://www.cibil.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">www.cibil.com</a>.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 
     // PAYMENT GATEWAY HANDLERS
     const handlePayNow = () => {
@@ -3594,7 +3401,6 @@ export default function Dashboard() {
             case "home": return renderHomeSection();
             case "loans": return renderLoansSection();
             case "apply": return renderApplySection();
-            case "credit": return renderCreditSection();
             case "repayments": return renderRepaymentsSection();
             case "documents": return renderDocumentsSection();
             case "security": return renderSecuritySection();

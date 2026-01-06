@@ -660,6 +660,8 @@ async def submit_loan_application(
             'home_ownership_status': application.home_ownership_status,
             'property_area': application.property_area,
             'coapplicant_income': application.coapplicant_income,
+            'cibil_score': application.cibil_score,  # Manual CIBIL score entry
+            'previous_loan_defaults': application.previous_loan_defaults,  # Yes/No
         }
         
         # 1. Store ML input features (loan_applications table)

@@ -147,12 +147,14 @@ class LoanApplicationCreate(BaseModel):
     monthly_debt_payments: float = Field(..., ge=0)
     loan_amount: float = Field(..., gt=0)
     loan_duration: int = Field(..., ge=6, le=360)  # 6 months to 30 years
-    loan_purpose: str  # Home, Auto, Education, Business, Personal
+    loan_purpose: str  # PERSONAL, EDUCATION, MEDICAL, VENTURE, HOMEIMPROVEMENT, DEBTCONSOLIDATION
     marital_status: str  # Single, Married, Divorced, Widowed
     number_of_dependents: int = Field(..., ge=0)
     home_ownership_status: str  # Own, Rent, Mortgage, Other
     property_area: str = "Urban"  # Urban, Semi-Urban, Rural
     coapplicant_income: float = 0
+    cibil_score: int = Field(..., ge=300, le=900)  # Mandatory CIBIL score entry
+    previous_loan_defaults: str = "No"  # Yes/No - Whether applicant has previous loan defaults
 
 
 class LoanApplicationResponse(BaseModel):

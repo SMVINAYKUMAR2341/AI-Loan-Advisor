@@ -1,0 +1,74 @@
+
+
+
+
+RangeIndex: 45000 entries, 0 to 44999
+Data columns (total 14 columns):
+ #   Column                          Non-Null Count  Dtype
+---  ------                          --------------  -----
+ 0   person_age                      45000 non-null  float64
+ 1   person_gender                   45000 non-null  object
+ 2   person_education                45000 non-null  object
+ 3   person_income                   45000 non-null  float64
+ 4   person_emp_exp                  45000 non-null  int64
+ 5   person_home_ownership           45000 non-null  object
+ 6   loan_amnt                       45000 non-null  float64
+ 7   loan_intent                     45000 non-null  object
+ 8   loan_int_rate                   45000 non-null  float64
+ 9   loan_percent_income             45000 non-null  float64
+ 10  cb_person_cred_hist_length      45000 non-null  float64
+ 11  credit_score                    45000 non-null  int64
+ 12  previous_loan_defaults_on_file  45000 non-null  object
+ 13  loan_status                     45000 non-null  int64
+dtypes: float64(6), int64(3), object(5)
+memory usage: 4.8+ MB
+None
+
+
+
+
+
+------------------------------ person_home_ownership---------------------------
+
+        person_age  person_gender  person_education  ...  credit_score  previous_loan_defaults_on_file  loan_status
+person_home_ownership                                               ...
+MORTGAGE                    18489          18489             18489  ...         18489                           18489        18489
+OTHER                         117            117               117  ...           117                             117          117
+OWN                          2951           2951              2951  ...          2951                            2951         2951
+RENT                        23443          23443             23443  ...         23443                           23443        23443
+
+[4 rows x 13 columns] 
+
+-------------------------------loan_status--------------------------------------
+
+             person_age  person_gender  person_education  ...  cb_person_cred_hist_length  credit_score  previous_loan_defaults_on_file
+loan_status                                               ...
+0                 35000          35000             35000  ...                       35000         35000                           35000
+1                 10000          10000             10000  ...                       10000         10000                           10000
+
+[2 rows x 13 columns] 
+
+-------------------------------loan_intent-------------------------------------
+
+                   person_age  person_gender  person_education  ...  credit_score  previous_loan_defaults_on_file  loan_status
+loan_intent                                                     ...
+DEBTCONSOLIDATION        7145           7145              7145  ...          7145                            7145         7145
+EDUCATION                9153           9153              9153  ...          9153                            9153         9153
+HOMEIMPROVEMENT          4783           4783              4783  ...          4783                            4783         4783
+MEDICAL                  8548           8548              8548  ...          8548                            8548         8548
+PERSONAL                 7552           7552              7552  ...          7552                            7552         7552
+VENTURE                  7819           7819              7819  ...          7819                            7819         7819
+
+[6 rows x 13 columns]
+
+-------------------------------person_education-------------------------------
+
+                  person_age  person_gender  person_income  ...  credit_score  previous_loan_defaults_on_file  loan_status
+person_education                                            ...
+Associate              12028          12028          12028  ...         12028                           12028        12028
+Bachelor               13399          13399          13399  ...         13399                           13399        13399
+Doctorate                621            621            621  ...           621                             621          621
+High School            11972          11972          11972  ...         11972                           11972        11972
+Master                  6980           6980           6980  ...          6980                            6980         6980
+
+[5 rows x 13 columns]
