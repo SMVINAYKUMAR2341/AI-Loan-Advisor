@@ -164,8 +164,9 @@ def evaluate(model, X_test, y_test):
     print(f"\nTest Accuracy: {accuracy * 100:.2f}%")
     print(f"Test ROC-AUC: {auc:.4f}")
     
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, target_names=['Rejected', 'Approved']))
+    print("\nDetailed Classification Report:")
+    # In this dataset: 0 = Approved, 1 = Rejected
+    print(classification_report(y_test, y_pred, target_names=['Approved', 'Rejected']))
     
     # Confusion matrix
     cm = confusion_matrix(y_test, y_pred)
