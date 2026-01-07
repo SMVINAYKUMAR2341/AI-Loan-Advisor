@@ -5,6 +5,8 @@ import os
 class MockApplication:
     def __init__(self):
         self.id = 12345
+        self.first_name = "Rahul"
+        self.last_name = "Sharma"
         self.full_name = "Rahul Sharma"
         self.customer_id = "CID-88992211"
         self.date_of_birth = datetime(1990, 5, 15)

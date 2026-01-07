@@ -1368,12 +1368,12 @@ class RBICompliantLoanReport(FPDF):
         self.set_text_color(30, 30, 30)
         self.cell(40, 6, 'Borrower:', 0, 0)
         self.set_font('Arial', '', 9)
-        self.cell(0, 6, f"{application.user.first_name} {application.user.last_name or ''}", 0, 1)
+        self.cell(0, 6, f"{getattr(application, 'first_name', 'Valued')} {getattr(application, 'last_name', 'Customer')}", 0, 1)
         
         self.set_font('Arial', 'B', 9)
         self.cell(40, 6, 'Customer ID:', 0, 0)
         self.set_font('Arial', '', 9)
-        self.cell(0, 6, f"{application.user.customer_id or 'CID-'+str(hash(str(application.user_id))%1000000)}", 0, 1)
+        self.cell(0, 6, f"{getattr(application, 'customer_id', 'CID-PENDING')}", 0, 1)
         
         self.set_font('Arial', 'B', 9)
         self.cell(40, 6, 'Platform/Lender:', 0, 0)
@@ -1439,7 +1439,7 @@ class RBICompliantLoanReport(FPDF):
         self.set_font('Arial', 'I', 8)
         self.set_text_color(100, 100, 100)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.cell(75, 5, f'Name: {application.user.first_name} {application.user.last_name or ""}', 0, 0, 'L')
+        self.cell(75, 5, f"Name: {getattr(application, 'first_name', 'Valued')} {getattr(application, 'last_name', 'Customer')}", 0, 0, 'L')
         self.cell(30, 5, '', 0, 0)
         self.cell(75, 5, 'DigiSign: SYSTEM_AUTH_V1', 0, 1, 'L')
         
@@ -1513,7 +1513,7 @@ def generate_loan_report_pdf(application, analysis_result):
     pdf.set_font('Arial', 'I', 9)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 5, 'This is a digitally generated document. No physical signature required.', 0, 1, 'C')
-    pdf.cell(0, 5, f'Document Hash: SHA256-{hash(str(application.id))%10000000000:010d}', 0, 1, 'C')
+    pdf.cell(0, 5, f'Document Hash: SHA256-{abs(hash(str(application.id)))%10000000000:010d}', 0, 1, 'C')
     pdf.cell(0, 5, 'Verify authenticity at: https://verify.secureidentityhub.com', 0, 1, 'C')
     
     return pdf.output()

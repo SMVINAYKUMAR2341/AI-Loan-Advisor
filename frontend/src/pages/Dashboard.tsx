@@ -1095,7 +1095,7 @@ export default function Dashboard() {
                                         <tr className="border-b border-gray-700">
                                             <th className="py-2 text-gray-400 font-medium">Factor</th>
                                             <th className="py-2 text-gray-400 font-medium text-center">Weight</th>
-                                            <th className="py-2 text-gray-400 font-medium">Real Bank Source (SBI/RBI)</th>
+                                            <th className="py-2 text-gray-400 font-medium">Real Bank Source (RBI)</th>
                                             <th className="py-2 text-gray-400 font-medium">Our AI Data Source (Proxy)</th>
                                         </tr>
                                     </thead>
@@ -1628,7 +1628,7 @@ export default function Dashboard() {
                                 </li>
                             ))}
                         </ul>
-                        {advisorResult.kyc_required && advisorResult.decision === 'APPROVED' && advisorResult.application_id && (
+                        {advisorResult.kyc_required && (advisorResult.decision === 'APPROVED' || advisorResult.decision === 'PENDING_REVIEW') && advisorResult.application_id && (
                             <div className="mt-4">
                                 <button
                                     onClick={() => {
@@ -2311,7 +2311,7 @@ export default function Dashboard() {
                                     value={bankForm.ifsc_code}
                                     onChange={(e) => setBankForm({ ...bankForm, ifsc_code: e.target.value.toUpperCase() })}
                                     className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white"
-                                    placeholder="e.g., SBIN0001234"
+                                    placeholder="e.g., ABCD0123456"
                                     maxLength={11}
                                 />
                             </div>
