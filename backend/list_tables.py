@@ -2,19 +2,25 @@ import asyncio
 import sys
 import os
 
-# Add root directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 from backend.database import AsyncSessionLocal
 
-async def check_tables():
+async def list_all_tables():
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+            text("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name")
         )
         tables = [row[0] for row in result.fetchall()]
-        print("Tables in database:", tables)
+        
+        print("=" * 50)
+        print("ALL DATABASE TABLES")
+        print("=" * 50)
+        for i, table in enumerate(tables, 1):
+            print(f"  {i:2}. {table}")
+        print("=" * 50)
+        print(f"Total: {len(tables)} tables")
         
         # Check all required tables (all from models.py)
         required = [
@@ -30,12 +36,23 @@ async def check_tables():
             'audit_logs',
             'user_sessions'
         ]
-        print("\nTable Status:")
+        
+        print("\n" + "=" * 50)
+        print("TABLE STATUS CHECK")
+        print("=" * 50)
+        missing = []
         for table in required:
             if table in tables:
                 print(f"  ✓ {table}")
             else:
-                print(f"  ✗ {table} (missing)")
+                print(f"  ✗ {table} (MISSING)")
+                missing.append(table)
+        
+        print("=" * 50)
+        if missing:
+            print(f"WARNING: {len(missing)} table(s) missing!")
+        else:
+            print("SUCCESS: All 11 required tables present!")
 
 if __name__ == "__main__":
-    asyncio.run(check_tables())
+    asyncio.run(list_all_tables())
