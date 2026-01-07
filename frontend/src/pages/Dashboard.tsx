@@ -1041,6 +1041,53 @@ export default function Dashboard() {
                         </div>
                     </div>
 
+                    {/* KYC STATUS SUMMARY PANEL */}
+                    {(advisorResult.decision === 'APPROVED' || advisorResult.decision === 'PENDING_REVIEW') && (
+                        <div className="p-6 bg-gray-900/50 rounded-2xl border border-teal-500/30 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <div className="flex items-center justify-between mb-6">
+                                <h4 className="text-lg font-semibold text-white flex items-center gap-2">
+                                    <Shield className="w-5 h-5 text-teal-400" />
+                                    KYC Verification Summary
+                                </h4>
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${kycStatus?.is_complete ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/10 text-teal-400'}`}>
+                                    {kycStatus?.is_complete ? '✓ Fully Verified' : 'In Progress'}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Step 1: Documents */}
+                                <div className={`p-4 rounded-xl border transition-all ${kycStatus && kycStatus.step_1_docs_uploaded >= 2 ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Identity Proofs</span>
+                                        {kycStatus && kycStatus.step_1_docs_uploaded >= 2 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
+                                    </div>
+                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_1_docs_uploaded || 0} <span className="text-sm font-normal text-gray-500">of 2</span></p>
+                                    <p className="text-[10px] text-gray-500 mt-2 uppercase">Required for verification</p>
+                                </div>
+
+                                {/* Step 2: Bank Linking */}
+                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_2_bank_linked ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Bank Linking</span>
+                                        {kycStatus?.step_2_bank_linked ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
+                                    </div>
+                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_2_bank_linked ? 'Linked' : 'Pending'}</p>
+                                    <p className="text-[10px] text-gray-500 mt-2 uppercase">Account for disbursement</p>
+                                </div>
+
+                                {/* Step 3: Agreement */}
+                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_3_signed ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Loan Agreement</span>
+                                        {kycStatus?.step_3_signed ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
+                                    </div>
+                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_3_signed ? 'Signed' : 'Pending'}</p>
+                                    <p className="text-[10px] text-gray-500 mt-2 uppercase">Digital e-signature</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Financial Summary Grid - Large Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="p-6 bg-gray-900 border-2 border-teal-500 rounded-2xl text-center">
@@ -1069,192 +1116,6 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* CIBIL Score Comparison Section - Enhanced Methodology */}
-                    <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl border border-cyan-500/30">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
-                                <TrendingUp className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-semibold text-white">Real CIBIL vs Our AI Score</h4>
-                                <p className="text-gray-400 text-sm">Detailed data source and methodology comparison</p>
-                            </div>
-                        </div>
-
-                        {/* Table 1: Factor Weights Comparison (Mockup Style) */}
-                        <div className="mb-8">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="w-5 h-5 bg-blue-500/20 rounded flex items-center justify-center">
-                                    <Activity className="w-3 h-3 text-blue-400" />
-                                </div>
-                                <h5 className="text-white text-sm font-semibold">Factor Weights Comparison</h5>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead>
-                                        <tr className="border-b border-gray-700">
-                                            <th className="py-2 text-gray-400 font-medium">Factor</th>
-                                            <th className="py-2 text-gray-400 font-medium text-center">Weight</th>
-                                            <th className="py-2 text-gray-400 font-medium">Real Bank Source (RBI)</th>
-                                            <th className="py-2 text-gray-400 font-medium">Our AI Data Source (Proxy)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {[
-                                            { factor: 'Payment History', weight: '35%', realSource: 'Past bank repayment records', source: 'Job tenure + Experience', icon: 'check' },
-                                            { factor: 'Credit Utilization', weight: '30%', realSource: 'Credit card usage vs limits', source: 'Debt-to-Income ratio', icon: 'check' },
-                                            { factor: 'Credit History Length', weight: '15%', realSource: 'Years since first loan/card', source: 'Age + Experience', icon: 'check' },
-                                            { factor: 'Credit Mix', weight: '10%', realSource: 'Balanced secured/unsecured loans', source: 'Home ownership + Education', icon: 'check' },
-                                            { factor: 'New Credit Inquiries', weight: '10%', realSource: 'Recent hard credit inquiries', source: 'Employment type + Income', icon: 'warn' },
-                                        ].map((row, i) => (
-                                            <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                                                <td className="py-3 text-cyan-400 font-medium">{row.factor}</td>
-                                                <td className="py-3 text-center">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        {row.icon === 'check' ? (
-                                                            <CheckCircle className="w-3 h-3 text-green-500" />
-                                                        ) : (
-                                                            <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                                        )}
-                                                        <span className={row.icon === 'check' ? 'text-green-500' : 'text-amber-500'}>{row.weight}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 text-gray-500">{row.realSource}</td>
-                                                <td className="py-3 text-gray-400">{row.source}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                            {/* Table 2: What Real CIBIL Has (That You Don't) */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <div className="w-5 h-5 bg-purple-500/20 rounded flex items-center justify-center">
-                                        <Search className="w-3 h-3 text-purple-400" />
-                                    </div>
-                                    <h5 className="text-white text-sm font-semibold">Data Gap: Real CIBIL vs Our AI</h5>
-                                </div>
-                                <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700/50">
-                                    <table className="w-full text-left text-xs">
-                                        <thead className="bg-gray-800/50">
-                                            <tr>
-                                                <th className="p-3 text-gray-400 font-medium">Real CIBIL Data</th>
-                                                <th className="p-3 text-gray-400 font-medium">Our AI Proxy</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[
-                                                { real: 'Actual loan repayment history', alt: 'Simulated from job stability', status: 'warn' },
-                                                { real: 'Credit card usage %', alt: 'DTI ratio as proxy', status: 'warn' },
-                                                { real: 'Number of active loans', alt: 'Not collected', status: 'fail' },
-                                                { real: 'Loan defaults/write-offs', alt: 'Not collected', status: 'fail' },
-                                                { real: 'Bankruptcy records', alt: 'Not collected', status: 'fail' },
-                                                { real: 'Number of credit inquiries', alt: 'Not collected', status: 'fail' },
-                                            ].map((row, i) => (
-                                                <tr key={i} className="border-b border-gray-800 last:border-0">
-                                                    <td className="p-3 text-gray-500">{row.real}</td>
-                                                    <td className="p-3">
-                                                        <div className="flex items-center gap-2">
-                                                            {row.status === 'warn' ? (
-                                                                <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                                            ) : (
-                                                                <X className="w-3 h-3 text-red-500" />
-                                                            )}
-                                                            <span className={row.status === 'warn' ? 'text-amber-500' : 'text-red-400'}>{row.alt}</span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {/* Table 3: What Matches Real Banks */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <div className="w-5 h-5 bg-green-500/20 rounded flex items-center justify-center">
-                                        <CheckCircle className="w-3 h-3 text-green-400" />
-                                    </div>
-                                    <h5 className="text-white text-sm font-semibold">What Matches Real Banks</h5>
-                                </div>
-                                <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700/50">
-                                    <table className="w-full text-left text-xs">
-                                        <thead className="bg-gray-800/50">
-                                            <tr>
-                                                <th className="p-3 text-gray-400 font-medium">Feature</th>
-                                                <th className="p-3 text-gray-400 font-medium">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[
-                                                { feat: 'Score range 300-900', status: 'Identical' },
-                                                { feat: '5 weighted factors', status: 'Identical weights' },
-                                                { feat: 'Rating bands (6 levels)', status: 'Identical' },
-                                                { feat: 'Interest rate tied to score', status: 'RBI-compliant rates' },
-                                                { feat: 'EMI calculation formula', status: 'Standard banking formula' },
-                                            ].map((row, i) => (
-                                                <tr key={i} className="border-b border-gray-800 last:border-0">
-                                                    <td className="p-3 text-gray-500">{row.feat}</td>
-                                                    <td className="p-3">
-                                                        <div className="flex items-center gap-2 text-green-500">
-                                                            <CheckSquare className="w-3 h-3" />
-                                                            <span>{row.status}</span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Score Range & Band Legend */}
-                        <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
-                            <p className="text-cyan-400 text-sm font-medium mb-3 flex items-center gap-2">
-                                <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
-                                Score Range & Ratings (AI-Estimated)
-                            </p>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                {[
-                                    { rating: 'Excellent', range: '800-900', color: 'from-green-500 to-emerald-400', active: advisorResult.credit_score.rating === 'Excellent' },
-                                    { rating: 'Very Good', range: '750-799', color: 'from-teal-500 to-cyan-400', active: advisorResult.credit_score.rating === 'Very Good' },
-                                    { rating: 'Good', range: '700-749', color: 'from-blue-500 to-blue-400', active: advisorResult.credit_score.rating === 'Good' },
-                                    { rating: 'Fair', range: '650-699', color: 'from-yellow-500 to-amber-400', active: advisorResult.credit_score.rating === 'Fair' },
-                                    { rating: 'Poor', range: '550-649', color: 'from-orange-500 to-orange-400', active: advisorResult.credit_score.rating === 'Poor' },
-                                    { rating: 'Very Poor', range: '300-549', color: 'from-red-500 to-red-400', active: advisorResult.credit_score.rating === 'Very Poor' },
-                                ].map((item, idx) => (
-                                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg ${item.active ? 'bg-cyan-500/20 border border-cyan-500/50' : 'bg-gray-700/30'}`}>
-                                        <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${item.color}`}></div>
-                                        <div className="flex-1">
-                                            <div className={`text-xs font-medium ${item.active ? 'text-white' : 'text-gray-400'}`}>{item.rating}</div>
-                                            <div className={`text-[10px] font-mono ${item.active ? 'text-cyan-400' : 'text-gray-500'}`}>{item.range}</div>
-                                        </div>
-                                        {item.active && <span className="text-cyan-400 text-[10px]">You</span>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Disclaimer */}
-                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <p className="text-amber-300 font-medium text-sm">Mandatory Disclaimer</p>
-                                    <p className="text-gray-400 text-xs mt-1">
-                                        This credit score is a mathematical simulation using CIBIL-standard weights applied to your reported income, debt and stability metrics.
-                                        Real CIBIL scores require access to your PAN-linked bank records from the past 3-10 years which we do not collect.
-                                        For your official credit report, please visit <a href="https://www.cibil.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">www.cibil.com</a>.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Loan & Income Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
