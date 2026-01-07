@@ -226,10 +226,10 @@ class LoanPredictor:
             proba = self.model.predict_proba(X)[0]
             approval_prob = proba[1] * 100  # Probability of approval (class 1)
             
-            # Determine status based on probability
-            if approval_prob >= 70:
+            # Determine status based on probability (Granular thresholds)
+            if approval_prob >= 75:
                 status = 'APPROVED'
-            elif approval_prob >= 40:
+            elif approval_prob >= 45:
                 status = 'PENDING_REVIEW'
             else:
                 status = 'REJECTED'
