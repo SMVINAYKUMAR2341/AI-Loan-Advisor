@@ -2833,7 +2833,11 @@ import hashlib
 report_tokens = {}
 
 @app.get("/loan-application/{application_id}/report-qr")
-async def get_report_qr_code(application_id: str, db: AsyncSession = Depends(database.get_db)):
+async def get_report_qr_code(
+    application_id: str, 
+    request: Request,
+    db: AsyncSession = Depends(database.get_db)
+):
     """Generate QR code for mobile report download"""
     try:
         # Verify application exists
@@ -2854,26 +2858,14 @@ async def get_report_qr_code(application_id: str, db: AsyncSession = Depends(dat
             "expiry": expiry
         }
         
-        # Create shareable URL - Use RENDER_EXTERNAL_URL if available, otherwise fallback to local/detected IP
-        backend_base_url = os.getenv("RENDER_EXTERNAL_URL")
+        # Create shareable URL - Use the current request's base URL for maximum reliability
+        # This handles localhost, IP addresses, and production domains (like Render) automatically
+        base_url = str(request.base_url).rstrip('/')
+        shareable_url = f"{base_url}/shared-report/{token}"
         
-        if not backend_base_url:
-            import socket
-            try:
-                # Get local IP address for local network testing
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                local_ip = s.getsockname()[0]
-                s.close()
-                backend_base_url = f"http://{local_ip}:8000"
-            except:
-                backend_base_url = "http://localhost:8000"
-        
-        shareable_url = f"{backend_base_url}/shared-report/{token}"
-        
-        # Generate QR code
+        # Generate QR code - Use version=None for auto-fitting
         qr = qrcode.QRCode(
-            version=1,
+            version=None,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
             box_size=10,
             border=4,
