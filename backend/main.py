@@ -2244,7 +2244,7 @@ async def get_kyc_status(
         "loan_status": prediction.decision,
         "kyc_eligible": True,
         "step_1_documents": kyc_tracking.step_1_documents,
-        "step_1_docs_required": 2,
+        "step_1_docs_required": 4,
         "step_1_docs_uploaded": uploaded_count,
         "step_1_docs_verified": verified_count,
         "step_2_bank_details": kyc_tracking.step_2_bank_details,
@@ -2635,10 +2635,10 @@ async def complete_kyc(
     doc_result = await db.execute(doc_query)
     documents = doc_result.scalars().all()
     
-    if len(documents) < 2:
+    if len(documents) < 4:
         raise HTTPException(
             status_code=400, 
-            detail=f"Step 1 incomplete: Upload at least 2 documents. Uploaded: {len(documents)}"
+            detail=f"Step 1 incomplete: Upload at least 4 documents. Uploaded: {len(documents)}"
         )
     
     # Verify Step 2: Bank Details

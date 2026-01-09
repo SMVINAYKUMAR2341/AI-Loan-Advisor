@@ -329,7 +329,7 @@ class KYCStatusTracking(Base):
     
     # Step Status: NOT_STARTED, IN_PROGRESS, COMPLETED, BLOCKED
     step_1_documents = Column(String(20), default="NOT_STARTED")
-    step_1_docs_required = Column(Integer, default=2)  # ID + Address
+    step_1_docs_required = Column(Integer, default=4)  # ID + Address + Extra Documentation
     step_1_docs_uploaded = Column(Integer, default=0)
     step_1_docs_verified = Column(Integer, default=0)
     

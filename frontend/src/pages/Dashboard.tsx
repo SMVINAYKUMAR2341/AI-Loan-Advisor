@@ -1049,39 +1049,39 @@ export default function Dashboard() {
                                     <Shield className="w-5 h-5 text-teal-400" />
                                     KYC Verification Summary
                                 </h4>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${kycStatus?.is_complete ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/10 text-teal-400'}`}>
-                                    {kycStatus?.is_complete ? '✓ Fully Verified' : 'In Progress'}
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${kycStatus?.overall_status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/10 text-teal-400'}`}>
+                                    {kycStatus?.overall_status === 'COMPLETED' ? '✓ Fully Verified' : 'In Progress'}
                                 </span>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {/* Step 1: Documents */}
-                                <div className={`p-4 rounded-xl border transition-all ${kycStatus && kycStatus.step_1_docs_uploaded >= 2 ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                                <div className={`p-4 rounded-xl border transition-all ${kycStatus && kycStatus.step_1_docs_uploaded >= 4 ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Identity Proofs</span>
-                                        {kycStatus && kycStatus.step_1_docs_uploaded >= 2 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
+                                        {kycStatus && kycStatus.step_1_docs_uploaded >= 4 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
                                     </div>
-                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_1_docs_uploaded || 0} <span className="text-sm font-normal text-gray-500">of 2</span></p>
+                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_1_docs_uploaded || 0} <span className="text-sm font-normal text-gray-500">of 4</span></p>
                                     <p className="text-[10px] text-gray-500 mt-2 uppercase">Required for verification</p>
                                 </div>
 
                                 {/* Step 2: Bank Linking */}
-                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_2_bank_linked ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_2_bank_details === 'COMPLETED' ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Bank Linking</span>
-                                        {kycStatus?.step_2_bank_linked ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
+                                        {kycStatus?.step_2_bank_details === 'COMPLETED' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
                                     </div>
-                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_2_bank_linked ? 'Linked' : 'Pending'}</p>
+                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_2_bank_details === 'COMPLETED' ? 'Linked' : 'Pending'}</p>
                                     <p className="text-[10px] text-gray-500 mt-2 uppercase">Account for disbursement</p>
                                 </div>
 
                                 {/* Step 3: Agreement */}
-                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_3_signed ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_3_agreement === 'COMPLETED' ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Loan Agreement</span>
-                                        {kycStatus?.step_3_signed ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
+                                        {kycStatus?.step_3_agreement === 'COMPLETED' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
                                     </div>
-                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_3_signed ? 'Signed' : 'Pending'}</p>
+                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_3_agreement === 'COMPLETED' ? 'Signed' : 'Pending'}</p>
                                     <p className="text-[10px] text-gray-500 mt-2 uppercase">Digital e-signature</p>
                                 </div>
                             </div>
@@ -2063,30 +2063,59 @@ export default function Dashboard() {
                             <FileText className="w-5 h-5 text-teal-400" />
                             Step 1: Upload Identity & Address Proof
                         </h4>
-                        <p className="text-gray-400 text-sm">Upload at least 2 documents: one ID proof and one address proof.</p>
+                        <p className="text-gray-400 text-sm">Upload all 4 required documents: Aadhaar, PAN, Passport, and Driving License/Bank Statement.</p>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                                { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR", icon: FileText, desc: "Address Proof" },
-                                { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Identity Proof" },
-                                { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Address Proof" },
-                                { label: "Driving License", type: "ID_PROOF", code: "DRIVING_LICENSE", icon: CreditCard, desc: "Identity Proof" }
+                                { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR", icon: FileText, desc: "Primary Address Proof" },
+                                { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Primary Identity Proof" },
+                                { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Secondary Address Proof" },
+                                { label: "Driving License / Bank Statement", type: "ID_PROOF", code: "DRIVING_LICENSE", icon: CreditCard, desc: "Secondary Identity Proof" }
                             ].map((doc, idx) => {
                                 const Icon = doc.icon;
+                                const isUploaded = kycStatus?.documents.some(d => d.document_type.includes(doc.code));
+
                                 return (
-                                    <button
-                                        key={doc.code}
-                                        onClick={() => uploadDocument(applicationId, doc.type, doc.code)}
-                                        className="flex items-center gap-4 p-4 bg-gray-800 hover:bg-gray-700 border border-white/10 hover:border-teal-500/50 rounded-xl transition-all group text-left"
-                                    >
-                                        <div className="w-12 h-12 bg-teal-900 rounded-full flex items-center justify-center group-hover:bg-teal-800 transition">
-                                            <Icon className="w-6 h-6 text-teal-400 group-hover:scale-110 transition" />
-                                        </div>
-                                        <div>
-                                            <p className="text-white font-semibold">{doc.label}</p>
-                                            <p className="text-gray-400 text-xs">{doc.desc}</p>
-                                        </div>
-                                    </button>
+                                    <div key={doc.code} className="relative">
+                                        <button
+                                            onClick={() => {
+                                                const input = document.getElementById(`file-upload-${doc.code}`);
+                                                if (input) input.click();
+                                            }}
+                                            disabled={isUploaded}
+                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all group text-left ${isUploaded
+                                                ? 'bg-green-900/20 border-green-500/50 cursor-default'
+                                                : 'bg-gray-800 hover:bg-gray-700 border-white/10 hover:border-teal-500/50'
+                                                }`}
+                                        >
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition ${isUploaded ? 'bg-green-500/20' : 'bg-teal-900 group-hover:bg-teal-800'
+                                                }`}>
+                                                {isUploaded ? (
+                                                    <CheckCircle className="w-6 h-6 text-green-400" />
+                                                ) : (
+                                                    <Icon className="w-6 h-6 text-teal-400 group-hover:scale-110 transition" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-white font-semibold">{doc.label}</p>
+                                                    {isUploaded && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">UPLOADED</span>}
+                                                </div>
+                                                <p className="text-gray-400 text-xs">{doc.desc}</p>
+                                            </div>
+                                        </button>
+                                        <input
+                                            id={`file-upload-${doc.code}`}
+                                            type="file"
+                                            className="hidden"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files[0]) {
+                                                    uploadDocument(applicationId, doc.type, doc.code);
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 );
                             })}
                         </div>
@@ -2106,7 +2135,7 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {kycStatus && kycStatus.step_1_docs_uploaded >= 2 && (
+                        {kycStatus && kycStatus.step_1_docs_uploaded >= 4 && (
                             <button
                                 onClick={() => setKycStep(2)}
                                 className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-green-500 rounded-xl text-white font-semibold"
@@ -2199,65 +2228,175 @@ export default function Dashboard() {
 
                 {/* Step 3: Agreement */}
                 {kycStep === 3 && (
-                    <div className="space-y-4">
-                        <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                            <Shield className="w-5 h-5 text-teal-400" />
-                            Step 3: Sign Loan Agreement
-                        </h4>
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                            <div>
+                                <h4 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Shield className="w-6 h-6 text-teal-400" />
+                                    Master Loan Agreement
+                                </h4>
+                                <p className="text-gray-400 text-sm">Ref: {applicationId.substring(0, 8).toUpperCase()}-MLA | {new Date().toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-blue-400 text-[10px] font-bold tracking-wider">RBI COMPLIANT</span>
+                                <span className="px-3 py-1 bg-teal-500/10 border border-teal-500/30 rounded-full text-teal-400 text-[10px] font-bold tracking-wider">ISO 27001</span>
+                            </div>
+                        </div>
 
                         {!agreement && (
-                            <button
-                                onClick={() => fetchAgreement(applicationId)}
-                                className="w-full py-3 bg-blue-900 border border-blue-500/30 rounded-xl text-blue-400"
-                            >
-                                Load Agreement
-                            </button>
+                            <div className="text-center py-12 bg-gray-800/50 rounded-2xl border border-dashed border-white/10">
+                                <div className="w-16 h-16 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                                    <FileText className="w-8 h-8 text-teal-400" />
+                                </div>
+                                <h5 className="text-white font-semibold mb-2">Generating Secure Agreement</h5>
+                                <p className="text-gray-400 text-sm mb-6 max-w-xs mx-auto">We are customizing your loan terms based on your approved profile and RBI guidelines.</p>
+                                <button
+                                    onClick={() => fetchAgreement(applicationId)}
+                                    className="px-8 py-3 bg-teal-500 hover:bg-teal-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-teal-500/20"
+                                >
+                                    Proceed to Review Agreement
+                                </button>
+                            </div>
                         )}
 
                         {agreement && (
-                            <div className="p-4 bg-gray-800 rounded-xl border border-white/10">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                    <div className="text-center p-3 bg-teal-900 rounded-lg">
-                                        <p className="text-teal-400 text-2xl font-bold">₹{agreement.loan_amount.toLocaleString()}</p>
-                                        <p className="text-gray-400 text-xs">Loan Amount</p>
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                {/* Key Facts Statement (KFS) - Dashboard Style */}
+                                <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border border-white/10 shadow-xl">
+                                    <div className="flex items-center gap-2 mb-4 text-teal-400 font-bold text-sm tracking-wider uppercase">
+                                        <Activity className="w-4 h-4" />
+                                        Key Facts Statement (KFS)
                                     </div>
-                                    <div className="text-center p-3 bg-blue-900 rounded-lg">
-                                        <p className="text-blue-400 text-2xl font-bold">{agreement.interest_rate}%</p>
-                                        <p className="text-gray-400 text-xs">Annual Rate</p>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                            <p className="text-gray-400 text-xs mb-1">Loan Amount</p>
+                                            <p className="text-white text-xl font-bold">₹{agreement.loan_amount.toLocaleString()}</p>
+                                        </div>
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                            <p className="text-gray-400 text-xs mb-1">Annual Interest Rate</p>
+                                            <p className="text-teal-400 text-xl font-bold">{agreement.interest_rate}% <span className="text-[10px] text-gray-500">Fixed</span></p>
+                                        </div>
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                            <p className="text-gray-400 text-xs mb-1">Monthly EMI</p>
+                                            <p className="text-white text-xl font-bold">₹{agreement.emi_amount.toLocaleString()}</p>
+                                        </div>
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                            <p className="text-gray-400 text-xs mb-1">Tenure</p>
+                                            <p className="text-white text-xl font-bold">{agreement.tenure_months} Months</p>
+                                        </div>
                                     </div>
-                                    <div className="text-center p-3 bg-purple-900 rounded-lg">
-                                        <p className="text-purple-400 text-2xl font-bold">₹{agreement.emi_amount.toLocaleString()}</p>
-                                        <p className="text-gray-400 text-xs">Monthly EMI</p>
-                                    </div>
-                                    <div className="text-center p-3 bg-orange-900 rounded-lg">
-                                        <p className="text-orange-400 text-2xl font-bold">{agreement.tenure_months}</p>
-                                        <p className="text-gray-400 text-xs">Months</p>
+                                    <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <p className="text-gray-500 text-[10px] uppercase font-bold">Processing Fee</p>
+                                            <p className="text-gray-300 text-sm font-semibold">₹{agreement.processing_fee.toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 text-[10px] uppercase font-bold">Total Interest</p>
+                                            <p className="text-gray-300 text-sm font-semibold">₹{(agreement.total_payable - agreement.loan_amount).toLocaleString()}</p>
+                                        </div>
+                                        <div className="md:text-right">
+                                            <p className="text-gray-500 text-[10px] uppercase font-bold">Net Disbursement</p>
+                                            <p className="text-green-400 text-sm font-bold">₹{(agreement.loan_amount - agreement.processing_fee).toLocaleString()}</p>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="p-4 bg-gray-800 rounded-lg max-h-60 overflow-y-auto mb-4">
-                                    <pre className="text-gray-300 text-sm whitespace-pre-wrap">{agreement.agreement_text}</pre>
+                                {/* Terms Sections - Accordion Style */}
+                                <div className="space-y-3">
+                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                        <h5 className="text-white font-semibold text-sm mb-2 flex items-center justify-between cursor-pointer">
+                                            1. Loan Disbursement & Repayment
+                                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                                        </h5>
+                                        <p className="text-gray-400 text-xs leading-relaxed">
+                                            The Loan shall be disbursed directly into the Borrower's bank account provided in Step 2. Repayment shall be via NACH/e-Mandate on the 5th of every month.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                        <h5 className="text-white font-semibold text-sm mb-2 flex items-center justify-between cursor-pointer">
+                                            2. Default & Penalty Clauses
+                                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                                        </h5>
+                                        <p className="text-gray-400 text-xs leading-relaxed">
+                                            Any delay in payment of Installments shall attract penal interest at the rate of 2% per month on the overdue amount. Repeated defaults may affect the Borrower's credit score.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                        <h5 className="text-white font-semibold text-sm mb-2 flex items-center justify-between cursor-pointer">
+                                            3. Pre-payment and Foreclosure
+                                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                                        </h5>
+                                        <p className="text-gray-400 text-xs leading-relaxed">
+                                            Borrower can foreclose the loan after 6 successful EMI payments. A foreclosure charge of 0% (Nil) shall be applicable for individual borrowers as per RBI norms.
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <label className="flex items-start gap-3 p-4 bg-yellow-900 border border-yellow-500/30 rounded-xl cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={agreementConsent}
-                                        onChange={(e) => setAgreementConsent(e.target.checked)}
-                                        className="w-5 h-5 mt-0.5 rounded border-gray-500"
-                                    />
-                                    <span className="text-yellow-400 text-sm">
-                                        I have read and agree to all terms and conditions of this loan agreement. I understand the repayment obligations and consequences of default.
-                                    </span>
-                                </label>
+                                {/* Full Agreement Text Scroll */}
+                                <div className="p-4 bg-black/40 rounded-xl border border-white/10 max-h-40 overflow-y-auto custom-scrollbar">
+                                    <p className="text-gray-500 text-[10px] mb-2 font-bold uppercase tracking-widest">Full Legal Text</p>
+                                    <pre className="text-gray-400 text-xs whitespace-pre-wrap font-sans leading-relaxed">
+                                        {agreement.agreement_text}
+                                    </pre>
+                                </div>
 
-                                <button
-                                    onClick={() => signAgreement(applicationId)}
-                                    disabled={!agreementConsent}
-                                    className="w-full mt-4 py-3 bg-gradient-to-r from-green-500 to-teal-500 disabled:opacity-50 rounded-xl text-white font-semibold"
-                                >
-                                    ✍️ Sign Agreement Digitally
-                                </button>
+                                {/* Signing Section - Premium Design */}
+                                <div className="bg-gradient-to-r from-teal-500/10 to-blue-500/10 p-6 rounded-2xl border border-teal-500/30">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-12 h-12 bg-teal-500 rounded-full flex items-center justify-center shadow-lg shadow-teal-500/20">
+                                            <User className="w-6 h-6 text-white" />
+                                        </div>
+                                        <div>
+                                            <h5 className="text-white font-bold">Digital Signature Confirmation</h5>
+                                            <p className="text-gray-400 text-xs uppercase tracking-tighter">Verified Aadhaar eSign Proxy</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <label className="flex items-start gap-4 p-4 bg-gray-900/60 rounded-xl border border-white/10 cursor-pointer hover:border-teal-500/50 transition-colors">
+                                            <div className="relative flex items-center mt-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={agreementConsent}
+                                                    onChange={(e) => setAgreementConsent(e.target.checked)}
+                                                    className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-teal-500 focus:ring-teal-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-white text-sm font-medium">I solemnly affirm and accept all terms</p>
+                                                <p className="text-gray-500 text-xs leading-tight">
+                                                    By checking this box, I acknowledge that I have read the complete Master Loan Agreement and Key Facts Statement. I authorize the lender to initiate NACH mandates for repayment.
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <div className="flex flex-col md:flex-row gap-4">
+                                            <button
+                                                onClick={() => signAgreement(applicationId)}
+                                                disabled={!agreementConsent}
+                                                className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-40 disabled:grayscale rounded-xl text-white font-bold text-lg shadow-xl shadow-teal-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <CheckCircle className="w-5 h-5" />
+                                                eSign Agreement Digitally
+                                            </button>
+                                            <button
+                                                className="px-6 py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+                                                onClick={() => window.print()}
+                                            >
+                                                <Search className="w-4 h-4" />
+                                                Download Draft
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 flex items-center justify-center gap-6">
+                                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                            <Shield className="w-3 h-3" /> Secure 256-bit SSL
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                            <Clock className="w-3 h-3" /> {new Date().toLocaleTimeString()} eSign Server
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
