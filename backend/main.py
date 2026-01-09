@@ -3080,3 +3080,181 @@ async def chat_with_ai(request: ChatRequest):
             response=fallback,
             timestamp=datetime.now().isoformat()
         )
+
+
+# =====================================================
+# MOCK VALIDATION APIs - For Demo/Testing
+# =====================================================
+
+class PANValidationRequest(BaseModel):
+    pan_number: str
+
+class AadhaarValidationRequest(BaseModel):
+    aadhaar_number: str
+
+class BankAccountValidationRequest(BaseModel):
+    account_number: str
+    ifsc_code: str
+
+class CIBILCheckRequest(BaseModel):
+    pan_number: str
+
+class StatementAnalysisRequest(BaseModel):
+    transactions: List[Dict[str, Any]]
+    requested_loan_amount: Optional[int] = 500000
+    loan_tenure_months: Optional[int] = 60
+
+
+@app.post("/mock/validate-pan")
+async def mock_validate_pan(request: PANValidationRequest):
+    """
+    Mock PAN validation - validates format and returns mock holder details.
+    No actual NSDL/Income Tax API call.
+    """
+    from bank_statement_analyzer import validate_pan
+    result = validate_pan(request.pan_number)
+    return result
+
+
+@app.post("/mock/validate-aadhaar")
+async def mock_validate_aadhaar(request: AadhaarValidationRequest):
+    """
+    Mock Aadhaar validation - validates format and returns mock details.
+    No OTP required, no actual UIDAI API call.
+    """
+    from bank_statement_analyzer import validate_aadhaar
+    result = validate_aadhaar(request.aadhaar_number)
+    return result
+
+
+@app.post("/mock/validate-bank-account")
+async def mock_validate_bank_account(request: BankAccountValidationRequest):
+    """
+    Mock bank account validation - validates format and returns mock bank details.
+    No actual penny drop or bank API call.
+    """
+    from bank_statement_analyzer import validate_bank_account
+    result = validate_bank_account(request.account_number, request.ifsc_code)
+    return result
+
+
+@app.post("/mock/cibil-check")
+async def mock_cibil_check(request: CIBILCheckRequest):
+    """
+    Mock CIBIL score check - returns mock credit score based on PAN.
+    No actual TransUnion CIBIL API call.
+    """
+    from bank_statement_analyzer import mock_cibil_check
+    result = mock_cibil_check(request.pan_number)
+    return result
+
+
+@app.get("/mock/bank-transactions")
+async def get_mock_bank_transactions():
+    """
+    Get mock bank transactions for demo.
+    Simulates fetching bank statement from Account Aggregator.
+    """
+    import json
+    import os
+    
+    mock_file = os.path.join(os.path.dirname(__file__), 'mock_bank_transactions.json')
+    
+    try:
+        with open(mock_file, 'r') as f:
+            data = json.load(f)
+        
+        # Return the first route's response body (transactions)
+        if data.get('routes') and len(data['routes']) > 0:
+            return data['routes'][0]['responses'][0]['body']
+        return {"error": "No mock data available"}
+    except FileNotFoundError:
+        return {"error": "Mock transactions file not found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/mock/analyze-statement")
+async def analyze_bank_statement(request: StatementAnalysisRequest):
+    """
+    Analyze bank statement transactions for loan eligibility.
+    Uses AI-powered analysis to assess income, expenses, and risk.
+    """
+    from bank_statement_analyzer import BankStatementAnalyzer
+    
+    if not request.transactions:
+        raise HTTPException(status_code=400, detail="Transactions list is required")
+    
+    analyzer = BankStatementAnalyzer(request.transactions)
+    analysis = analyzer.generate_full_analysis(
+        requested_loan=request.requested_loan_amount,
+        tenure_months=request.loan_tenure_months
+    )
+    
+    return analysis
+
+
+@app.get("/mock/analyze-statement")
+async def analyze_mock_statement(
+    loan_amount: int = 500000,
+    tenure: int = 60
+):
+    """
+    Analyze the mock bank statement for loan eligibility.
+    Uses the built-in mock transaction data.
+    """
+    import json
+    import os
+    from bank_statement_analyzer import BankStatementAnalyzer
+    
+    mock_file = os.path.join(os.path.dirname(__file__), 'mock_bank_transactions.json')
+    
+    try:
+        with open(mock_file, 'r') as f:
+            data = json.load(f)
+        
+        # Extract transactions from mock file
+        if data.get('routes') and len(data['routes']) > 0:
+            body = data['routes'][0]['responses'][0]['body']
+            transactions = body.get('transactions', [])
+        else:
+            return {"error": "No mock data available"}
+        
+        analyzer = BankStatementAnalyzer(transactions)
+        analysis = analyzer.generate_full_analysis(
+            requested_loan=loan_amount,
+            tenure_months=tenure
+        )
+        
+        # Add account info from mock
+        analysis['account_info'] = {
+            'holder': body.get('account_holder'),
+            'account': body.get('account_number'),
+            'bank': body.get('bank_name'),
+            'period': body.get('period')
+        }
+        
+        return analysis
+        
+    except FileNotFoundError:
+        return {"error": "Mock transactions file not found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# Health check for mock APIs
+@app.get("/mock/health")
+async def mock_health():
+    """Check if mock APIs are available"""
+    return {
+        "status": "ok",
+        "mock_apis_available": [
+            "/mock/validate-pan",
+            "/mock/validate-aadhaar", 
+            "/mock/validate-bank-account",
+            "/mock/cibil-check",
+            "/mock/bank-transactions",
+            "/mock/analyze-statement"
+        ],
+        "description": "Mock validation APIs for demo/testing. No actual API calls are made."
+    }

@@ -1,0 +1,326 @@
+{
+    "name": "Indian Bank Transactions Mock API",
+    "port": 3005,
+    "routes": [
+        {
+            "method": "get",
+            "endpoint": "/transactions",
+            "responses": [
+                {
+                    "body": {
+                        "account_holder": "Vinay Kumar",
+                        "account_number": "XXXX1234",
+                        "bank_name": "State Bank of India",
+                        "ifsc": "SBIN0001234",
+                        "period": {
+                            "from": "2024-10-01",
+                            "to": "2024-12-31"
+                        },
+                        "summary": {
+                            "opening_balance": 45000,
+                            "closing_balance": 72500,
+                            "total_credits": 285000,
+                            "total_debits": 257500,
+                            "average_balance": 58750
+                        },
+                        "transactions": [
+                            {
+                                "id": "TXN001",
+                                "date": "2024-12-28",
+                                "type": "CREDIT",
+                                "category": "SALARY",
+                                "description": "SALARY DEC 2024 - INFOSYS LTD",
+                                "amount": 85000,
+                                "balance": 72500,
+                                "reference": "SAL202412281234",
+                                "mode": "NEFT"
+                            },
+                            {
+                                "id": "TXN002",
+                                "date": "2024-12-27",
+                                "type": "DEBIT",
+                                "category": "EMI",
+                                "description": "HOME LOAN EMI - HDFC BANK",
+                                "amount": 28500,
+                                "balance": -12500,
+                                "reference": "EMLHDFC12345",
+                                "mode": "NACH"
+                            },
+                            {
+                                "id": "TXN003",
+                                "date": "2024-12-26",
+                                "type": "DEBIT",
+                                "category": "UPI",
+                                "description": "UPI/SWIGGY/merchant@paytm",
+                                "amount": 450,
+                                "balance": 16000,
+                                "reference": "UPI123456789",
+                                "mode": "UPI"
+                            },
+                            {
+                                "id": "TXN004",
+                                "date": "2024-12-25",
+                                "type": "DEBIT",
+                                "category": "UTILITY",
+                                "description": "BESCOM ELECTRICITY BILL",
+                                "amount": 2800,
+                                "balance": 16450,
+                                "reference": "BILBES202412",
+                                "mode": "BBPS"
+                            },
+                            {
+                                "id": "TXN005",
+                                "date": "2024-12-24",
+                                "type": "DEBIT",
+                                "category": "UPI",
+                                "description": "UPI/AMAZON/amazon@apl",
+                                "amount": 3200,
+                                "balance": 19250,
+                                "reference": "UPI234567890",
+                                "mode": "UPI"
+                            },
+                            {
+                                "id": "TXN006",
+                                "date": "2024-12-23",
+                                "type": "CREDIT",
+                                "category": "TRANSFER",
+                                "description": "IMPS FROM RAHUL SHARMA",
+                                "amount": 5000,
+                                "balance": 22450,
+                                "reference": "IMPS987654321",
+                                "mode": "IMPS"
+                            },
+                            {
+                                "id": "TXN007",
+                                "date": "2024-12-22",
+                                "type": "DEBIT",
+                                "category": "FUEL",
+                                "description": "HP PETROL PUMP BANGALORE",
+                                "amount": 3500,
+                                "balance": 17450,
+                                "reference": "POS456789",
+                                "mode": "CARD"
+                            },
+                            {
+                                "id": "TXN008",
+                                "date": "2024-12-20",
+                                "type": "DEBIT",
+                                "category": "INSURANCE",
+                                "description": "LIC PREMIUM - POLICY 12345",
+                                "amount": 8500,
+                                "balance": 20950,
+                                "reference": "LICPREM12345",
+                                "mode": "NACH"
+                            },
+                            {
+                                "id": "TXN009",
+                                "date": "2024-12-18",
+                                "type": "DEBIT",
+                                "category": "EMI",
+                                "description": "CAR LOAN EMI - ICICI BANK",
+                                "amount": 12000,
+                                "balance": 29450,
+                                "reference": "EMLICICI67890",
+                                "mode": "NACH"
+                            },
+                            {
+                                "id": "TXN010",
+                                "date": "2024-12-15",
+                                "type": "DEBIT",
+                                "category": "RENT",
+                                "description": "RENT DEC 2024 - NEFT",
+                                "amount": 22000,
+                                "balance": 41450,
+                                "reference": "RENT202412",
+                                "mode": "NEFT"
+                            },
+                            {
+                                "id": "TXN011",
+                                "date": "2024-12-12",
+                                "type": "DEBIT",
+                                "category": "SUBSCRIPTION",
+                                "description": "NETFLIX SUBSCRIPTION",
+                                "amount": 649,
+                                "balance": 63450,
+                                "reference": "SUBS123456",
+                                "mode": "CARD"
+                            },
+                            {
+                                "id": "TXN012",
+                                "date": "2024-12-10",
+                                "type": "DEBIT",
+                                "category": "GROCERY",
+                                "description": "BIGBASKET ORDER",
+                                "amount": 4200,
+                                "balance": 64099,
+                                "reference": "BB123456",
+                                "mode": "UPI"
+                            },
+                            {
+                                "id": "TXN013",
+                                "date": "2024-12-05",
+                                "type": "CREDIT",
+                                "category": "REFUND",
+                                "description": "AMAZON REFUND",
+                                "amount": 1500,
+                                "balance": 68299,
+                                "reference": "REF789012",
+                                "mode": "IMPS"
+                            },
+                            {
+                                "id": "TXN014",
+                                "date": "2024-12-01",
+                                "type": "DEBIT",
+                                "category": "SIP",
+                                "description": "SBI MUTUAL FUND SIP",
+                                "amount": 10000,
+                                "balance": 66799,
+                                "reference": "SIP202412",
+                                "mode": "NACH"
+                            },
+                            {
+                                "id": "TXN015",
+                                "date": "2024-11-28",
+                                "type": "CREDIT",
+                                "category": "SALARY",
+                                "description": "SALARY NOV 2024 - INFOSYS LTD",
+                                "amount": 85000,
+                                "balance": 76799,
+                                "reference": "SAL202411281234",
+                                "mode": "NEFT"
+                            },
+                            {
+                                "id": "TXN016",
+                                "date": "2024-11-27",
+                                "type": "DEBIT",
+                                "category": "EMI",
+                                "description": "HOME LOAN EMI - HDFC BANK",
+                                "amount": 28500,
+                                "balance": -8201,
+                                "reference": "EMLHDFC12346",
+                                "mode": "NACH"
+                            },
+                            {
+                                "id": "TXN017",
+                                "date": "2024-11-20",
+                                "type": "DEBIT",
+                                "category": "MEDICAL",
+                                "description": "APOLLO PHARMACY",
+                                "amount": 1850,
+                                "balance": 20299,
+                                "reference": "POS567890",
+                                "mode": "CARD"
+                            },
+                            {
+                                "id": "TXN018",
+                                "date": "2024-11-15",
+                                "type": "DEBIT",
+                                "category": "RENT",
+                                "description": "RENT NOV 2024 - NEFT",
+                                "amount": 22000,
+                                "balance": 22149,
+                                "reference": "RENT202411",
+                                "mode": "NEFT"
+                            },
+                            {
+                                "id": "TXN019",
+                                "date": "2024-11-10",
+                                "type": "DEBIT",
+                                "category": "EMI",
+                                "description": "CAR LOAN EMI - ICICI BANK",
+                                "amount": 12000,
+                                "balance": 44149,
+                                "reference": "EMLICICI67891",
+                                "mode": "NACH"
+                            },
+                            {
+                                "id": "TXN020",
+                                "date": "2024-11-05",
+                                "type": "CREDIT",
+                                "category": "BONUS",
+                                "description": "PERFORMANCE BONUS Q3 - INFOSYS",
+                                "amount": 25000,
+                                "balance": 56149,
+                                "reference": "BON202411",
+                                "mode": "NEFT"
+                            }
+                        ]
+                    },
+                    "statusCode": 200
+                }
+            ]
+        },
+        {
+            "method": "get",
+            "endpoint": "/transactions/analyze",
+            "responses": [
+                {
+                    "body": {
+                        "analysis_date": "2024-12-31",
+                        "period_analyzed": "3 months",
+                        "income_analysis": {
+                            "monthly_salary": 85000,
+                            "other_income": 10000,
+                            "total_monthly_income": 95000,
+                            "income_stability": "STABLE",
+                            "salary_regularity": "REGULAR"
+                        },
+                        "expense_analysis": {
+                            "fixed_expenses": {
+                                "rent": 22000,
+                                "emi_home_loan": 28500,
+                                "emi_car_loan": 12000,
+                                "insurance": 8500,
+                                "sip": 10000,
+                                "total_fixed": 81000
+                            },
+                            "variable_expenses": {
+                                "utilities": 2800,
+                                "groceries": 4200,
+                                "fuel": 3500,
+                                "food_delivery": 3000,
+                                "shopping": 5000,
+                                "subscriptions": 1500,
+                                "medical": 2000,
+                                "total_variable": 22000
+                            },
+                            "total_monthly_expenses": 103000
+                        },
+                        "financial_ratios": {
+                            "debt_to_income": 0.426,
+                            "fixed_expense_ratio": 0.852,
+                            "savings_rate": -0.084,
+                            "emi_to_income": 0.426,
+                            "foir": 0.426
+                        },
+                        "eligibility_assessment": {
+                            "max_affordable_emi": 8500,
+                            "recommended_loan_amount": 400000,
+                            "risk_level": "MODERATE",
+                            "recommendation": "Consider reducing existing EMI obligations before applying for a new loan. Current FOIR is at 42.6% which is near the upper limit of 50%."
+                        },
+                        "spending_patterns": {
+                            "essential_spending": 0.68,
+                            "discretionary_spending": 0.32,
+                            "monthly_deficit": -8000,
+                            "cash_flow_status": "NEGATIVE"
+                        },
+                        "red_flags": [
+                            "Monthly expenses exceed income",
+                            "High existing EMI obligations (42.6% of income)",
+                            "No emergency fund detected",
+                            "Negative monthly savings"
+                        ],
+                        "green_flags": [
+                            "Regular salary credits on 28th of each month",
+                            "Consistent job - same employer for salary",
+                            "Active SIP investment shows financial planning",
+                            "Insurance premiums paid regularly"
+                        ]
+                    },
+                    "statusCode": 200
+                }
+            ]
+        }
+    ]
+}
