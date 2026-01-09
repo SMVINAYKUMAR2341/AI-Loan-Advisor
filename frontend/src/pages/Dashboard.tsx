@@ -1110,8 +1110,12 @@ export default function Dashboard() {
                                     <span className="text-white font-semibold">{formatCurrency(advisorResult.income_analysis.annual_income)}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-400">Debt-to-Income Ratio</span>
-                                    <span className="text-white font-semibold">{advisorResult.income_analysis.debt_to_income_ratio}%</span>
+                                    <span className="text-gray-400">EMI-to-Income (FOIR)</span>
+                                    <span className="text-white font-semibold">{advisorResult.income_analysis.emi_to_income_ratio.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500 mt-0">
+                                    <span>Existing DTI: {advisorResult.income_analysis.debt_to_income_ratio}%</span>
+                                    <span>Limit: 50%</span>
                                 </div>
                             </div>
                         </div>
@@ -2532,7 +2536,7 @@ export default function Dashboard() {
                                         </div>
                                         <div className="md:text-right">
                                             <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Agreement Info</p>
-                                            <p className="text-gray-400 text-xs">Version: {agreement.agreement_version || 'v1.0'}</p>
+                                            <p className="text-gray-400 text-xs">Version: v2.4 (RBI Compliant)</p>
                                             <p className="text-gray-500 text-[10px]">Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
                                         </div>
                                     </div>

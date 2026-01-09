@@ -963,8 +963,11 @@ class LoanAdvisor:
             
         # If Effective DTI is dangerous (> 60%), cap score at 40%
         # This aligns the Score with the Rejection Decision
+        # If Effective DTI is dangerous (> 60%), cap score at 33% (Clear Rejection)
+        # But allow variability (10-33%) based on their profile strength
         elif effective_dti > 0.60:
-            calibrated = min(calibrated, 0.40)
+            calibrated = calibrated * 0.50  # 50% Penalty
+            calibrated = min(calibrated, 0.33)
             
         # If Effective DTI is Borderline (45% - 60%), ensure score reflects "Pending" (Min 45%)
         # But only if they are not already penalized by Defaults/Credit Score
@@ -972,13 +975,25 @@ class LoanAdvisor:
             calibrated = max(calibrated, 0.45)
 
         # 3. BOOSTERS (For Excellent Candidates)
-        # Only boost if FOIR is safe (<= 60%) to allow Approved status for valid loans
-        if credit_score >= 750 and defaults == 'No' and effective_dti <= 0.60:
+        # Only boost if FOIR is strictly SAFE (<= 45%)
+        # If FOIR is Borderline (45-60%), we CANNOT boost to 90%+ because it's a Pending case.
+        if credit_score >= 750 and defaults == 'No' and effective_dti <= 0.45:
             # Ensure at least 85%
             calibrated = max(calibrated, 0.85)
             # If extremely high score (> 800), ensure > 90%
             if credit_score >= 800:
                 calibrated = max(calibrated, 0.92)
+        
+        # If in Pending Zone (45% < FOIR <= 60%), CAP the score to keep it consistent with "Pending"
+        # Pending Status triggers at 40-70%. So we cap at 68% to avoid "92% but Pending".
+        if 0.45 < effective_dti <= 0.60 and defaults == 'No':
+            calibrated = min(calibrated, 0.68)
+            calibrated = max(calibrated, 0.42) # Ensure not auto-rejected (<40) if otherwise good
+        
+        # 4. GLOBAL FLOOR
+        # Avoid 0% or 1% scores which look like system errors. Min 5%.
+        calibrated = max(calibrated, 0.05)
+        calibrated = min(calibrated, 0.99)
                 
         return round(calibrated, 4)
     
