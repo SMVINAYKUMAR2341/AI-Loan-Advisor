@@ -895,41 +895,61 @@ class LoanAdvisor:
             self._last_processed_input = input_df
             self._last_raw_input = raw_data.to_dict('records')[0]
             
-            # Get probability (Class 0 = Rejected, Class 1 = Approved)
+            # Get probability 
+            # Class 0 = Non-Default (Approved)
+            # Class 1 = Default (Rejected)
             proba = self.model.predict_proba(input_df)[0]
-            ml_score = float(proba[1])
+            
+            # ROI: Return probability of Class 0 (Non-Default/Approved)
+            ml_score = float(proba[0])
             
             # --- CALIBRATION LAYER ---
-            # Correct ML mispredictions for high-quality applicants
-            rule_score = self._rule_based_score(profile)
+            # The ML model can sometimes be inconsistent on edge cases or OOD data.
+            # We apply business logic guardrails to ensure sanity.
             
-            # Criteria for "High Quality" applicant
-            is_high_cibil = credit_score >= 750
-            is_low_dti = (float(profile.get('debt_to_income_ratio', 0.5)) < 0.40)
-            is_good_income = person_income >= 500000  # 5L PA
-            
-            final_score = ml_score
-            
-            if is_high_cibil and is_low_dti:
-                # If excellent profile, trust rule-based score if ML is too low
-                # Boost ML score significantly if it's unreasonably low
-                if ml_score < 0.60:
-                    final_score = max(ml_score, rule_score, 0.85) # Ensure at least 85%
-                else:
-                    final_score = max(ml_score, rule_score)
-            elif credit_score >= 700 and is_low_dti:
-                # If good profile, take the higher of ML or Rule
-                final_score = max(ml_score, rule_score)
-            
-            # Ensure 800+ CIBIL always gets approved
-            if credit_score >= 800:
-                final_score = max(final_score, 0.92)
-                
+            final_score = self._calibrate_score(ml_score, profile)
             return final_score
             
         except Exception as e:
             print(f"Prediction Error: {e}")
             return self._rule_based_score(profile)
+
+    def _calibrate_score(self, ml_score: float, profile: Dict[str, Any]) -> float:
+        """
+        Adjusts ML score based on hard financial facts to prevent model hallucinations.
+        """
+        # 1. Extract Key Metrics
+        credit_score = int(profile.get('cibil_score', 650))
+        defaults = str(profile.get('previous_loan_defaults', 'No'))
+        dti = float(profile.get('debt_to_income_ratio', 0.5))
+        income = float(profile.get('monthly_income', 0))
+        
+        calibrated = ml_score
+        
+        # 2. PENALTIES (For Risky Candidates)
+        # If model gives high score to a defaulter, crush it.
+        if defaults == 'Yes':
+            # Cap score at 30% if they have defaults, regardless of what ML says
+            calibrated = min(calibrated, 0.30)
+            
+        # If credit score is terrible (< 600), cap score at 40%
+        if credit_score < 600:
+            calibrated = min(calibrated, 0.40)
+            
+        # If DTI is dangerous (> 60%), cap score at 45%
+        if dti > 0.60:
+            calibrated = min(calibrated, 0.45)
+            
+        # 3. BOOSTERS (For Excellent Candidates)
+        # If credit score is excellent (> 750) and no defaults, ensure high score
+        if credit_score >= 750 and defaults == 'No' and dti < 0.40:
+            # Ensure at least 85%
+            calibrated = max(calibrated, 0.85)
+            # If extremely high score (> 800), ensure > 90%
+            if credit_score >= 800:
+                calibrated = max(calibrated, 0.92)
+                
+        return round(calibrated, 4)
     
     def _get_real_shap_explanations(self, profile: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
