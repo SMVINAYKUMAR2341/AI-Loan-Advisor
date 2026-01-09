@@ -223,8 +223,10 @@ class LoanPredictor:
             X = self.preprocess_input(loan_data)
             
             # Get prediction probability
+            # Class 0 = Non-Default (Approved)
+            # Class 1 = Default (Rejected)
             proba = self.model.predict_proba(X)[0]
-            approval_prob = proba[1] * 100  # Probability of approval (class 1)
+            approval_prob = proba[0] * 100  # Probability of approval (class 0)
             
             # Determine status based on probability (Granular thresholds)
             if approval_prob >= 75:
