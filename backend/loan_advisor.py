@@ -897,7 +897,35 @@ class LoanAdvisor:
             
             # Get probability (Class 0 = Rejected, Class 1 = Approved)
             proba = self.model.predict_proba(input_df)[0]
-            return float(proba[1])  # Return approval probability (Class 1) 
+            ml_score = float(proba[1])
+            
+            # --- CALIBRATION LAYER ---
+            # Correct ML mispredictions for high-quality applicants
+            rule_score = self._rule_based_score(profile)
+            
+            # Criteria for "High Quality" applicant
+            is_high_cibil = credit_score >= 750
+            is_low_dti = (float(profile.get('debt_to_income_ratio', 0.5)) < 0.40)
+            is_good_income = person_income >= 500000  # 5L PA
+            
+            final_score = ml_score
+            
+            if is_high_cibil and is_low_dti:
+                # If excellent profile, trust rule-based score if ML is too low
+                # Boost ML score significantly if it's unreasonably low
+                if ml_score < 0.60:
+                    final_score = max(ml_score, rule_score, 0.85) # Ensure at least 85%
+                else:
+                    final_score = max(ml_score, rule_score)
+            elif credit_score >= 700 and is_low_dti:
+                # If good profile, take the higher of ML or Rule
+                final_score = max(ml_score, rule_score)
+            
+            # Ensure 800+ CIBIL always gets approved
+            if credit_score >= 800:
+                final_score = max(final_score, 0.92)
+                
+            return final_score
             
         except Exception as e:
             print(f"Prediction Error: {e}")
