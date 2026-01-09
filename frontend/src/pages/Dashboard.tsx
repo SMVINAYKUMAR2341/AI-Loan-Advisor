@@ -1035,58 +1035,13 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             <div className="text-center md:text-right bg-gray-800 rounded-2xl p-6">
-                                <div className="text-5xl font-bold text-white">{advisorResult.approval_probability.toFixed(0)}%</div>
+                                <div className="text-5xl font-bold text-white">{advisorResult.approval_probability.toFixed(1)}%</div>
                                 <div className="text-gray-400">Approval Score</div>
                             </div>
                         </div>
                     </div>
 
-                    {/* KYC STATUS SUMMARY PANEL */}
-                    {(advisorResult.decision === 'APPROVED' || advisorResult.decision === 'PENDING_REVIEW') && (
-                        <div className="p-6 bg-gray-900/50 rounded-2xl border border-teal-500/30 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                            <div className="flex items-center justify-between mb-6">
-                                <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                                    <Shield className="w-5 h-5 text-teal-400" />
-                                    KYC Verification Summary
-                                </h4>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${kycStatus?.overall_status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/10 text-teal-400'}`}>
-                                    {kycStatus?.overall_status === 'COMPLETED' ? '✓ Fully Verified' : 'In Progress'}
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Step 1: Documents */}
-                                <div className={`p-4 rounded-xl border transition-all ${kycStatus && kycStatus.step_1_docs_uploaded >= 4 ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Identity Proofs</span>
-                                        {kycStatus && kycStatus.step_1_docs_uploaded >= 4 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
-                                    </div>
-                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_1_docs_uploaded || 0} <span className="text-sm font-normal text-gray-500">of 4</span></p>
-                                    <p className="text-[10px] text-gray-500 mt-2 uppercase">Required for verification</p>
-                                </div>
-
-                                {/* Step 2: Bank Linking */}
-                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_2_bank_details === 'COMPLETED' ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Bank Linking</span>
-                                        {kycStatus?.step_2_bank_details === 'COMPLETED' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
-                                    </div>
-                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_2_bank_details === 'COMPLETED' ? 'Linked' : 'Pending'}</p>
-                                    <p className="text-[10px] text-gray-500 mt-2 uppercase">Account for disbursement</p>
-                                </div>
-
-                                {/* Step 3: Agreement */}
-                                <div className={`p-4 rounded-xl border transition-all ${kycStatus?.step_3_agreement === 'COMPLETED' ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Loan Agreement</span>
-                                        {kycStatus?.step_3_agreement === 'COMPLETED' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-gray-500" />}
-                                    </div>
-                                    <p className="text-xl font-bold text-white leading-none">{kycStatus?.step_3_agreement === 'COMPLETED' ? 'Signed' : 'Pending'}</p>
-                                    <p className="text-[10px] text-gray-500 mt-2 uppercase">Digital e-signature</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {/* KYC STATUS SUMMARY PANEL - REMOVED BY USER REQUEST */}
 
                     {/* Financial Summary Grid - Large Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1171,7 +1126,7 @@ export default function Dashboard() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 rounded-xl p-4 border border-purple-500/30">
                                     <p className="text-purple-300 text-xs font-medium mb-1">ML Confidence</p>
-                                    <p className="text-2xl font-bold text-white">{advisorResult.approval_probability}%</p>
+                                    <p className="text-2xl font-bold text-white">{advisorResult.approval_probability.toFixed(1)}%</p>
                                     <p className="text-xs text-purple-400 mt-1">{advisorResult.decision}</p>
                                 </div>
                                 <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/30 rounded-xl p-4 border border-blue-500/30">
@@ -1279,7 +1234,7 @@ export default function Dashboard() {
                                             >
                                             </Pie>
                                             <text x="50%" y="45%" textAnchor="middle" fill="#fff" fontSize="36" fontWeight="bold">
-                                                {advisorResult.approval_probability}%
+                                                {advisorResult.approval_probability.toFixed(1)}%
                                             </text>
                                             <text x="50%" y="58%" textAnchor="middle" fill={advisorResult.approval_probability >= 60 ? '#22C55E' : advisorResult.approval_probability >= 35 ? '#F59E0B' : '#EF4444'} fontSize="16" fontWeight="600">
                                                 {advisorResult.decision}
