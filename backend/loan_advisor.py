@@ -798,31 +798,8 @@ class LoanAdvisor:
         # This produces realistic scores like 92%, 87%, 76%, 54%, etc.
         raw_prob = approval_probability
         
-        # Convert ML probability (0-1) to display score (0-100) with variability
-        # Use actual probability with adjustments for profile factors (Granular RBI Scoring)
-        base_score = raw_prob * 100
-        
-        # Add variability based on profile factors (±3 points for granular "real" look)
-        import random
-        random.seed(hash(f"{monthly_income}{loan_amount}{profile.get('age', 30)}"))
-        variability = random.uniform(-1.5, 1.5)
-        
-        # Profile-based adjustments
-        if profile.get('employment_status') == 'Employed' and profile.get('job_tenure', 0) >= 3:
-            base_score += 1.5
-        if debt_to_income < 0.25:
-            base_score += 1.0
-        elif debt_to_income > 0.45:
-            base_score -= 2.0
-            
-        display_score = base_score + variability
-        
-        # If hard rejection due to FOIR, cap the score
-        if emi_to_income > 0.55:
-            display_score = min(35.0, display_score)
-        
-        # Clamp to valid range (10-98) to keep it realistic
-        display_score = round(max(10.2, min(97.8, display_score)), 1)
+        # Show raw ML prediction as percentage (no adjustments, no clamping)
+        display_score = round(raw_prob * 100, 1)
 
         return {
             "application_date": application_date,
