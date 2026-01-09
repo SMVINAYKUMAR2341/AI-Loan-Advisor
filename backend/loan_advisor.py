@@ -967,8 +967,8 @@ class LoanAdvisor:
             calibrated = min(calibrated, 0.40)
             
         # 3. BOOSTERS (For Excellent Candidates)
-        # Only boost if DTI is safe
-        if credit_score >= 750 and defaults == 'No' and effective_dti < 0.50:
+        # Only boost if FOIR is safe (<= 60%) to allow Approved status for valid loans
+        if credit_score >= 750 and defaults == 'No' and effective_dti <= 0.60:
             # Ensure at least 85%
             calibrated = max(calibrated, 0.85)
             # If extremely high score (> 800), ensure > 90%
