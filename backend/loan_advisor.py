@@ -921,9 +921,34 @@ class LoanAdvisor:
         # 1. Extract Key Metrics
         credit_score = int(profile.get('cibil_score', 650))
         defaults = str(profile.get('previous_loan_defaults', 'No'))
-        dti = float(profile.get('debt_to_income_ratio', 0.5))
         income = float(profile.get('monthly_income', 0))
         
+        # Calculate Projected FOIR (Fixed Obligation to Income Ratio)
+        # Existing Debts
+        existing_dti = float(profile.get('debt_to_income_ratio', 0.0))
+        existing_emis = income * existing_dti
+        
+        # New Loan EMI
+        loan_amount = float(profile.get('loan_amount', 0))
+        duration_months = float(profile.get('loan_duration', 12))
+        interest_rate = 0.12 # Assume 12% for estimation
+        
+        if duration_months > 0 and loan_amount > 0:
+            r = interest_rate / 12
+            numerator = loan_amount * r * ((1 + r)**duration_months)
+            denominator = ((1 + r)**duration_months) - 1
+            new_emi = numerator / denominator
+        else:
+            new_emi = 0
+            
+        total_obligation = existing_emis + new_emi
+        
+        # EFFECTIVE DTI (FOIR)
+        if income > 0:
+            effective_dti = total_obligation / income
+        else:
+            effective_dti = 1.0 # Max risk if no income
+
         calibrated = ml_score
         
         # 2. PENALTIES (For Risky Candidates)
@@ -936,13 +961,14 @@ class LoanAdvisor:
         if credit_score < 600:
             calibrated = min(calibrated, 0.40)
             
-        # If DTI is dangerous (> 60%), cap score at 45%
-        if dti > 0.60:
-            calibrated = min(calibrated, 0.45)
+        # If Effective DTI is dangerous (> 60%), cap score at 40%
+        # This aligns the Score with the Rejection Decision
+        if effective_dti > 0.60:
+            calibrated = min(calibrated, 0.40)
             
         # 3. BOOSTERS (For Excellent Candidates)
-        # If credit score is excellent (> 750) and no defaults, ensure high score
-        if credit_score >= 750 and defaults == 'No' and dti < 0.40:
+        # Only boost if DTI is safe
+        if credit_score >= 750 and defaults == 'No' and effective_dti < 0.50:
             # Ensure at least 85%
             calibrated = max(calibrated, 0.85)
             # If extremely high score (> 800), ensure > 90%
