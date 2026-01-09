@@ -883,10 +883,17 @@ class RBICompliantLoanReport(FPDF):
         self.set_draw_color(200, 200, 200)
         self.set_line_width(0.3)
         
+        # Calculate monthly and annual values for principal and interest
+        duration_months = duration_years * 12 if duration_years > 0 else 1
+        monthly_principal = principal / duration_months if duration_months > 0 else 0
+        monthly_interest = interest / duration_months if duration_months > 0 else 0
+        annual_principal = monthly_principal * 12
+        annual_interest = monthly_interest * 12
+        
         rows = [
             ('EMI Payment', f'Rs.{monthly_emi:,.0f}', f'Rs.{monthly_emi * 12:,.0f}', f'Rs.{total:,.0f}'),
-            ('Principal Repaid', '-', '-', f'Rs.{principal:,.0f}'),
-            ('Interest Charged', '-', '-', f'Rs.{interest:,.0f}'),
+            ('Principal Repaid', f'Rs.{monthly_principal:,.0f}', f'Rs.{annual_principal:,.0f}', f'Rs.{principal:,.0f}'),
+            ('Interest Charged', f'Rs.{monthly_interest:,.0f}', f'Rs.{annual_interest:,.0f}', f'Rs.{interest:,.0f}'),
         ]
         
         for i, row in enumerate(rows):
@@ -941,39 +948,52 @@ class RBICompliantLoanReport(FPDF):
                 else:
                     pct = 12.5
                 
-                # Impact indicator
+                # Impact indicator styling
                 if impact == 'positive':
-                    self.set_fill_color(220, 252, 231)
-                    indicator = '^ POSITIVE'
-                    bar_color = (34, 197, 94)
+                    bg_color = (220, 252, 231)
+                    indicator = 'POSITIVE'
+                    indicator_symbol = '+'
+                    text_color = (22, 101, 52)
                 else:
-                    self.set_fill_color(254, 226, 226)
-                    indicator = 'v NEGATIVE'
-                    bar_color = (239, 68, 68)
+                    bg_color = (254, 226, 226)
+                    indicator = 'NEGATIVE'
+                    indicator_symbol = '-'
+                    text_color = (153, 27, 27)
                 
-                # Factor row with proper alignment
-                self.set_x(15)  # Left margin
+                # Card-style layout for each factor
+                y_start = self.get_y()
+                
+                # Background card
+                self.set_fill_color(*bg_color)
+                self.rect(15, y_start, 180, 8, 'F')
+                
+                # Factor name header (full width, wraps if needed)
+                self.set_xy(15, y_start + 1)
                 self.set_font('Arial', 'B', 9)
                 self.set_text_color(30, 30, 30)
-                self.cell(105, 10, f'  {factor}', 1, 0, 'L', True)
+                
+                # Calculate display: Factor name + Impact + Percentage on one line
+                factor_display = f"  {factor}"
+                impact_display = f"[{indicator_symbol} {indicator}]"
+                pct_display = f"{pct:.1f}%"
+                
+                self.cell(120, 6, factor_display, 0, 0, 'L')
                 
                 self.set_font('Arial', 'B', 8)
-                if impact == 'positive':
-                    self.set_text_color(22, 101, 52)
-                else:
-                    self.set_text_color(153, 27, 27)
-                self.cell(45, 10, indicator, 1, 0, 'C')
+                self.set_text_color(*text_color)
+                self.cell(35, 6, impact_display, 0, 0, 'C')
                 
                 self.set_text_color(60, 60, 60)
-                self.cell(30, 10, f'{pct:.1f}%', 1, 1, 'C')
+                self.cell(25, 6, pct_display, 0, 1, 'C')
                 
-                # Description row for the factor
+                # Description row (full width with wrapping)
                 self.set_x(15)
                 self.set_font('Arial', '', 8)
                 self.set_text_color(70, 70, 70)
                 sanitized_desc = self.sanitize_text(description)
-                self.multi_cell(180, 5, sanitized_desc, 1, 'L')
-                self.ln(2)
+                self.set_fill_color(248, 250, 252)
+                self.multi_cell(180, 5, f"  {sanitized_desc}", 0, 'L', True)
+                self.ln(3)
         else:
             self.add_info_box('Detailed factor analysis is being processed.', 'info')
         
@@ -1382,12 +1402,7 @@ def generate_loan_report_pdf(application, analysis_result):
     pdf.add_page()
     pdf.add_risk_assessment_section(analysis_result)
     
-    # Page 7: KYC Verification & Agreement (New Sections)
-    pdf.add_page()
-    pdf.add_kyc_verification_section(application)
-    pdf.add_formal_loan_agreement_section(application, analysis_result)
-    
-    # Page 8: Regulatory Compliance & Terms
+    # Page 7: Regulatory Compliance & Terms
     pdf.add_page()
     pdf.add_compliance_section()
     pdf.add_terms_section()

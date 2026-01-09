@@ -1223,7 +1223,7 @@ export default function Dashboard() {
                                                                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${f.impact === 'positive' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                                                                     {f.impact === 'positive' ? '↑' : '↓'}
                                                                 </span>
-                                                                <span className="text-gray-300 text-sm font-medium">{f.factor.length > 18 ? f.factor.substring(0, 18) + '...' : f.factor}</span>
+                                                                <span className="text-gray-300 text-sm font-medium">{f.factor}</span>
                                                             </div>
                                                             <span className={`text-sm font-bold ${f.impact === 'positive' ? 'text-green-400' : 'text-red-400'}`}>
                                                                 {normalizedPercent.toFixed(1)}%
