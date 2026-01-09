@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { API_BASE_URL } from "../services/api";
+import { API_BASE_URL, getMockBankTransactions, BankTransaction, BankTransactionsResponse } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { SmokeyBackground } from "@/components/ui/login-form";
 
@@ -206,6 +206,10 @@ export default function Dashboard() {
     const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'netbanking' | 'wallet' | null>(null);
     const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'processing' | 'success'>('method');
     const [netBankingStep, setNetBankingStep] = useState<'select' | 'login'>('select');
+
+    // BANK TRANSACTIONS STATE
+    const [bankTransactions, setBankTransactions] = useState<BankTransactionsResponse | null>(null);
+    const [loadingTransactions, setLoadingTransactions] = useState(false);
     const [paymentData, setPaymentData] = useState({
         cardNumber: '',
         cardName: '',
@@ -2653,6 +2657,119 @@ export default function Dashboard() {
                 >
                     Pay Now
                 </button>
+            </div>
+
+            {/* BANK TRANSACTIONS SECTION */}
+            <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-semibold text-white">Bank Transactions</h3>
+                    <button
+                        onClick={async () => {
+                            setLoadingTransactions(true);
+                            try {
+                                const data = await getMockBankTransactions();
+                                setBankTransactions(data);
+                            } catch (error) {
+                                console.error('Failed to load transactions:', error);
+                            } finally {
+                                setLoadingTransactions(false);
+                            }
+                        }}
+                        className="px-4 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg text-sm font-medium transition"
+                    >
+                        {loadingTransactions ? 'Loading...' : bankTransactions ? 'Refresh' : 'Load Transactions'}
+                    </button>
+                </div>
+
+                {bankTransactions ? (
+                    <div className="space-y-4">
+                        {/* Account Info */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-900/50 rounded-xl">
+                            <div>
+                                <p className="text-gray-500 text-xs">Account Holder</p>
+                                <p className="text-white font-medium">{bankTransactions.account_holder}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 text-xs">Account</p>
+                                <p className="text-white font-medium">{bankTransactions.account_number}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 text-xs">Bank</p>
+                                <p className="text-white font-medium">{bankTransactions.bank_name}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 text-xs">IFSC</p>
+                                <p className="text-white font-medium">{bankTransactions.ifsc}</p>
+                            </div>
+                        </div>
+
+                        {/* Summary */}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                                <p className="text-gray-400 text-xs">Total Credits</p>
+                                <p className="text-green-400 font-bold">₹{bankTransactions.summary.total_credits.toLocaleString()}</p>
+                            </div>
+                            <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                                <p className="text-gray-400 text-xs">Total Debits</p>
+                                <p className="text-red-400 font-bold">₹{bankTransactions.summary.total_debits.toLocaleString()}</p>
+                            </div>
+                            <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                <p className="text-gray-400 text-xs">Opening Balance</p>
+                                <p className="text-blue-400 font-bold">₹{bankTransactions.summary.opening_balance.toLocaleString()}</p>
+                            </div>
+                            <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                                <p className="text-gray-400 text-xs">Closing Balance</p>
+                                <p className="text-purple-400 font-bold">₹{bankTransactions.summary.closing_balance.toLocaleString()}</p>
+                            </div>
+                            <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                                <p className="text-gray-400 text-xs">Avg Balance</p>
+                                <p className="text-amber-400 font-bold">₹{bankTransactions.summary.average_balance.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        {/* Transactions Table */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-gray-700">
+                                        <th className="text-left py-3 px-2 text-gray-400 font-medium">Date</th>
+                                        <th className="text-left py-3 px-2 text-gray-400 font-medium">Description</th>
+                                        <th className="text-left py-3 px-2 text-gray-400 font-medium">Mode</th>
+                                        <th className="text-right py-3 px-2 text-gray-400 font-medium">Amount</th>
+                                        <th className="text-right py-3 px-2 text-gray-400 font-medium">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {bankTransactions.transactions.slice(0, 10).map((txn) => (
+                                        <tr key={txn.id} className="border-b border-gray-800 hover:bg-gray-700/30">
+                                            <td className="py-3 px-2 text-gray-300">{new Date(txn.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
+                                            <td className="py-3 px-2">
+                                                <p className="text-white text-xs truncate max-w-[200px]">{txn.description}</p>
+                                                <p className="text-gray-500 text-[10px]">{txn.category}</p>
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <span className="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-gray-300">{txn.mode}</span>
+                                            </td>
+                                            <td className={`py-3 px-2 text-right font-medium ${txn.type === 'CREDIT' ? 'text-green-400' : 'text-red-400'}`}>
+                                                {txn.type === 'CREDIT' ? '+' : '-'}₹{txn.amount.toLocaleString()}
+                                            </td>
+                                            <td className="py-3 px-2 text-right text-gray-300">₹{txn.balance.toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {bankTransactions.transactions.length > 10 && (
+                            <p className="text-gray-500 text-xs text-center">Showing 10 of {bankTransactions.transactions.length} transactions</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                        <Wallet className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                        <p className="text-gray-400">Click "Load Transactions" to view your bank statement</p>
+                        <p className="text-gray-500 text-xs mt-1">Simulates Account Aggregator data fetch</p>
+                    </div>
+                )}
             </div>
 
             {/* PAYMENT GATEWAY MODAL */}

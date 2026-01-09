@@ -466,3 +466,95 @@ export async function verifyDocument(documentId: string, status: string, notes?:
     }
     return response.json();
 }
+
+// =============================================================================
+// MOCK APIs - Bank Transactions & Validation
+// =============================================================================
+
+export interface BankTransaction {
+    id: string;
+    date: string;
+    type: 'CREDIT' | 'DEBIT';
+    category: string;
+    description: string;
+    amount: number;
+    balance: number;
+    reference: string;
+    mode: string;
+}
+
+export interface BankTransactionsResponse {
+    account_holder: string;
+    account_number: string;
+    bank_name: string;
+    ifsc: string;
+    period: { from: string; to: string };
+    summary: {
+        opening_balance: number;
+        closing_balance: number;
+        total_credits: number;
+        total_debits: number;
+        average_balance: number;
+    };
+    transactions: BankTransaction[];
+}
+
+export interface StatementAnalysis {
+    analysis_date: string;
+    period_analyzed: string;
+    transactions_count: number;
+    income_analysis: {
+        monthly_salary: number;
+        other_income: number;
+        total_monthly_income: number;
+        income_stability: string;
+        salary_regularity: string;
+    };
+    expense_analysis: {
+        fixed_expenses: Record<string, number>;
+        variable_expenses: Record<string, number>;
+        total_monthly_expenses: number;
+    };
+    financial_ratios: {
+        debt_to_income: number;
+        fixed_expense_ratio: number;
+        savings_rate: number;
+        emi_to_income: number;
+        foir: number;
+    };
+    eligibility_assessment: {
+        max_affordable_emi: number;
+        recommended_loan_amount: number;
+        risk_level: string;
+        recommendation: string;
+    };
+    spending_patterns: {
+        essential_spending: number;
+        discretionary_spending: number;
+        monthly_deficit: number;
+        cash_flow_status: string;
+    };
+    red_flags: string[];
+    green_flags: string[];
+    overall_score: {
+        score: number;
+        rating: string;
+        description: string;
+    };
+}
+
+export async function getMockBankTransactions(): Promise<BankTransactionsResponse> {
+    const response = await fetch(`${API_BASE_URL}/mock/bank-transactions`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch bank transactions');
+    }
+    return response.json();
+}
+
+export async function getMockStatementAnalysis(loanAmount: number = 500000, tenure: number = 60): Promise<StatementAnalysis> {
+    const response = await fetch(`${API_BASE_URL}/mock/analyze-statement?loan_amount=${loanAmount}&tenure=${tenure}`);
+    if (!response.ok) {
+        throw new Error('Failed to analyze statement');
+    }
+    return response.json();
+}
