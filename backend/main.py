@@ -2476,10 +2476,11 @@ async def get_loan_agreement(
     agreement = agree_result.scalars().first()
     
     if not agreement:
-        # Generate agreement from prediction data
-        loan_amount = prediction.recommended_amount or application.features_json.get("loan_amount", 100000)
-        interest_rate = prediction.recommended_interest_rate or 12.0
-        tenure_months = application.features_json.get("loan_duration", 60)
+        # Generate agreement from prediction and application data
+        # Use application.loan_amount directly (it's a column)
+        loan_amount = application.loan_amount or (application.features_json or {}).get("loan_amount", 100000)
+        interest_rate = prediction.interest_rate or 12.0
+        tenure_months = application.loan_duration or (application.features_json or {}).get("loan_duration", 60)
         
         # Calculate EMI: P * r * (1+r)^n / ((1+r)^n - 1)
         monthly_rate = interest_rate / 12 / 100
