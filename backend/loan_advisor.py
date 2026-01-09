@@ -958,14 +958,19 @@ class LoanAdvisor:
             calibrated = min(calibrated, 0.30)
             
         # If credit score is terrible (< 600), cap score at 40%
-        if credit_score < 600:
+        elif credit_score < 600:
             calibrated = min(calibrated, 0.40)
             
         # If Effective DTI is dangerous (> 60%), cap score at 40%
         # This aligns the Score with the Rejection Decision
-        if effective_dti > 0.60:
+        elif effective_dti > 0.60:
             calibrated = min(calibrated, 0.40)
             
+        # If Effective DTI is Borderline (45% - 60%), ensure score reflects "Pending" (Min 45%)
+        # But only if they are not already penalized by Defaults/Credit Score
+        elif 0.45 < effective_dti <= 0.60:
+            calibrated = max(calibrated, 0.45)
+
         # 3. BOOSTERS (For Excellent Candidates)
         # Only boost if FOIR is safe (<= 60%) to allow Approved status for valid loans
         if credit_score >= 750 and defaults == 'No' and effective_dti <= 0.60:
