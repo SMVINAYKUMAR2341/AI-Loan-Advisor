@@ -918,9 +918,9 @@ class LoanAdvisor:
             self._last_processed_input = input_df
             self._last_raw_input = raw_data.to_dict('records')[0]
             
-            # Get probability (Class 0 = Approved, Class 1 = Rejected)
+            # Get probability (Class 0 = Rejected, Class 1 = Approved)
             proba = self.model.predict_proba(input_df)[0]
-            return float(proba[0]) 
+            return float(proba[1])  # Return approval probability (Class 1) 
             
         except Exception as e:
             print(f"Prediction Error: {e}")

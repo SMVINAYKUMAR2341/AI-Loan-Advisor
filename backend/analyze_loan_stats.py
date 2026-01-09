@@ -1,0 +1,10 @@
+import pandas as pd
+data = pd.read_csv("c:/Users/AsusUser/Downloads/InfosysSpringboard-Virtual-Internship-6.0-master/InfosysSpringboard-Virtual-Internship-6.0-master/backend/PR_Dset/loan_dataS.csv")
+print("Loan Percent Income Stats:")
+print(data['loan_percent_income'].describe())
+print("\nMean loan_percent_income by status (0=Approved?, 1=Rejected?):")
+print(data.groupby('loan_status')['loan_percent_income'].mean())
+print("\nMax loan_percent_income for status 0:")
+print(data[data['loan_status'] == 0]['loan_percent_income'].max())
+print("\nMin loan_percent_income for status 1:")
+print(data[data['loan_status'] == 1]['loan_percent_income'].min())
