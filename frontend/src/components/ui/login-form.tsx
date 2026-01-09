@@ -31,7 +31,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
 
     vec2 distortion = centeredUV;
     // Apply distortion for a wavy, smokey effect
-    for (float i = 1.0; i < 8.0; i++) {
+    for (float i = 1.0; i < 4.0; i++) {
         distortion.x += 0.5 / i * cos(i * 2.0 * distortion.y + time + rippleCenter.x * 3.1415);
         distortion.y += 0.5 / i * cos(i * 2.0 * distortion.x + time + rippleCenter.y * 3.1415);
     }
@@ -60,6 +60,7 @@ interface SmokeyBackgroundProps {
   backdropBlurAmount?: string;
   color?: string;
   className?: string;
+  staticBg?: boolean;
 }
 
 /**
@@ -82,6 +83,7 @@ export function SmokeyBackground({
   backdropBlurAmount = "sm",
   color = "#1E40AF", // Default dark blue
   className = "",
+  staticBg = false,
 }: SmokeyBackgroundProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -153,22 +155,31 @@ export function SmokeyBackground({
     const render = () => {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      canvas.width = width;
-      canvas.height = height;
-      gl.viewport(0, 0, width, height);
 
-      const currentTime = (Date.now() - startTime) / 1000;
+      // Only resize if dimensions changed
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        gl.viewport(0, 0, width, height);
+      }
+
+      // If static, usage fixed time (e.g. 10.0) to get a nice snapshot
+      // If dynamic, use real time
+      const currentTime = staticBg ? 10.0 : (Date.now() - startTime) / 1000;
 
       gl.uniform2f(iResolutionLocation, width, height);
       gl.uniform1f(iTimeLocation, currentTime);
       gl.uniform2f(iMouseLocation, width / 2, height / 2);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      requestAnimationFrame(render);
+
+      if (!staticBg) {
+        requestAnimationFrame(render);
+      }
     };
 
     render();
-  }, [color]);
+  }, [color, staticBg]);
 
   const finalBlurClass = blurClassMap[backdropBlurAmount as BlurSize] || blurClassMap["sm"];
 
