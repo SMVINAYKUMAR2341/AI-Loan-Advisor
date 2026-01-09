@@ -19,7 +19,7 @@ import {
     Home, Wallet, FileText, TrendingUp, CreditCard, FolderOpen, Shield, History,
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
-    Activity, CheckSquare, Search, AlertTriangle
+    Activity, CheckSquare, Search, AlertTriangle, Download
 } from "lucide-react";
 
 // Charts - Professional visualization
@@ -191,6 +191,7 @@ export default function Dashboard() {
         account_type: 'SAVINGS'
     });
     const [agreementConsent, setAgreementConsent] = useState(false);
+    const [electronicConsent, setElectronicConsent] = useState(false);
 
     // Account & Security State (moved here to comply with Rules of Hooks)
     const [accountData, setAccountData] = useState<any>(null);
@@ -2181,20 +2182,22 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* Step 3: Agreement */}
+                {/* Step 3: Agreement - RBI-Governor Grade Design */}
                 {kycStep === 3 && (
                     <div className="space-y-6">
+                        {/* Header Section – Trust & Identity */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-4">
                             <div>
                                 <h4 className="text-xl font-bold text-white flex items-center gap-2">
                                     <Shield className="w-6 h-6 text-teal-400" />
-                                    Master Loan Agreement
+                                    Loan Agreement & Borrower Consent
                                 </h4>
-                                <p className="text-gray-400 text-sm">Ref: {applicationId.substring(0, 8).toUpperCase()}-MLA | {new Date().toLocaleDateString()}</p>
+                                <p className="text-gray-400 text-sm mt-1">This document outlines the terms governing your approved loan, as per regulatory guidelines.</p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap justify-end">
                                 <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-blue-400 text-[10px] font-bold tracking-wider">RBI COMPLIANT</span>
-                                <span className="px-3 py-1 bg-teal-500/10 border border-teal-500/30 rounded-full text-teal-400 text-[10px] font-bold tracking-wider">ISO 27001</span>
+                                <span className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-green-400 text-[10px] font-bold tracking-wider">SSL SECURE</span>
+                                <span className="px-3 py-1 bg-teal-500/10 border border-teal-500/30 rounded-full text-teal-400 text-[10px] font-bold tracking-wider">IT ACT 2000</span>
                             </div>
                         </div>
 
@@ -2216,98 +2219,192 @@ export default function Dashboard() {
 
                         {agreement && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                {/* Key Facts Statement (KFS) - Dashboard Style */}
+
+                                {/* Borrower & Loan Snapshot Card */}
                                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border border-white/10 shadow-xl">
-                                    <div className="flex items-center gap-2 mb-4 text-teal-400 font-bold text-sm tracking-wider uppercase">
-                                        <Activity className="w-4 h-4" />
-                                        Key Facts Statement (KFS)
-                                    </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                                            <p className="text-gray-400 text-xs mb-1">Loan Amount</p>
-                                            <p className="text-white text-xl font-bold">₹{agreement.loan_amount.toLocaleString()}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Borrower Details */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-blue-400 font-bold text-sm tracking-wider uppercase mb-3">
+                                                <User className="w-4 h-4" />
+                                                Borrower Details
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                                                    <span className="text-gray-400 text-sm">Full Name</span>
+                                                    <span className="text-white font-semibold">{accountData?.first_name || 'N/A'} {accountData?.last_name || ''}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                                                    <span className="text-gray-400 text-sm">Registered Mobile</span>
+                                                    <span className="text-white font-semibold">****{accountData?.mobile_number?.slice(-4) || '****'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                                                    <span className="text-gray-400 text-sm">PAN</span>
+                                                    <span className="text-white font-semibold">{accountData?.pan_number ? accountData.pan_number.substring(0, 4) + '****' + accountData.pan_number.slice(-1) : 'XXXX****X'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center py-2">
+                                                    <span className="text-gray-400 text-sm">Agreement Ref.</span>
+                                                    <span className="text-teal-400 font-mono text-sm">{applicationId?.substring(0, 8).toUpperCase()}-MLA</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                                            <p className="text-gray-400 text-xs mb-1">Annual Interest Rate</p>
-                                            <p className="text-teal-400 text-xl font-bold">{agreement.interest_rate}% <span className="text-[10px] text-gray-500">Fixed</span></p>
-                                        </div>
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                                            <p className="text-gray-400 text-xs mb-1">Monthly EMI</p>
-                                            <p className="text-white text-xl font-bold">₹{agreement.emi_amount.toLocaleString()}</p>
-                                        </div>
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                                            <p className="text-gray-400 text-xs mb-1">Tenure</p>
-                                            <p className="text-white text-xl font-bold">{agreement.tenure_months} Months</p>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <p className="text-gray-500 text-[10px] uppercase font-bold">Processing Fee</p>
-                                            <p className="text-gray-300 text-sm font-semibold">₹{agreement.processing_fee.toLocaleString()}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-500 text-[10px] uppercase font-bold">Total Interest</p>
-                                            <p className="text-gray-300 text-sm font-semibold">₹{(agreement.total_payable - agreement.loan_amount).toLocaleString()}</p>
-                                        </div>
-                                        <div className="md:text-right">
-                                            <p className="text-gray-500 text-[10px] uppercase font-bold">Net Disbursement</p>
-                                            <p className="text-green-400 text-sm font-bold">₹{(agreement.loan_amount - agreement.processing_fee).toLocaleString()}</p>
+
+                                        {/* Loan Overview */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-teal-400 font-bold text-sm tracking-wider uppercase mb-3">
+                                                <Activity className="w-4 h-4" />
+                                                Key Facts Statement (KFS)
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="p-3 bg-white/5 rounded-xl">
+                                                    <p className="text-gray-400 text-xs mb-1">Loan Amount</p>
+                                                    <p className="text-white text-lg font-bold">₹{agreement.loan_amount?.toLocaleString()}</p>
+                                                </div>
+                                                <div className="p-3 bg-white/5 rounded-xl">
+                                                    <p className="text-gray-400 text-xs mb-1">Interest Rate (APR)</p>
+                                                    <p className="text-teal-400 text-lg font-bold">{agreement.interest_rate}% <span className="text-[10px] text-gray-500">Fixed</span></p>
+                                                </div>
+                                                <div className="p-3 bg-white/5 rounded-xl">
+                                                    <p className="text-gray-400 text-xs mb-1">Monthly EMI</p>
+                                                    <p className="text-white text-lg font-bold">₹{agreement.emi_amount?.toLocaleString()}</p>
+                                                </div>
+                                                <div className="p-3 bg-white/5 rounded-xl">
+                                                    <p className="text-gray-400 text-xs mb-1">Tenure</p>
+                                                    <p className="text-white text-lg font-bold">{agreement.tenure_months} Months</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5">
+                                                <div>
+                                                    <p className="text-gray-500 text-[10px] uppercase">Processing Fee</p>
+                                                    <p className="text-gray-300 text-sm font-semibold">₹{agreement.processing_fee?.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-500 text-[10px] uppercase">Total Interest</p>
+                                                    <p className="text-gray-300 text-sm font-semibold">₹{(agreement.total_payable - agreement.loan_amount)?.toLocaleString()}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-gray-500 text-[10px] uppercase">Total Payable</p>
+                                                    <p className="text-amber-400 text-sm font-bold">₹{agreement.total_payable?.toLocaleString()}</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Terms Sections - Accordion Style */}
+                                {/* Agreement Sections - Expandable Accordions */}
                                 <div className="space-y-3">
-                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
-                                        <h5 className="text-white font-semibold text-sm mb-2 flex items-center justify-between cursor-pointer">
-                                            1. Loan Disbursement & Repayment
-                                            <ChevronRight className="w-4 h-4 text-gray-500" />
-                                        </h5>
-                                        <p className="text-gray-400 text-xs leading-relaxed">
-                                            The Loan shall be disbursed directly into the Borrower's bank account provided in Step 2. Repayment shall be via NACH/e-Mandate on the 5th of every month.
-                                        </p>
-                                    </div>
-                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
-                                        <h5 className="text-white font-semibold text-sm mb-2 flex items-center justify-between cursor-pointer">
-                                            2. Default & Penalty Clauses
-                                            <ChevronRight className="w-4 h-4 text-gray-500" />
-                                        </h5>
-                                        <p className="text-gray-400 text-xs leading-relaxed">
-                                            Any delay in payment of Installments shall attract penal interest at the rate of 2% per month on the overdue amount. Repeated defaults may affect the Borrower's credit score.
-                                        </p>
-                                    </div>
-                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
-                                        <h5 className="text-white font-semibold text-sm mb-2 flex items-center justify-between cursor-pointer">
-                                            3. Pre-payment and Foreclosure
-                                            <ChevronRight className="w-4 h-4 text-gray-500" />
-                                        </h5>
-                                        <p className="text-gray-400 text-xs leading-relaxed">
-                                            Borrower can foreclose the loan after 6 successful EMI payments. A foreclosure charge of 0% (Nil) shall be applicable for individual borrowers as per RBI norms.
-                                        </p>
-                                    </div>
+                                    {/* Section A: Interest & Charges */}
+                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
+                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
+                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
+                                                <span className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 text-xs font-bold">A</span>
+                                                Interest & Charges
+                                            </h5>
+                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
+                                        </summary>
+                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
+                                            <p><strong className="text-gray-300">Type:</strong> Fixed Rate Loan</p>
+                                            <p><strong className="text-gray-300">Annual Percentage Rate (APR):</strong> {agreement.interest_rate}%</p>
+                                            <p><strong className="text-gray-300">Processing Fee:</strong> ₹{agreement.processing_fee?.toLocaleString()} (2% of principal, one-time)</p>
+                                            <p><strong className="text-gray-300">Penal Interest:</strong> 2% per month on overdue amount (capped as per RBI guidelines)</p>
+                                        </div>
+                                    </details>
+
+                                    {/* Section B: Repayment & EMI Rules */}
+                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
+                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
+                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
+                                                <span className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 text-xs font-bold">B</span>
+                                                Repayment & EMI Rules
+                                            </h5>
+                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
+                                        </summary>
+                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
+                                            <p><strong className="text-gray-300">EMI Schedule:</strong> {agreement.tenure_months} monthly installments of ₹{agreement.emi_amount?.toLocaleString()}</p>
+                                            <p><strong className="text-gray-300">EMI Date:</strong> 5th of every month via NACH/e-Mandate</p>
+                                            <p><strong className="text-gray-300">Grace Period:</strong> 5 days from due date (no penalty)</p>
+                                            <p><strong className="text-gray-300">Missed EMI:</strong> May result in penal charges and impact on credit score. We encourage early communication if facing difficulties.</p>
+                                        </div>
+                                    </details>
+
+                                    {/* Section C: Borrower Rights - HIGHLIGHTED */}
+                                    <details open className="group bg-gradient-to-r from-green-900/30 to-teal-900/20 rounded-xl border border-green-500/30 overflow-hidden">
+                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
+                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
+                                                <span className="w-6 h-6 bg-green-500/30 rounded-full flex items-center justify-center text-green-400 text-xs font-bold">C</span>
+                                                <span className="text-green-400">Borrower Rights</span>
+                                                <span className="px-2 py-0.5 bg-green-500/20 rounded text-[10px] text-green-400 font-bold">IMPORTANT</span>
+                                            </h5>
+                                            <ChevronRight className="w-4 h-4 text-green-400 group-open:rotate-90 transition-transform" />
+                                        </summary>
+                                        <div className="p-4 pt-0 text-gray-300 text-xs leading-relaxed space-y-2 border-t border-green-500/20">
+                                            <p>✓ <strong>Right to Prepayment:</strong> You may prepay or foreclose the loan after 6 EMIs with NIL penalty (as per RBI norms)</p>
+                                            <p>✓ <strong>Right to Statement:</strong> You will receive monthly statements and full amortization schedule</p>
+                                            <p>✓ <strong>Right to Grievance Redressal:</strong> You can escalate concerns to our Grievance Officer (details in footer)</p>
+                                            <p>✓ <strong>No Unilateral Changes:</strong> Terms cannot be changed without 30-day prior written notice</p>
+                                            <p>✓ <strong>Fair Collection:</strong> RBI-compliant recovery practices (no calls before 8 AM or after 7 PM)</p>
+                                        </div>
+                                    </details>
+
+                                    {/* Section D: Data Usage & Privacy */}
+                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
+                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
+                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
+                                                <span className="w-6 h-6 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 text-xs font-bold">D</span>
+                                                Data Usage & Privacy
+                                            </h5>
+                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
+                                        </summary>
+                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
+                                            <p><strong className="text-gray-300">Data Collected:</strong> KYC documents, bank details, employment information, credit bureau data</p>
+                                            <p><strong className="text-gray-300">Purpose:</strong> Loan processing, credit assessment, regulatory compliance, EMI collection</p>
+                                            <p><strong className="text-gray-300">Sharing:</strong> Credit bureaus (CIBIL, Experian), RBI as required by law</p>
+                                            <p><strong className="text-gray-300">No Misuse Assurance:</strong> Your data will not be sold or used for unsolicited marketing</p>
+                                            <p><strong className="text-gray-300">Retention:</strong> As per RBI record-keeping guidelines (minimum 8 years after loan closure)</p>
+                                        </div>
+                                    </details>
+
+                                    {/* Section E: Default & Recovery */}
+                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
+                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
+                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
+                                                <span className="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 text-xs font-bold">E</span>
+                                                Default & Recovery (Ethical Practices)
+                                            </h5>
+                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
+                                        </summary>
+                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
+                                            <p><strong className="text-gray-300">No Coercive Practices:</strong> We adhere strictly to RBI Fair Practices Code</p>
+                                            <p><strong className="text-gray-300">Recovery Hours:</strong> Contact only between 8 AM - 7 PM on weekdays</p>
+                                            <p><strong className="text-gray-300">Communication:</strong> Polite reminders via SMS/Email before any escalation</p>
+                                            <p><strong className="text-gray-300">Dispute Resolution:</strong> 30-day window to raise disputes before reporting to credit bureaus</p>
+                                            <p><strong className="text-gray-300">Legal Action:</strong> Only as last resort after exhausting all communication channels</p>
+                                        </div>
+                                    </details>
                                 </div>
 
-                                {/* Full Agreement Text Scroll */}
-                                <div className="p-4 bg-black/40 rounded-xl border border-white/10 max-h-40 overflow-y-auto custom-scrollbar">
+                                {/* Full Legal Text Scroll */}
+                                <div className="p-4 bg-black/40 rounded-xl border border-white/10 max-h-32 overflow-y-auto custom-scrollbar">
                                     <p className="text-gray-500 text-[10px] mb-2 font-bold uppercase tracking-widest">Full Legal Text</p>
                                     <pre className="text-gray-400 text-xs whitespace-pre-wrap font-sans leading-relaxed">
                                         {agreement.agreement_text}
                                     </pre>
                                 </div>
 
-                                {/* Signing Section - Premium Design */}
+                                {/* Consent & Acknowledgement - Critical UX Zone */}
                                 <div className="bg-gradient-to-r from-teal-500/10 to-blue-500/10 p-6 rounded-2xl border border-teal-500/30">
                                     <div className="flex items-center gap-4 mb-6">
                                         <div className="w-12 h-12 bg-teal-500 rounded-full flex items-center justify-center shadow-lg shadow-teal-500/20">
                                             <User className="w-6 h-6 text-white" />
                                         </div>
                                         <div>
-                                            <h5 className="text-white font-bold">Digital Signature Confirmation</h5>
-                                            <p className="text-gray-400 text-xs uppercase tracking-tighter">Verified Aadhaar eSign Proxy</p>
+                                            <h5 className="text-white font-bold">Digital Signature & Consent</h5>
+                                            <p className="text-gray-400 text-xs uppercase tracking-tighter">Verified eSign as per IT Act, 2000</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
+                                        {/* Checkbox 1: Terms Agreement */}
                                         <label className="flex items-start gap-4 p-4 bg-gray-900/60 rounded-xl border border-white/10 cursor-pointer hover:border-teal-500/50 transition-colors">
                                             <div className="relative flex items-center mt-1">
                                                 <input
@@ -2318,31 +2415,62 @@ export default function Dashboard() {
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-white text-sm font-medium">I solemnly affirm and accept all terms</p>
+                                                <p className="text-white text-sm font-medium">I confirm that I have read, understood, and agree to the loan terms</p>
                                                 <p className="text-gray-500 text-xs leading-tight">
-                                                    By checking this box, I acknowledge that I have read the complete Master Loan Agreement and Key Facts Statement. I authorize the lender to initiate NACH mandates for repayment.
+                                                    I acknowledge the loan amount, interest rate, EMI, charges, and repayment obligations as stated in the Key Facts Statement and agreement sections above.
                                                 </p>
                                             </div>
                                         </label>
 
-                                        <div className="flex flex-col md:flex-row gap-4">
+                                        {/* Checkbox 2: Electronic Agreement Validity */}
+                                        <label className="flex items-start gap-4 p-4 bg-gray-900/60 rounded-xl border border-white/10 cursor-pointer hover:border-blue-500/50 transition-colors">
+                                            <div className="relative flex items-center mt-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={electronicConsent}
+                                                    onChange={(e) => setElectronicConsent(e.target.checked)}
+                                                    className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-white text-sm font-medium">I consent to electronic execution of this agreement</p>
+                                                <p className="text-gray-500 text-xs leading-tight">
+                                                    I acknowledge that this digital signature is legally valid under the Information Technology Act, 2000 and constitutes my binding consent.
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        {/* CTA Buttons */}
+                                        <div className="flex flex-col md:flex-row gap-4 pt-2">
                                             <button
                                                 onClick={() => signAgreement(applicationId)}
-                                                disabled={!agreementConsent}
+                                                disabled={!agreementConsent || !electronicConsent}
                                                 className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-40 disabled:grayscale rounded-xl text-white font-bold text-lg shadow-xl shadow-teal-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                                             >
                                                 <CheckCircle className="w-5 h-5" />
-                                                eSign Agreement Digitally
+                                                Accept Agreement & Proceed
                                             </button>
                                             <button
                                                 className="px-6 py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
                                                 onClick={() => window.print()}
                                             >
-                                                <Search className="w-4 h-4" />
-                                                Download Draft
+                                                <Download className="w-4 h-4" />
+                                                Download Agreement (PDF)
+                                            </button>
+                                        </div>
+
+                                        {/* Cancel/Exit Option */}
+                                        <div className="text-center pt-2">
+                                            <button
+                                                onClick={() => setKycStep(2)}
+                                                className="text-gray-500 hover:text-gray-300 text-sm underline underline-offset-4 transition-colors"
+                                            >
+                                                Cancel & Exit Without Penalty
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Security Indicators */}
                                     <div className="mt-4 flex items-center justify-center gap-6">
                                         <div className="flex items-center gap-1 text-[10px] text-gray-500">
                                             <Shield className="w-3 h-3" /> Secure 256-bit SSL
@@ -2350,6 +2478,36 @@ export default function Dashboard() {
                                         <div className="flex items-center gap-1 text-[10px] text-gray-500">
                                             <Clock className="w-3 h-3" /> {new Date().toLocaleTimeString()} eSign Server
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer – Regulatory Assurance */}
+                                <div className="bg-gray-900/80 p-6 rounded-2xl border border-white/5 space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center md:text-left">
+                                        <div>
+                                            <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Lender Details</p>
+                                            <p className="text-gray-400 text-xs">LoanAdvisor Financial Services Pvt. Ltd.</p>
+                                            <p className="text-gray-500 text-[10px]">CIN: U65910KA2024PTC185XXX</p>
+                                            <p className="text-gray-500 text-[10px]">RBI Reg: N-05.00XXX</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Grievance Officer</p>
+                                            <p className="text-gray-400 text-xs">Mr. Compliance Officer</p>
+                                            <p className="text-teal-400 text-xs">grievance@loanadvisor.in</p>
+                                            <p className="text-gray-500 text-[10px]">Response within 48 hours</p>
+                                        </div>
+                                        <div className="md:text-right">
+                                            <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Agreement Info</p>
+                                            <p className="text-gray-400 text-xs">Version: {agreement.agreement_version || 'v1.0'}</p>
+                                            <p className="text-gray-500 text-[10px]">Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 border-t border-white/5">
+                                        <p className="text-gray-500 text-[10px] text-center leading-relaxed">
+                                            This loan is subject to terms and conditions. All disputes shall be subject to courts/tribunals having jurisdiction in Bangalore.
+                                            The lender is governed by RBI's Fair Practices Code and Digital Lending Guidelines (2022).
+                                            For complaints, contact RBI Ombudsman at rb.crpc@rbi.org.in
+                                        </p>
                                     </div>
                                 </div>
                             </div>
