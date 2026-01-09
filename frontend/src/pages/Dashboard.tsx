@@ -2291,96 +2291,144 @@ export default function Dashboard() {
                                     </div>
                                 </div>
 
-                                {/* Agreement Sections - Expandable Accordions */}
-                                <div className="space-y-3">
-                                    {/* Section A: Interest & Charges */}
-                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
-                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
-                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
-                                                <span className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 text-xs font-bold">A</span>
-                                                Interest & Charges
-                                            </h5>
-                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
-                                        </summary>
-                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
-                                            <p><strong className="text-gray-300">Type:</strong> Fixed Rate Loan</p>
-                                            <p><strong className="text-gray-300">Annual Percentage Rate (APR):</strong> {agreement.interest_rate}%</p>
-                                            <p><strong className="text-gray-300">Processing Fee:</strong> ₹{agreement.processing_fee?.toLocaleString()} (2% of principal, one-time)</p>
-                                            <p><strong className="text-gray-300">Penal Interest:</strong> 2% per month on overdue amount (capped as per RBI guidelines)</p>
+                                {/* Agreement Sections - Clean Document Style */}
+                                <div className="space-y-6">
+                                    {/* Section 1: Interest & Charges */}
+                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
+                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400 text-sm font-bold">1</span>
+                                            Interest & Charges
+                                        </h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Loan Type</p>
+                                                <p className="text-white font-medium">Fixed Rate</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Interest Rate (APR)</p>
+                                                <p className="text-purple-400 font-bold text-lg">{agreement.interest_rate}%</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Processing Fee</p>
+                                                <p className="text-white font-medium">₹{agreement.processing_fee?.toLocaleString()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Penal Interest</p>
+                                                <p className="text-white font-medium">2% p.m.</p>
+                                            </div>
                                         </div>
-                                    </details>
+                                    </div>
 
-                                    {/* Section B: Repayment & EMI Rules */}
-                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
-                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
-                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
-                                                <span className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 text-xs font-bold">B</span>
-                                                Repayment & EMI Rules
-                                            </h5>
-                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
-                                        </summary>
-                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
-                                            <p><strong className="text-gray-300">EMI Schedule:</strong> {agreement.tenure_months} monthly installments of ₹{agreement.emi_amount?.toLocaleString()}</p>
-                                            <p><strong className="text-gray-300">EMI Date:</strong> 5th of every month via NACH/e-Mandate</p>
-                                            <p><strong className="text-gray-300">Grace Period:</strong> 5 days from due date (no penalty)</p>
-                                            <p><strong className="text-gray-300">Missed EMI:</strong> May result in penal charges and impact on credit score. We encourage early communication if facing difficulties.</p>
+                                    {/* Section 2: Repayment Schedule */}
+                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
+                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 text-sm font-bold">2</span>
+                                            Repayment Schedule
+                                        </h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Monthly EMI</p>
+                                                <p className="text-blue-400 font-bold text-lg">₹{agreement.emi_amount?.toLocaleString()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Tenure</p>
+                                                <p className="text-white font-medium">{agreement.tenure_months} months</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">EMI Date</p>
+                                                <p className="text-white font-medium">5th of month</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Grace Period</p>
+                                                <p className="text-green-400 font-medium">5 days</p>
+                                            </div>
                                         </div>
-                                    </details>
+                                    </div>
 
-                                    {/* Section C: Borrower Rights - HIGHLIGHTED */}
-                                    <details open className="group bg-gradient-to-r from-green-900/30 to-teal-900/20 rounded-xl border border-green-500/30 overflow-hidden">
-                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
-                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
-                                                <span className="w-6 h-6 bg-green-500/30 rounded-full flex items-center justify-center text-green-400 text-xs font-bold">C</span>
-                                                <span className="text-green-400">Borrower Rights</span>
-                                                <span className="px-2 py-0.5 bg-green-500/20 rounded text-[10px] text-green-400 font-bold">IMPORTANT</span>
-                                            </h5>
-                                            <ChevronRight className="w-4 h-4 text-green-400 group-open:rotate-90 transition-transform" />
-                                        </summary>
-                                        <div className="p-4 pt-0 text-gray-300 text-xs leading-relaxed space-y-2 border-t border-green-500/20">
-                                            <p>✓ <strong>Right to Prepayment:</strong> You may prepay or foreclose the loan after 6 EMIs with NIL penalty (as per RBI norms)</p>
-                                            <p>✓ <strong>Right to Statement:</strong> You will receive monthly statements and full amortization schedule</p>
-                                            <p>✓ <strong>Right to Grievance Redressal:</strong> You can escalate concerns to our Grievance Officer (details in footer)</p>
-                                            <p>✓ <strong>No Unilateral Changes:</strong> Terms cannot be changed without 30-day prior written notice</p>
-                                            <p>✓ <strong>Fair Collection:</strong> RBI-compliant recovery practices (no calls before 8 AM or after 7 PM)</p>
+                                    {/* Section 3: Your Rights */}
+                                    <div className="bg-gradient-to-r from-emerald-900/30 to-teal-900/20 rounded-xl p-6 border border-emerald-500/30">
+                                        <h4 className="text-emerald-400 font-bold text-lg mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400 text-sm font-bold">3</span>
+                                            Your Rights as Borrower
+                                            <span className="px-2 py-0.5 bg-emerald-500/20 rounded text-[10px] text-emerald-400 font-bold">PROTECTED</span>
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-gray-300 text-sm">Prepay after 6 EMIs with NIL penalty</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-gray-300 text-sm">Monthly statements provided</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-gray-300 text-sm">Grievance redressal available</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-gray-300 text-sm">No unilateral term changes</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-gray-300 text-sm">Fair collection (8 AM - 7 PM only)</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-gray-300 text-sm">30-day notice for any changes</span>
+                                            </div>
                                         </div>
-                                    </details>
+                                    </div>
 
-                                    {/* Section D: Data Usage & Privacy */}
-                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
-                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
-                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
-                                                <span className="w-6 h-6 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 text-xs font-bold">D</span>
-                                                Data Usage & Privacy
-                                            </h5>
-                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
-                                        </summary>
-                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
-                                            <p><strong className="text-gray-300">Data Collected:</strong> KYC documents, bank details, employment information, credit bureau data</p>
-                                            <p><strong className="text-gray-300">Purpose:</strong> Loan processing, credit assessment, regulatory compliance, EMI collection</p>
-                                            <p><strong className="text-gray-300">Sharing:</strong> Credit bureaus (CIBIL, Experian), RBI as required by law</p>
-                                            <p><strong className="text-gray-300">No Misuse Assurance:</strong> Your data will not be sold or used for unsolicited marketing</p>
-                                            <p><strong className="text-gray-300">Retention:</strong> As per RBI record-keeping guidelines (minimum 8 years after loan closure)</p>
+                                    {/* Section 4: Data & Privacy */}
+                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
+                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-400 text-sm font-bold">4</span>
+                                            Data & Privacy
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Data Collected</p>
+                                                <p className="text-gray-300">KYC, bank details, employment, credit bureau</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Sharing</p>
+                                                <p className="text-gray-300">CIBIL, Experian, RBI (as required by law)</p>
+                                            </div>
                                         </div>
-                                    </details>
+                                        <div className="mt-3 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                            <p className="text-emerald-400 text-sm flex items-center gap-2">
+                                                <Shield className="w-4 h-4" />
+                                                Your data will never be sold or used for unsolicited marketing
+                                            </p>
+                                        </div>
+                                    </div>
 
-                                    {/* Section E: Default & Recovery */}
-                                    <details className="group bg-gray-800/50 rounded-xl border border-white/5 overflow-hidden">
-                                        <summary className="p-4 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors">
-                                            <h5 className="text-white font-semibold text-sm flex items-center gap-2">
-                                                <span className="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 text-xs font-bold">E</span>
-                                                Default & Recovery (Ethical Practices)
-                                            </h5>
-                                            <ChevronRight className="w-4 h-4 text-gray-500 group-open:rotate-90 transition-transform" />
-                                        </summary>
-                                        <div className="p-4 pt-0 text-gray-400 text-xs leading-relaxed space-y-2 border-t border-white/5">
-                                            <p><strong className="text-gray-300">No Coercive Practices:</strong> We adhere strictly to RBI Fair Practices Code</p>
-                                            <p><strong className="text-gray-300">Recovery Hours:</strong> Contact only between 8 AM - 7 PM on weekdays</p>
-                                            <p><strong className="text-gray-300">Communication:</strong> Polite reminders via SMS/Email before any escalation</p>
-                                            <p><strong className="text-gray-300">Dispute Resolution:</strong> 30-day window to raise disputes before reporting to credit bureaus</p>
-                                            <p><strong className="text-gray-300">Legal Action:</strong> Only as last resort after exhausting all communication channels</p>
+                                    {/* Section 5: Recovery Terms */}
+                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
+                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+                                            <span className="w-8 h-8 bg-rose-500/20 rounded-lg flex items-center justify-center text-rose-400 text-sm font-bold">5</span>
+                                            Recovery & Default Terms
+                                        </h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Recovery Hours</p>
+                                                <p className="text-gray-300">8 AM - 7 PM</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">First Contact</p>
+                                                <p className="text-gray-300">SMS/Email reminder</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Dispute Window</p>
+                                                <p className="text-gray-300">30 days</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs mb-1">Practices</p>
+                                                <p className="text-emerald-400">RBI Compliant</p>
+                                            </div>
                                         </div>
-                                    </details>
+                                    </div>
                                 </div>
 
                                 {/* Full Legal Text Scroll */}
