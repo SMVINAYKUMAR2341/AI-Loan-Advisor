@@ -2404,7 +2404,7 @@ export default function Dashboard() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        {/* Checkbox 1: Terms Agreement */}
+                                        {/* Consent Checkbox */}
                                         <label className="flex items-start gap-4 p-4 bg-gray-900/60 rounded-xl border border-white/10 cursor-pointer hover:border-teal-500/50 transition-colors">
                                             <div className="relative flex items-center mt-1">
                                                 <input
@@ -2417,25 +2417,7 @@ export default function Dashboard() {
                                             <div className="space-y-1">
                                                 <p className="text-white text-sm font-medium">I confirm that I have read, understood, and agree to the loan terms</p>
                                                 <p className="text-gray-500 text-xs leading-tight">
-                                                    I acknowledge the loan amount, interest rate, EMI, charges, and repayment obligations as stated in the Key Facts Statement and agreement sections above.
-                                                </p>
-                                            </div>
-                                        </label>
-
-                                        {/* Checkbox 2: Electronic Agreement Validity */}
-                                        <label className="flex items-start gap-4 p-4 bg-gray-900/60 rounded-xl border border-white/10 cursor-pointer hover:border-blue-500/50 transition-colors">
-                                            <div className="relative flex items-center mt-1">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={electronicConsent}
-                                                    onChange={(e) => setElectronicConsent(e.target.checked)}
-                                                    className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-white text-sm font-medium">I consent to electronic execution of this agreement</p>
-                                                <p className="text-gray-500 text-xs leading-tight">
-                                                    I acknowledge that this digital signature is legally valid under the Information Technology Act, 2000 and constitutes my binding consent.
+                                                    I acknowledge the loan amount, interest rate, EMI, charges, and repayment obligations. I consent to electronic execution of this agreement as per IT Act, 2000.
                                                 </p>
                                             </div>
                                         </label>
@@ -2444,7 +2426,7 @@ export default function Dashboard() {
                                         <div className="flex flex-col md:flex-row gap-4 pt-2">
                                             <button
                                                 onClick={() => signAgreement(applicationId)}
-                                                disabled={!agreementConsent || !electronicConsent}
+                                                disabled={!agreementConsent}
                                                 className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-40 disabled:grayscale rounded-xl text-white font-bold text-lg shadow-xl shadow-teal-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                                             >
                                                 <CheckCircle className="w-5 h-5" />
