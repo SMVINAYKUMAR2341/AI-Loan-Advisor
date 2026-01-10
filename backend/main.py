@@ -3940,7 +3940,7 @@ async def sign_loan_agreement(
     Sign the loan agreement.
     Requires explicit consent checkbox.
     """
-    from backend import device_utils
+    import device_utils
     
     application, prediction, kyc_tracking = await verify_kyc_eligibility(
         application_id, current_user.id, db
