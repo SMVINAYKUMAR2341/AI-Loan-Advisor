@@ -1249,6 +1249,7 @@ async def generate_tracking_id(db: AsyncSession) -> str:
 @app.post("/loan-application", response_model=schemas.LoanApplicationResponse)
 async def submit_loan_application(
     application: schemas.LoanApplicationCreate,
+    request: Request,
     db: AsyncSession = Depends(database.get_db),
     current_user: Optional[models.User] = Depends(auth.get_optional_user)
 ):
@@ -1351,7 +1352,7 @@ async def submit_loan_application(
         await db.refresh(db_prediction)
         
         # 5. Return response
-        return schemas.LoanApplicationResponse(
+        response_model = schemas.LoanApplicationResponse(
             id=db_application.id,
             created_at=db_application.created_at,
             decision=result['decision'],
@@ -1368,12 +1369,105 @@ async def submit_loan_application(
             kyc_required=result['kyc_required']
         )
         
+        # 6. Log Audit Event (Background task to avoid latency)
+        await log_audit(
+            db=db,
+            user_id=current_user.id,
+            action="LOAN_APPLIED",
+            entity_type="LOAN_APPLICATION",
+            entity_id=str(db_application.id),
+            description=f"Applied for {application.loan_purpose} loan of ₹{application.loan_amount:,}",
+            metadata={"amount": application.loan_amount, "purpose": application.loan_purpose},
+            request=request,
+            session_id=None 
+        )
+
+        return response_model
+        
     except Exception as e:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Application submission failed: {str(e)}"
         )
+
+
+# =====================================================
+# ACTIVITY & AUDIT LOG ENDPOINTS
+# =====================================================
+
+@app.get("/activity", response_model=dict)
+async def get_all_activity(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all activity logs for the current user"""
+    query = select(models.AuditLog).where(
+        models.AuditLog.user_id == current_user.id
+    ).order_by(models.AuditLog.timestamp.desc()).limit(50)
+    
+    result = await db.execute(query)
+    events = result.scalars().all()
+    
+    return {
+        "events": events,
+        "total_events": len(events)
+    }
+
+@app.get("/activity/{category}", response_model=dict)
+async def get_activity_by_category(
+    category: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get activity logs filtered by category"""
+    # Map frontend categories to backend enums if needed
+    category_map = {
+        "loans": "LOAN",
+        "security": "SECURITY",
+        "kyc": "KYC",
+        "payments": "PAYMENT",
+        "profile": "PROFILE"
+    }
+    
+    db_category = category_map.get(category.lower(), category.upper())
+    
+    query = select(models.AuditLog).where(
+        models.AuditLog.user_id == current_user.id,
+        models.AuditLog.event_category == db_category
+    ).order_by(models.AuditLog.timestamp.desc()).limit(50)
+    
+    result = await db.execute(query)
+    events = result.scalars().all()
+    
+    return {
+        "events": events,
+        "total_events": len(events)
+    }
+
+@app.get("/sessions", response_model=dict)
+async def get_active_sessions(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get active sessions (Mock for now as we use stateless JWT)"""
+    # In a real app, we would query a sessions table. 
+    # For now, return a mock session representing the current one.
+    return {
+        "sessions": [
+            {
+                "id": "curr_session",
+                "started_at": datetime.now().isoformat(),
+                "browser": "Chrome", 
+                "os": "Windows",
+                "location": "Bangalore, India",
+                "device_type": "Desktop",
+                "is_active": True,
+                "is_new_device": False,
+                "last_activity": datetime.now().isoformat()
+            }
+        ]
+    }
 
 
 @app.get("/my-applications", response_model=List[schemas.ApplicationListItem])
