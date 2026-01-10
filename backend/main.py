@@ -442,6 +442,99 @@ async def admin_login(
 
 
 # =====================================================
+# USER FINANCIAL DATA ENDPOINTS
+# =====================================================
+
+@app.get("/loan-applications")
+async def get_my_loan_applications(
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all loan applications for the current user"""
+    query = (
+        select(models.LoanApplication, models.LoanPrediction)
+        .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
+        .where(models.LoanApplication.user_id == user.id)
+        .order_by(models.LoanApplication.created_at.desc())
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(app.id),
+        "loan_amount": app.loan_amount,
+        "loan_purpose": app.loan_purpose,
+        "created_at": app.created_at.isoformat(),
+        "tracking_id": app.tracking_id,
+        # Prediction details (might be None if not processed yet)
+        "decision": pred.decision if pred else "PENDING",
+        "status": pred.decision if pred else "PENDING", # Map decision to status for frontend compatibility
+        "approval_probability": pred.approval_probability if pred else 0,
+        "interest_rate": pred.interest_rate if pred else 0,
+        "emi": pred.emi if pred else 0,
+        "tenure": app.loan_duration
+    } for app, pred in rows]
+
+
+@app.get("/repayments/me")
+async def get_my_repayments(
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all EMI repayments for the current user across all loans"""
+    # Join with LoanApplication to ensure we get repayments for this user's loans
+    query = (
+        select(models.Repayment)
+        .join(models.LoanApplication)
+        .where(models.LoanApplication.user_id == user.id)
+        .order_by(models.Repayment.due_date.desc())
+    )
+    result = await db.execute(query)
+    repayments = result.scalars().all()
+    
+    return [{
+        "id": str(r.id),
+        "application_id": str(r.application_id),
+        "emi_number": r.emi_number,
+        "due_date": r.due_date.isoformat(),
+        "emi_amount": r.emi_amount,
+        "payment_status": r.payment_status,
+        "payment_date": r.payment_date.isoformat() if r.payment_date else None,
+        "payment_amount": r.payment_amount,
+        "payment_reference": r.payment_reference,
+        "payment_method": r.payment_method
+    } for r in repayments]
+
+
+@app.get("/disbursements/me")
+async def get_my_disbursements(
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all loan disbursements received by the user"""
+    query = (
+        select(models.Disbursement, models.LoanApplication)
+        .join(models.LoanApplication, models.Disbursement.application_id == models.LoanApplication.id)
+        .where(models.Disbursement.user_id == user.id)
+        .order_by(models.Disbursement.processed_at.desc())
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(d.id),
+        "application_id": str(d.application_id),
+        "amount": d.amount,
+        "transaction_ref": d.transaction_ref,
+        "status": d.status,
+        "processed_at": d.processed_at.isoformat() if d.processed_at else None,
+        "loan_purpose": app.loan_purpose,
+        "bank_name": d.bank_name,
+        "account_number_masked": d.account_number_masked
+    } for d, app in rows]
+
+
+# =====================================================
 # ADMIN PROFILE MANAGEMENT ENDPOINTS
 # =====================================================
 

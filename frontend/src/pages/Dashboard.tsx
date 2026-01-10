@@ -144,6 +144,8 @@ export default function Dashboard() {
         loan_amount: number;
         loan_purpose: string;
         decision: string;
+        status: string; // Mapped from decision
+        interest_rate: number;
         approval_probability: number;
         created_at: string;
         tracking_id?: string;
@@ -162,6 +164,38 @@ export default function Dashboard() {
         processed_at: string;
     }
     const [disbursements, setDisbursements] = useState<DisbursementItem[]>([]);
+
+    // REPAYMENTS STATE
+    interface RepaymentItem {
+        id: string;
+        application_id: string;
+        emi_number: number;
+        due_date: string;
+        emi_amount: number;
+        payment_status: string;
+        payment_date?: string;
+        payment_amount?: number;
+        payment_reference?: string;
+    }
+    const [repayments, setRepayments] = useState<RepaymentItem[]>([]);
+    const [repaymentsLoading, setRepaymentsLoading] = useState(false);
+
+    const fetchRepayments = async () => {
+        setRepaymentsLoading(true);
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/repayments/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setRepayments(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch repayments:", error);
+        }
+        setRepaymentsLoading(false);
+    };
 
     const fetchLoanApplications = async () => {
         setLoanApplicationsLoading(true);
@@ -299,6 +333,19 @@ export default function Dashboard() {
             if (response.ok) {
                 const data = await response.json();
                 setAccountData(data);
+                // Update profileData with real user info to fix ProfileOverview showing mock data
+                setProfileData(prev => prev ? {
+                    ...prev,
+                    user: {
+                        ...prev.user,
+                        fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim() || prev.user.fullName,
+                        email: data.email || prev.user.email,
+                        phone: data.mobile_number || prev.user.phone,
+                        id: data.customer_id || prev.user.id,
+                        createdAt: data.created_at || prev.user.createdAt,
+                        accountStatus: data.kyc_verified ? 'kyc_verified' : 'kyc_pending',
+                    }
+                } : prev);
             }
         } catch (error) {
             console.error("Failed to fetch account:", error);
@@ -311,6 +358,9 @@ export default function Dashboard() {
         if (activeSection === "loans") {
             fetchLoanApplications();
             fetchDisbursements();
+        } else if (activeSection === "repayments") {
+            fetchRepayments();
+            fetchLoanApplications();
         }
     }, [activeSection]);
 
@@ -607,6 +657,13 @@ export default function Dashboard() {
         window.addEventListener("resize", checkMobile);
         return () => window.removeEventListener("resize", checkMobile);
     }, []);
+
+    // Fetch account data on initial load to populate ProfileOverview with real data
+    useEffect(() => {
+        if (isAuthenticated && !accountData) {
+            fetchAccountData();
+        }
+    }, [isAuthenticated]);
 
     const handleLogout = () => {
         localStorage.removeItem("user_id");
@@ -2792,538 +2849,595 @@ export default function Dashboard() {
     };
 
     // REPAYMENTS SECTION
-    const renderRepaymentsSection = () => (
-        <div className="space-y-6">
-            <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
-                <h3 className="text-xl font-semibold text-white mb-6">Repayments & EMIs</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                        <p className="text-gray-400 text-sm">Next EMI Due</p>
-                        <p className="text-2xl font-bold text-white mt-1">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</p>
-                        <p className="text-yellow-400 text-sm mt-1 flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {new Date(mockDashboardData.activeLoan.nextEmiDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </p>
-                    </div>
-                    <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
-                        <p className="text-gray-400 text-sm">EMIs Paid</p>
-                        <p className="text-2xl font-bold text-white mt-1">{mockDashboardData.activeLoan.paidEmis}</p>
-                        <p className="text-green-400 text-sm mt-1">of {mockDashboardData.activeLoan.tenure} months</p>
-                    </div>
-                    <div className="p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
-                        <p className="text-gray-400 text-sm">Interest Rate</p>
-                        <p className="text-2xl font-bold text-white mt-1">{mockDashboardData.activeLoan.interestRate}%</p>
-                        <p className="text-teal-400 text-sm mt-1">per annum</p>
-                    </div>
-                </div>
-                <button
-                    onClick={handlePayNow}
-                    className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
-                >
-                    Pay Now
-                </button>
-            </div>
+    const renderRepaymentsSection = () => {
+        // Calculate stats from real data
+        const totalPaidEmis = repayments.filter(r => r.payment_status === 'PAID').length;
+        const nextEmi = repayments.find(r => r.payment_status === 'PENDING') || repayments[0]; // Simple logic for now
+        const nextEmiDate = nextEmi ? new Date(nextEmi.due_date) : new Date();
+        const nextEmiAmount = nextEmi ? nextEmi.emi_amount : 0;
 
-            {/* BANK TRANSACTIONS SECTION */}
-            <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold text-white">Bank Transactions</h3>
-                    <button
-                        onClick={async () => {
-                            setLoadingTransactions(true);
-                            try {
-                                const data = await getMockBankTransactions();
-                                setBankTransactions(data);
-                            } catch (error) {
-                                console.error('Failed to load transactions:', error);
-                            } finally {
-                                setLoadingTransactions(false);
-                            }
-                        }}
-                        className="px-4 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg text-sm font-medium transition"
-                    >
-                        {loadingTransactions ? 'Loading...' : bankTransactions ? 'Refresh' : 'Load Transactions'}
-                    </button>
-                </div>
+        // Derive interest rate from active loan (if available) or fallback
+        const activeLoan = loanApplications.find(l => l.status === 'APPROVED' || l.status === 'DISBURSED');
+        const interestRate = activeLoan?.interest_rate || 0;
 
-                {bankTransactions ? (
-                    <div className="space-y-4">
-                        {/* Account Info */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-900/50 rounded-xl">
-                            <div>
-                                <p className="text-gray-500 text-xs">Account Holder</p>
-                                <p className="text-white font-medium">{bankTransactions.account_holder}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-xs">Account</p>
-                                <p className="text-white font-medium">{bankTransactions.account_number}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-xs">Bank</p>
-                                <p className="text-white font-medium">{bankTransactions.bank_name}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-xs">IFSC</p>
-                                <p className="text-white font-medium">{bankTransactions.ifsc}</p>
-                            </div>
+        return (
+            <div className="space-y-6">
+                <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
+                    <h3 className="text-xl font-semibold text-white mb-6">Repayments & EMIs</h3>
+
+                    {repaymentsLoading ? (
+                        <div className="text-center py-8 text-gray-400">Loading repayments...</div>
+                    ) : repayments.length === 0 ? (
+                        <div className="text-center py-8">
+                            <p className="text-gray-400">No repayment schedule found.</p>
                         </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                                    <p className="text-gray-400 text-sm">Next EMI Due</p>
+                                    <p className="text-2xl font-bold text-white mt-1">{formatCurrency(nextEmiAmount)}</p>
+                                    <p className="text-yellow-400 text-sm mt-1 flex items-center gap-1">
+                                        <Calendar className="w-4 h-4" />
+                                        {nextEmiDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </p>
+                                </div>
+                                <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                                    <p className="text-gray-400 text-sm">EMIs Paid</p>
+                                    <p className="text-2xl font-bold text-white mt-1">{totalPaidEmis}</p>
+                                    <p className="text-green-400 text-sm mt-1">of {repayments.length} total</p>
+                                </div>
+                                <div className="p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
+                                    <p className="text-gray-400 text-sm">Interest Rate</p>
+                                    <p className="text-2xl font-bold text-white mt-1">{interestRate}%</p>
+                                    <p className="text-teal-400 text-sm mt-1">per annum</p>
+                                </div>
+                            </div>
 
-                        {/* Summary */}
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                                <p className="text-gray-400 text-xs">Total Credits</p>
-                                <p className="text-green-400 font-bold">₹{bankTransactions.summary.total_credits.toLocaleString()}</p>
-                            </div>
-                            <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                                <p className="text-gray-400 text-xs">Total Debits</p>
-                                <p className="text-red-400 font-bold">₹{bankTransactions.summary.total_debits.toLocaleString()}</p>
-                            </div>
-                            <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                                <p className="text-gray-400 text-xs">Opening Balance</p>
-                                <p className="text-blue-400 font-bold">₹{bankTransactions.summary.opening_balance.toLocaleString()}</p>
-                            </div>
-                            <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                                <p className="text-gray-400 text-xs">Closing Balance</p>
-                                <p className="text-purple-400 font-bold">₹{bankTransactions.summary.closing_balance.toLocaleString()}</p>
-                            </div>
-                            <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                                <p className="text-gray-400 text-xs">Avg Balance</p>
-                                <p className="text-amber-400 font-bold">₹{bankTransactions.summary.average_balance.toLocaleString()}</p>
-                            </div>
-                        </div>
-
-                        {/* Transactions Table */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-gray-700">
-                                        <th className="text-left py-3 px-2 text-gray-400 font-medium">Date</th>
-                                        <th className="text-left py-3 px-2 text-gray-400 font-medium">Description</th>
-                                        <th className="text-left py-3 px-2 text-gray-400 font-medium">Mode</th>
-                                        <th className="text-right py-3 px-2 text-gray-400 font-medium">Amount</th>
-                                        <th className="text-right py-3 px-2 text-gray-400 font-medium">Balance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {bankTransactions.transactions.slice(0, 10).map((txn) => (
-                                        <tr key={txn.id} className="border-b border-gray-800 hover:bg-gray-700/30">
-                                            <td className="py-3 px-2 text-gray-300">{new Date(txn.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
-                                            <td className="py-3 px-2">
-                                                <p className="text-white text-xs truncate max-w-[200px]">{txn.description}</p>
-                                                <p className="text-gray-500 text-[10px]">{txn.category}</p>
-                                            </td>
-                                            <td className="py-3 px-2">
-                                                <span className="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-gray-300">{txn.mode}</span>
-                                            </td>
-                                            <td className={`py-3 px-2 text-right font-medium ${txn.type === 'CREDIT' ? 'text-green-400' : 'text-red-400'}`}>
-                                                {txn.type === 'CREDIT' ? '+' : '-'}₹{txn.amount.toLocaleString()}
-                                            </td>
-                                            <td className="py-3 px-2 text-right text-gray-300">₹{txn.balance.toLocaleString()}</td>
+                            {/* Repayment History Table */}
+                            <div className="overflow-hidden rounded-xl border border-gray-700">
+                                <table className="w-full text-sm text-left text-gray-400">
+                                    <thead className="bg-gray-700/50 text-gray-300 uppercase font-medium">
+                                        <tr>
+                                            <th className="px-4 py-3">EMI No</th>
+                                            <th className="px-4 py-3">Due Date</th>
+                                            <th className="px-4 py-3">Amount</th>
+                                            <th className="px-4 py-3">Status</th>
+                                            <th className="px-4 py-3">Paid On</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        {bankTransactions.transactions.length > 10 && (
-                            <p className="text-gray-500 text-xs text-center">Showing 10 of {bankTransactions.transactions.length} transactions</p>
-                        )}
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-700">
+                                        {repayments.map((r) => (
+                                            <tr key={r.id} className="hover:bg-gray-700/30">
+                                                <td className="px-4 py-3">#{r.emi_number}</td>
+                                                <td className="px-4 py-3">{new Date(r.due_date).toLocaleDateString()}</td>
+                                                <td className="px-4 py-3 font-medium text-white">{formatCurrency(r.emi_amount)}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${r.payment_status === 'PAID' ? 'bg-green-500/20 text-green-400' :
+                                                        r.payment_status === 'OVERDUE' ? 'bg-red-500/20 text-red-400' :
+                                                            'bg-yellow-500/20 text-yellow-400'
+                                                        }`}>
+                                                        {r.payment_status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">{r.payment_date ? new Date(r.payment_date).toLocaleDateString() : '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button
+                                onClick={handlePayNow}
+                                className="w-full mt-6 py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
+                            >
+                                Pay Now
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                {/* BANK TRANSACTIONS SECTION */}
+                <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-white">Bank Transactions</h3>
+                        <button
+                            onClick={async () => {
+                                setLoadingTransactions(true);
+                                try {
+                                    const data = await getMockBankTransactions();
+                                    setBankTransactions(data);
+                                } catch (error) {
+                                    console.error('Failed to load transactions:', error);
+                                } finally {
+                                    setLoadingTransactions(false);
+                                }
+                            }}
+                            className="px-4 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg text-sm font-medium transition"
+                        >
+                            {loadingTransactions ? 'Loading...' : bankTransactions ? 'Refresh' : 'Load Transactions'}
+                        </button>
                     </div>
-                ) : (
-                    <div className="text-center py-8">
-                        <Wallet className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                        <p className="text-gray-400">Click "Load Transactions" to view your bank statement</p>
-                        <p className="text-gray-500 text-xs mt-1">Simulates Account Aggregator data fetch</p>
+
+                    {bankTransactions ? (
+                        <div className="space-y-4">
+                            {/* Account Info */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-900/50 rounded-xl">
+                                <div>
+                                    <p className="text-gray-500 text-xs">Account Holder</p>
+                                    <p className="text-white font-medium">{bankTransactions.account_holder}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 text-xs">Account</p>
+                                    <p className="text-white font-medium">{bankTransactions.account_number}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 text-xs">Bank</p>
+                                    <p className="text-white font-medium">{bankTransactions.bank_name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 text-xs">IFSC</p>
+                                    <p className="text-white font-medium">{bankTransactions.ifsc}</p>
+                                </div>
+                            </div>
+
+                            {/* Summary */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                                    <p className="text-gray-400 text-xs">Total Credits</p>
+                                    <p className="text-green-400 font-bold">₹{bankTransactions.summary.total_credits.toLocaleString()}</p>
+                                </div>
+                                <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                                    <p className="text-gray-400 text-xs">Total Debits</p>
+                                    <p className="text-red-400 font-bold">₹{bankTransactions.summary.total_debits.toLocaleString()}</p>
+                                </div>
+                                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                    <p className="text-gray-400 text-xs">Opening Balance</p>
+                                    <p className="text-blue-400 font-bold">₹{bankTransactions.summary.opening_balance.toLocaleString()}</p>
+                                </div>
+                                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                                    <p className="text-gray-400 text-xs">Closing Balance</p>
+                                    <p className="text-purple-400 font-bold">₹{bankTransactions.summary.closing_balance.toLocaleString()}</p>
+                                </div>
+                                <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                                    <p className="text-gray-400 text-xs">Avg Balance</p>
+                                    <p className="text-amber-400 font-bold">₹{bankTransactions.summary.average_balance.toLocaleString()}</p>
+                                </div>
+                            </div>
+
+                            {/* Transactions Table */}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-gray-700">
+                                            <th className="text-left py-3 px-2 text-gray-400 font-medium">Date</th>
+                                            <th className="text-left py-3 px-2 text-gray-400 font-medium">Description</th>
+                                            <th className="text-left py-3 px-2 text-gray-400 font-medium">Mode</th>
+                                            <th className="text-right py-3 px-2 text-gray-400 font-medium">Amount</th>
+                                            <th className="text-right py-3 px-2 text-gray-400 font-medium">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {bankTransactions.transactions.slice(0, 10).map((txn) => (
+                                            <tr key={txn.id} className="border-b border-gray-800 hover:bg-gray-700/30">
+                                                <td className="py-3 px-2 text-gray-300">{new Date(txn.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
+                                                <td className="py-3 px-2">
+                                                    <p className="text-white text-xs truncate max-w-[200px]">{txn.description}</p>
+                                                    <p className="text-gray-500 text-[10px]">{txn.category}</p>
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <span className="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-gray-300">{txn.mode}</span>
+                                                </td>
+                                                <td className={`py-3 px-2 text-right font-medium ${txn.type === 'CREDIT' ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {txn.type === 'CREDIT' ? '+' : '-'}₹{txn.amount.toLocaleString()}
+                                                </td>
+                                                <td className="py-3 px-2 text-right text-gray-300">₹{txn.balance.toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {bankTransactions.transactions.length > 10 && (
+                                <p className="text-gray-500 text-xs text-center">Showing 10 of {bankTransactions.transactions.length} transactions</p>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8">
+                            <Wallet className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                            <p className="text-gray-400">Click "Load Transactions" to view your bank statement</p>
+                            <p className="text-gray-500 text-xs mt-1">Simulates Account Aggregator data fetch</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* PAYMENT GATEWAY MODAL */}
+                {showPaymentGateway && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-gray-900 rounded-2xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            {/* Header */}
+                            <div className="p-6 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-900">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white">Secure Payment Gateway</h2>
+                                    <p className="text-gray-400 text-sm">Amount: {formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</p>
+                                </div>
+                                <button onClick={closePaymentGateway} className="text-gray-400 hover:text-white">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-6">
+                                {/* STEP 1: SELECT PAYMENT METHOD */}
+                                {paymentStep === 'method' && (
+                                    <div className="space-y-4">
+                                        <h3 className="text-lg font-semibold text-white mb-4">Choose Payment Method</h3>
+
+                                        {/* Credit/Debit Card */}
+                                        <button
+                                            onClick={() => handlePaymentMethodSelect('card')}
+                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
+                                        >
+                                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                                <CreditCard className="w-6 h-6 text-white" />
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <p className="text-white font-semibold">Credit / Debit Card</p>
+                                                <p className="text-gray-400 text-sm">Visa, Mastercard, RuPay, Amex</p>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
+                                        </button>
+
+                                        {/* UPI */}
+                                        <button
+                                            onClick={() => handlePaymentMethodSelect('upi')}
+                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
+                                        >
+                                            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
+                                                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <p className="text-white font-semibold">UPI</p>
+                                                <p className="text-gray-400 text-sm">Google Pay, PhonePe, Paytm, BHIM</p>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
+                                        </button>
+
+                                        {/* Net Banking */}
+                                        <button
+                                            onClick={() => handlePaymentMethodSelect('netbanking')}
+                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
+                                        >
+                                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center">
+                                                <Wallet className="w-6 h-6 text-white" />
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <p className="text-white font-semibold">Net Banking</p>
+                                                <p className="text-gray-400 text-sm">All major banks supported</p>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
+                                        </button>
+
+                                        {/* Wallets */}
+                                        <button
+                                            onClick={() => handlePaymentMethodSelect('wallet')}
+                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
+                                        >
+                                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
+                                                <Sparkles className="w-6 h-6 text-white" />
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                <p className="text-white font-semibold">Digital Wallets</p>
+                                                <p className="text-gray-400 text-sm">Paytm, Amazon Pay, PhonePe</p>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* STEP 2: PAYMENT DETAILS */}
+                                {paymentStep === 'details' && paymentMethod === 'card' && (
+                                    <div className="space-y-4">
+                                        <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
+                                            ← Back to payment methods
+                                        </button>
+                                        <h3 className="text-lg font-semibold text-white mb-4">Enter Card Details</h3>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">Card Number</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="1234 5678 9012 3456"
+                                                    maxLength={19}
+                                                    value={paymentData.cardNumber}
+                                                    onChange={(e) => setPaymentData({ ...paymentData, cardNumber: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">Cardholder Name</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="JOHN DOE"
+                                                    value={paymentData.cardName}
+                                                    onChange={(e) => setPaymentData({ ...paymentData, cardName: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Month</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="MM"
+                                                        maxLength={2}
+                                                        value={paymentData.expiryMonth}
+                                                        onChange={(e) => setPaymentData({ ...paymentData, expiryMonth: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Year</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="YY"
+                                                        maxLength={2}
+                                                        value={paymentData.expiryYear}
+                                                        onChange={(e) => setPaymentData({ ...paymentData, expiryYear: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-300 mb-2">CVV</label>
+                                                    <input
+                                                        type="password"
+                                                        placeholder="123"
+                                                        maxLength={3}
+                                                        value={paymentData.cvv}
+                                                        onChange={(e) => setPaymentData({ ...paymentData, cvv: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={processPayment}
+                                                className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition mt-6"
+                                            >
+                                                Pay {formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {paymentStep === 'details' && paymentMethod === 'upi' && (
+                                    <div className="space-y-4">
+                                        <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
+                                            ← Back to payment methods
+                                        </button>
+                                        <h3 className="text-lg font-semibold text-white mb-4">Enter UPI ID</h3>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">UPI ID</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="yourname@paytm"
+                                                    value={paymentData.upiId}
+                                                    onChange={(e) => setPaymentData({ ...paymentData, upiId: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                />
+                                                <p className="text-gray-400 text-xs mt-2">Enter your UPI ID (e.g., name@gpay, name@paytm)</p>
+                                            </div>
+                                            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                                                <p className="text-blue-400 text-sm">You will receive a payment request on your UPI app</p>
+                                            </div>
+                                            <button
+                                                onClick={processPayment}
+                                                className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
+                                            >
+                                                Send Payment Request
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {paymentStep === 'details' && paymentMethod === 'netbanking' && (
+                                    <div className="space-y-4">
+                                        <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
+                                            ← Back to payment methods
+                                        </button>
+
+                                        {netBankingStep === 'select' ? (
+                                            <>
+                                                <h3 className="text-lg font-semibold text-white mb-4">Select Your Bank</h3>
+                                                <div className="space-y-3">
+                                                    {[
+                                                        { name: 'State Bank of India', logo: '🏦' },
+                                                        { name: 'HDFC Bank', logo: '🏦' },
+                                                        { name: 'ICICI Bank', logo: '🏦' },
+                                                        { name: 'Axis Bank', logo: '🏦' },
+                                                        { name: 'Kotak Mahindra Bank', logo: '🏦' },
+                                                        { name: 'Punjab National Bank', logo: '🏦' },
+                                                        { name: 'Bank of Baroda', logo: '🏦' },
+                                                        { name: 'Canara Bank', logo: '🏦' }
+                                                    ].map((bank) => (
+                                                        <button
+                                                            key={bank.name}
+                                                            onClick={() => handleBankSelect(bank.name)}
+                                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-3 text-left transition group"
+                                                        >
+                                                            <div className="text-2xl">{bank.logo}</div>
+                                                            <div className="flex-1">
+                                                                <p className="text-white font-medium">{bank.name}</p>
+                                                                <p className="text-gray-400 text-xs">Retail & Corporate Banking</p>
+                                                            </div>
+                                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={() => setNetBankingStep('select')}
+                                                    className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4"
+                                                >
+                                                    ← Change Bank
+                                                </button>
+                                                <div className="p-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-xl mb-4">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <div className="text-2xl">🏦</div>
+                                                        <div>
+                                                            <p className="text-white font-semibold">{paymentData.bankName}</p>
+                                                            <p className="text-gray-400 text-xs">Internet Banking Login</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <h3 className="text-lg font-semibold text-white mb-4">Login to Complete Payment</h3>
+
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-300 mb-2">User ID / Customer ID</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter your User ID"
+                                                            value={paymentData.bankUserId}
+                                                            onChange={(e) => setPaymentData({ ...paymentData, bankUserId: e.target.value })}
+                                                            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-300 mb-2">Password / IPIN</label>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="Enter your password"
+                                                            value={paymentData.bankPassword}
+                                                            onChange={(e) => setPaymentData({ ...paymentData, bankPassword: e.target.value })}
+                                                            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
+                                                        />
+                                                    </div>
+
+                                                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                                                        <div className="flex gap-2">
+                                                            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                                                            <div>
+                                                                <p className="text-yellow-400 text-sm font-medium mb-1">Security Notice</p>
+                                                                <p className="text-yellow-300/80 text-xs">
+                                                                    This is a mock payment gateway. Your actual bank credentials are never stored or transmitted.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-3 bg-gray-800 rounded-xl border border-gray-700">
+                                                        <div className="flex justify-between text-sm mb-1">
+                                                            <span className="text-gray-400">Payment Amount</span>
+                                                            <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-gray-400">Payee</span>
+                                                            <span className="text-white">Secure Identity Hub</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={processPayment}
+                                                        disabled={!paymentData.bankUserId || !paymentData.bankPassword}
+                                                        className="w-full py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl text-white font-semibold transition"
+                                                    >
+                                                        Proceed to Pay
+                                                    </button>
+
+                                                    <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                                                        <Shield className="w-3 h-3" />
+                                                        <span>Protected by 2048-bit encryption</span>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                {paymentStep === 'details' && paymentMethod === 'wallet' && (
+                                    <div className="space-y-4">
+                                        <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
+                                            ← Back to payment methods
+                                        </button>
+                                        <h3 className="text-lg font-semibold text-white mb-4">Select Digital Wallet</h3>
+
+                                        <div className="space-y-3">
+                                            {['Paytm Wallet', 'PhonePe Wallet', 'Amazon Pay', 'Mobikwik', 'Freecharge'].map((wallet) => (
+                                                <button
+                                                    key={wallet}
+                                                    onClick={() => {
+                                                        setPaymentData({ ...paymentData, walletType: wallet });
+                                                        processPayment();
+                                                    }}
+                                                    className="w-full p-3 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl text-left text-white transition"
+                                                >
+                                                    {wallet}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* STEP 3: PROCESSING */}
+                                {paymentStep === 'processing' && (
+                                    <div className="text-center py-12">
+                                        <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                        <h3 className="text-xl font-semibold text-white mb-2">Processing Payment...</h3>
+                                        <p className="text-gray-400">Please wait while we process your payment</p>
+                                    </div>
+                                )}
+
+                                {/* STEP 4: SUCCESS */}
+                                {paymentStep === 'success' && (
+                                    <div className="text-center py-12">
+                                        <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <CheckCircle className="w-10 h-10 text-green-400" />
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-white mb-2">Payment Successful!</h3>
+                                        <p className="text-gray-400 mb-6">Transaction ID: TXN{Date.now().toString().slice(-10)}</p>
+                                        <div className="p-4 bg-gray-800 rounded-xl mb-6 text-left max-w-sm mx-auto">
+                                            <div className="flex justify-between mb-2">
+                                                <span className="text-gray-400">Amount Paid</span>
+                                                <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</span>
+                                            </div>
+                                            <div className="flex justify-between mb-2">
+                                                <span className="text-gray-400">Payment Method</span>
+                                                <span className="text-white">{paymentMethod?.toUpperCase()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">Date & Time</span>
+                                                <span className="text-white">{new Date().toLocaleString('en-IN')}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={closePaymentGateway}
+                                            className="px-6 py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Security Badge */}
+                            {paymentStep !== 'success' && (
+                                <div className="p-4 bg-gray-800 border-t border-gray-700 flex items-center justify-center gap-2">
+                                    <Shield className="w-4 h-4 text-green-400" />
+                                    <p className="text-sm text-gray-400">Secured by 256-bit SSL encryption</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
-
-            {/* PAYMENT GATEWAY MODAL */}
-            {showPaymentGateway && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-900 rounded-2xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        {/* Header */}
-                        <div className="p-6 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-900">
-                            <div>
-                                <h2 className="text-2xl font-bold text-white">Secure Payment Gateway</h2>
-                                <p className="text-gray-400 text-sm">Amount: {formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</p>
-                            </div>
-                            <button onClick={closePaymentGateway} className="text-gray-400 hover:text-white">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        <div className="p-6">
-                            {/* STEP 1: SELECT PAYMENT METHOD */}
-                            {paymentStep === 'method' && (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-white mb-4">Choose Payment Method</h3>
-
-                                    {/* Credit/Debit Card */}
-                                    <button
-                                        onClick={() => handlePaymentMethodSelect('card')}
-                                        className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                    >
-                                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                            <CreditCard className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div className="flex-1 text-left">
-                                            <p className="text-white font-semibold">Credit / Debit Card</p>
-                                            <p className="text-gray-400 text-sm">Visa, Mastercard, RuPay, Amex</p>
-                                        </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                    </button>
-
-                                    {/* UPI */}
-                                    <button
-                                        onClick={() => handlePaymentMethodSelect('upi')}
-                                        className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                    >
-                                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
-                                            </svg>
-                                        </div>
-                                        <div className="flex-1 text-left">
-                                            <p className="text-white font-semibold">UPI</p>
-                                            <p className="text-gray-400 text-sm">Google Pay, PhonePe, Paytm, BHIM</p>
-                                        </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                    </button>
-
-                                    {/* Net Banking */}
-                                    <button
-                                        onClick={() => handlePaymentMethodSelect('netbanking')}
-                                        className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                    >
-                                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center">
-                                            <Wallet className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div className="flex-1 text-left">
-                                            <p className="text-white font-semibold">Net Banking</p>
-                                            <p className="text-gray-400 text-sm">All major banks supported</p>
-                                        </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                    </button>
-
-                                    {/* Wallets */}
-                                    <button
-                                        onClick={() => handlePaymentMethodSelect('wallet')}
-                                        className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                    >
-                                        <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
-                                            <Sparkles className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div className="flex-1 text-left">
-                                            <p className="text-white font-semibold">Digital Wallets</p>
-                                            <p className="text-gray-400 text-sm">Paytm, Amazon Pay, PhonePe</p>
-                                        </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* STEP 2: PAYMENT DETAILS */}
-                            {paymentStep === 'details' && paymentMethod === 'card' && (
-                                <div className="space-y-4">
-                                    <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
-                                        ← Back to payment methods
-                                    </button>
-                                    <h3 className="text-lg font-semibold text-white mb-4">Enter Card Details</h3>
-
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Card Number</label>
-                                            <input
-                                                type="text"
-                                                placeholder="1234 5678 9012 3456"
-                                                maxLength={19}
-                                                value={paymentData.cardNumber}
-                                                onChange={(e) => setPaymentData({ ...paymentData, cardNumber: e.target.value })}
-                                                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Cardholder Name</label>
-                                            <input
-                                                type="text"
-                                                placeholder="JOHN DOE"
-                                                value={paymentData.cardName}
-                                                onChange={(e) => setPaymentData({ ...paymentData, cardName: e.target.value })}
-                                                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Month</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="MM"
-                                                    maxLength={2}
-                                                    value={paymentData.expiryMonth}
-                                                    onChange={(e) => setPaymentData({ ...paymentData, expiryMonth: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Year</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="YY"
-                                                    maxLength={2}
-                                                    value={paymentData.expiryYear}
-                                                    onChange={(e) => setPaymentData({ ...paymentData, expiryYear: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">CVV</label>
-                                                <input
-                                                    type="password"
-                                                    placeholder="123"
-                                                    maxLength={3}
-                                                    value={paymentData.cvv}
-                                                    onChange={(e) => setPaymentData({ ...paymentData, cvv: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                />
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={processPayment}
-                                            className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition mt-6"
-                                        >
-                                            Pay {formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {paymentStep === 'details' && paymentMethod === 'upi' && (
-                                <div className="space-y-4">
-                                    <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
-                                        ← Back to payment methods
-                                    </button>
-                                    <h3 className="text-lg font-semibold text-white mb-4">Enter UPI ID</h3>
-
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">UPI ID</label>
-                                            <input
-                                                type="text"
-                                                placeholder="yourname@paytm"
-                                                value={paymentData.upiId}
-                                                onChange={(e) => setPaymentData({ ...paymentData, upiId: e.target.value })}
-                                                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                            />
-                                            <p className="text-gray-400 text-xs mt-2">Enter your UPI ID (e.g., name@gpay, name@paytm)</p>
-                                        </div>
-                                        <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                                            <p className="text-blue-400 text-sm">You will receive a payment request on your UPI app</p>
-                                        </div>
-                                        <button
-                                            onClick={processPayment}
-                                            className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
-                                        >
-                                            Send Payment Request
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {paymentStep === 'details' && paymentMethod === 'netbanking' && (
-                                <div className="space-y-4">
-                                    <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
-                                        ← Back to payment methods
-                                    </button>
-
-                                    {netBankingStep === 'select' ? (
-                                        <>
-                                            <h3 className="text-lg font-semibold text-white mb-4">Select Your Bank</h3>
-                                            <div className="space-y-3">
-                                                {[
-                                                    { name: 'State Bank of India', logo: '🏦' },
-                                                    { name: 'HDFC Bank', logo: '🏦' },
-                                                    { name: 'ICICI Bank', logo: '🏦' },
-                                                    { name: 'Axis Bank', logo: '🏦' },
-                                                    { name: 'Kotak Mahindra Bank', logo: '🏦' },
-                                                    { name: 'Punjab National Bank', logo: '🏦' },
-                                                    { name: 'Bank of Baroda', logo: '🏦' },
-                                                    { name: 'Canara Bank', logo: '🏦' }
-                                                ].map((bank) => (
-                                                    <button
-                                                        key={bank.name}
-                                                        onClick={() => handleBankSelect(bank.name)}
-                                                        className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-3 text-left transition group"
-                                                    >
-                                                        <div className="text-2xl">{bank.logo}</div>
-                                                        <div className="flex-1">
-                                                            <p className="text-white font-medium">{bank.name}</p>
-                                                            <p className="text-gray-400 text-xs">Retail & Corporate Banking</p>
-                                                        </div>
-                                                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => setNetBankingStep('select')}
-                                                className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4"
-                                            >
-                                                ← Change Bank
-                                            </button>
-                                            <div className="p-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-xl mb-4">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <div className="text-2xl">🏦</div>
-                                                    <div>
-                                                        <p className="text-white font-semibold">{paymentData.bankName}</p>
-                                                        <p className="text-gray-400 text-xs">Internet Banking Login</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <h3 className="text-lg font-semibold text-white mb-4">Login to Complete Payment</h3>
-
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">User ID / Customer ID</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Enter your User ID"
-                                                        value={paymentData.bankUserId}
-                                                        onChange={(e) => setPaymentData({ ...paymentData, bankUserId: e.target.value })}
-                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Password / IPIN</label>
-                                                    <input
-                                                        type="password"
-                                                        placeholder="Enter your password"
-                                                        value={paymentData.bankPassword}
-                                                        onChange={(e) => setPaymentData({ ...paymentData, bankPassword: e.target.value })}
-                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                    />
-                                                </div>
-
-                                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                                                    <div className="flex gap-2">
-                                                        <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                                                        <div>
-                                                            <p className="text-yellow-400 text-sm font-medium mb-1">Security Notice</p>
-                                                            <p className="text-yellow-300/80 text-xs">
-                                                                This is a mock payment gateway. Your actual bank credentials are never stored or transmitted.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="p-3 bg-gray-800 rounded-xl border border-gray-700">
-                                                    <div className="flex justify-between text-sm mb-1">
-                                                        <span className="text-gray-400">Payment Amount</span>
-                                                        <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-gray-400">Payee</span>
-                                                        <span className="text-white">Secure Identity Hub</span>
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    onClick={processPayment}
-                                                    disabled={!paymentData.bankUserId || !paymentData.bankPassword}
-                                                    className="w-full py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl text-white font-semibold transition"
-                                                >
-                                                    Proceed to Pay
-                                                </button>
-
-                                                <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                                                    <Shield className="w-3 h-3" />
-                                                    <span>Protected by 2048-bit encryption</span>
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            {paymentStep === 'details' && paymentMethod === 'wallet' && (
-                                <div className="space-y-4">
-                                    <button onClick={() => setPaymentStep('method')} className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-sm mb-4">
-                                        ← Back to payment methods
-                                    </button>
-                                    <h3 className="text-lg font-semibold text-white mb-4">Select Digital Wallet</h3>
-
-                                    <div className="space-y-3">
-                                        {['Paytm Wallet', 'PhonePe Wallet', 'Amazon Pay', 'Mobikwik', 'Freecharge'].map((wallet) => (
-                                            <button
-                                                key={wallet}
-                                                onClick={() => {
-                                                    setPaymentData({ ...paymentData, walletType: wallet });
-                                                    processPayment();
-                                                }}
-                                                className="w-full p-3 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl text-left text-white transition"
-                                            >
-                                                {wallet}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* STEP 3: PROCESSING */}
-                            {paymentStep === 'processing' && (
-                                <div className="text-center py-12">
-                                    <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                                    <h3 className="text-xl font-semibold text-white mb-2">Processing Payment...</h3>
-                                    <p className="text-gray-400">Please wait while we process your payment</p>
-                                </div>
-                            )}
-
-                            {/* STEP 4: SUCCESS */}
-                            {paymentStep === 'success' && (
-                                <div className="text-center py-12">
-                                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <CheckCircle className="w-10 h-10 text-green-400" />
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-white mb-2">Payment Successful!</h3>
-                                    <p className="text-gray-400 mb-6">Transaction ID: TXN{Date.now().toString().slice(-10)}</p>
-                                    <div className="p-4 bg-gray-800 rounded-xl mb-6 text-left max-w-sm mx-auto">
-                                        <div className="flex justify-between mb-2">
-                                            <span className="text-gray-400">Amount Paid</span>
-                                            <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</span>
-                                        </div>
-                                        <div className="flex justify-between mb-2">
-                                            <span className="text-gray-400">Payment Method</span>
-                                            <span className="text-white">{paymentMethod?.toUpperCase()}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">Date & Time</span>
-                                            <span className="text-white">{new Date().toLocaleString('en-IN')}</span>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={closePaymentGateway}
-                                        className="px-6 py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
-                                    >
-                                        Done
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Security Badge */}
-                        {paymentStep !== 'success' && (
-                            <div className="p-4 bg-gray-800 border-t border-gray-700 flex items-center justify-center gap-2">
-                                <Shield className="w-4 h-4 text-green-400" />
-                                <p className="text-sm text-gray-400">Secured by 256-bit SSL encryption</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+        );
+    };
 
     // DOCUMENTS SECTION
     const renderDocumentsSection = () => (
