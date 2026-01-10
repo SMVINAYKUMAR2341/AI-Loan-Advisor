@@ -1,73 +1,84 @@
-# Welcome to your Lovable project
+# LoanAdmin - Bank Admin Dashboard
 
-## Project info
+## Overview
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+LoanAdmin is the Bank Officer Dashboard for the AI-Driven Loan Advisor system. It provides bank officers with tools to manage loan applications, verify KYC documents, process disbursements, track EMIs, and send notifications to customers.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Dashboard**: Real-time overview of loan statistics and metrics
+- **Loan Applications**: View all customer applications with AI approval scores
+- **Loan Disbursement**: Process loan payouts with transaction tracking
+- **EMI Tracking**: Monitor upcoming, overdue, and paid EMIs
+- **Documents**: Verify customer KYC documents (PAN, Aadhaar, Income Proof)
+- **Customers**: View all registered customers and their profiles
+- **Notifications**: Send SMS/Email reminders to customers
+- **Reports**: Analytics and visualizations on loan performance
 
-**Use Lovable**
+## Tech Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- **Frontend**: React 18, TypeScript, Vite
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **Charts**: Recharts
+- **Icons**: Lucide React
 
-Changes made via Lovable will be committed automatically to this repo.
+## Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Node.js 18+
+- npm or bun
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Installation
 
-Follow these steps:
+```bash
+cd loan-admin-hub-main
+npm install
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Running Locally
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The admin dashboard will be available at `http://localhost:8080`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Backend Connection
 
-**Use GitHub Codespaces**
+Ensure the FastAPI backend is running at `http://localhost:8000` for API connectivity.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Admin Login
 
-## What technologies are used for this project?
+Use the following demo credentials:
+- **Email**: admin@bank.com
+- **Password**: admin123
 
-This project is built with:
+## Project Structure
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```
+src/
+├── components/
+│   ├── dashboard/    # Dashboard-specific components
+│   ├── layout/       # AdminLayout, AppSidebar
+│   └── ui/           # shadcn/ui components
+├── pages/
+│   ├── Dashboard.tsx
+│   ├── LoanApplications.tsx
+│   ├── LoanDisbursement.tsx
+│   ├── EMITracking.tsx
+│   ├── Documents.tsx
+│   ├── Customers.tsx
+│   ├── Notifications.tsx
+│   ├── Reports.tsx
+│   ├── AdminProfile.tsx
+│   └── Login.tsx
+├── lib/
+│   └── api.ts        # API client connecting to backend
+└── hooks/
+    └── use-toast.ts  # Toast notifications
+```
 
-## How can I deploy this project?
+## License
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This project is part of the AI-Driven Loan Advisor system.
