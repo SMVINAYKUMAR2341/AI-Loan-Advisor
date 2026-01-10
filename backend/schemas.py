@@ -666,3 +666,14 @@ class AdminBankDetailsResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# =============================================================================
+# REPAYMENT SCHEMAS
+# =============================================================================
+
+class RepaymentCreate(BaseModel):
+    application_id: str
+    emi_number: int
+    amount: float
+    payment_method: str = "UPI"
+    payment_reference: Optional[str] = None

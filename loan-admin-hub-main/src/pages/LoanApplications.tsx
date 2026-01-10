@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, CheckCircle, XCircle, Filter, Loader2, Download, FileText, TrendingUp, Sparkles } from 'lucide-react';
+import { Search, Eye, CheckCircle, XCircle, Filter, Loader2, Download, FileText, TrendingUp, Sparkles, ShieldCheck } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -130,6 +130,26 @@ export default function LoanApplications() {
       setAgreement(null);
     }
     setLoadingAgreement(false);
+  };
+
+  const handleDownloadAgreement = async (appId: string) => {
+    try {
+      toast({
+        title: 'Downloading...',
+        description: 'Preparing official loan agreement PDF.'
+      });
+      await adminApi.downloadAgreement(appId);
+      toast({
+        title: 'Success',
+        description: 'Loan agreement downloaded successfully.'
+      });
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: 'Could not download the agreement.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const filteredLoans = loans.filter((loan) => {
@@ -397,43 +417,61 @@ export default function LoanApplications() {
                   View Signed Agreement
                 </Button>
 
-                {/* Agreement Details Panel */}
+                {/* New Professional Agreement Details Panel */}
                 {agreement && (
-                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-3">
-                    <h4 className="font-medium text-purple-400">Signed Agreement Details</h4>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-gray-400">Loan Amount</p>
-                        <p className="text-white font-medium">{formatCurrency(agreement.loan_amount)}</p>
+                  <div className="mt-4 p-5 rounded-2xl bg-gray-900 border border-teal-500/30 space-y-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <ShieldCheck className="h-16 w-16 text-teal-400" />
+                    </div>
+
+                    <div className="flex items-center justify-between relative z-10">
+                      <h4 className="font-bold text-lg text-white flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-teal-400" />
+                        Loan Agreement Summary
+                      </h4>
+                      <Badge className={agreement.consent_given ? 'bg-teal-500/20 text-teal-400 border-teal-500/30' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'}>
+                        {agreement.status}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-sm relative z-10">
+                      <div className="p-2 rounded-lg bg-gray-800/50">
+                        <p className="text-gray-500 text-xs">Principal Amount</p>
+                        <p className="text-white font-bold">{formatCurrency(agreement.loan_amount)}</p>
                       </div>
-                      <div>
-                        <p className="text-gray-400">Interest Rate</p>
-                        <p className="text-white font-medium">{agreement.interest_rate}% p.a.</p>
+                      <div className="p-2 rounded-lg bg-gray-800/50">
+                        <p className="text-gray-500 text-xs">Interest Rate</p>
+                        <p className="text-teal-400 font-bold">{agreement.interest_rate}% p.a.</p>
                       </div>
-                      <div>
-                        <p className="text-gray-400">Tenure</p>
-                        <p className="text-white font-medium">{agreement.tenure_months} months</p>
+                      <div className="p-2 rounded-lg bg-gray-800/50">
+                        <p className="text-gray-500 text-xs">Monthy EMI</p>
+                        <p className="text-yellow-400 font-bold">{formatCurrency(agreement.emi_amount)}</p>
                       </div>
-                      <div>
-                        <p className="text-gray-400">EMI Amount</p>
-                        <p className="text-white font-medium">{formatCurrency(agreement.emi_amount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Total Payable</p>
-                        <p className="text-white font-medium">{formatCurrency(agreement.total_payable)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Status</p>
-                        <Badge className={agreement.consent_given ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}>
-                          {agreement.status}
-                        </Badge>
+                      <div className="p-2 rounded-lg bg-gray-800/50">
+                        <p className="text-gray-500 text-xs">Total Repayment</p>
+                        <p className="text-white font-bold">{formatCurrency(agreement.total_payable)}</p>
                       </div>
                     </div>
+
                     {agreement.signed_at && (
-                      <p className="text-xs text-gray-500">
-                        Signed on: {new Date(agreement.signed_at).toLocaleString()}
-                      </p>
+                      <div className="p-3 rounded-xl bg-teal-500/5 border border-teal-500/20 flex flex-col gap-1 relative z-10">
+                        <p className="text-xs text-teal-400 font-medium flex items-center gap-1">
+                          <ShieldCheck className="h-3 w-3" />
+                          DIGITALLY AUTHENTICATED
+                        </p>
+                        <p className="text-[10px] text-gray-500 font-mono">
+                          Signed on: {new Date(agreement.signed_at).toLocaleString()}
+                        </p>
+                      </div>
                     )}
+
+                    <Button
+                      onClick={() => handleDownloadAgreement(selectedLoan.id)}
+                      className="w-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-900/20 relative z-10"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Official Agreement PDF
+                    </Button>
                   </div>
                 )}
 

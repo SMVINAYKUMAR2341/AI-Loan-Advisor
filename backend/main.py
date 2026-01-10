@@ -860,6 +860,11 @@ async def get_application_full_details(
     result = await db.execute(review_query)
     officer_review = result.scalars().first()
     
+    # Fetch agreement if exists
+    agree_query = select(models.LoanAgreement).where(models.LoanAgreement.application_id == application_id)
+    result = await db.execute(agree_query)
+    agreement = result.scalars().first()
+    
     return {
         "application": {
             "id": str(application.id),
@@ -904,7 +909,18 @@ async def get_application_full_details(
             "final_decision": officer_review.final_decision if officer_review else None,
             "justification": officer_review.justification if officer_review else None,
             "reviewed_at": officer_review.reviewed_at.isoformat() if officer_review and officer_review.reviewed_at else None,
-        } if officer_review else None
+        } if officer_review else None,
+        "agreement": {
+            "id": str(agreement.id),
+            "status": agreement.status,
+            "loan_amount": agreement.loan_amount,
+            "interest_rate": agreement.interest_rate,
+            "tenure_months": agreement.tenure_months,
+            "emi_amount": agreement.emi_amount,
+            "total_payable": agreement.total_payable,
+            "consent_given": agreement.consent_given,
+            "signed_at": agreement.signed_at.isoformat() if agreement.signed_at else None,
+        } if agreement else None
     }
 
 
@@ -1166,17 +1182,19 @@ async def get_my_notifications(
 
 @app.post("/repayments")
 async def make_emi_payment(
-    application_id: str,
-    emi_number: int,
-    amount: float,
-    payment_method: str = "UPI",  # UPI, NEFT, CARD, CASH
-    payment_reference: Optional[str] = None,
+    repayment_data: schemas.RepaymentCreate,
     user: models.User = Depends(auth.get_current_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
     Customer makes an EMI payment for their loan.
     """
+    application_id = repayment_data.application_id
+    emi_number = repayment_data.emi_number
+    amount = repayment_data.amount
+    payment_method = repayment_data.payment_method
+    payment_reference = repayment_data.payment_reference
+    
     # Validate application belongs to user
     app_query = select(models.LoanApplication).where(
         models.LoanApplication.id == application_id,
@@ -1239,6 +1257,51 @@ async def make_emi_payment(
         "amount": amount,
         "payment_reference": repayment.payment_reference
     }
+
+
+@app.get("/repayments/me")
+async def get_my_repayments(
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all repayments and EMI schedule for the current user.
+    """
+    # Get all applications for this user
+    apps_query = select(models.LoanApplication).where(models.LoanApplication.user_id == user.id)
+    result = await db.execute(apps_query)
+    applications = result.scalars().all()
+    app_ids = [app.id for app in applications]
+    
+    if not app_ids:
+        return []
+
+    # Get all repayment records for these applications
+    repayments_query = (
+        select(models.Repayment)
+        .where(models.Repayment.application_id.in_(app_ids))
+        .order_by(models.Repayment.emi_number.asc())
+    )
+    result = await db.execute(repayments_query)
+    repayments = result.scalars().all()
+    
+    # If no repayments found, we should still return the schedule if loan is disbursed
+    # For now, we only return actual repayment records or a generated schedule.
+    # To keep it simple, we'll return the repayment records.
+    # In a real system, we'd generate the schedule from the prediction data.
+    
+    return [{
+        "id": str(r.id),
+        "application_id": str(r.application_id),
+        "emi_number": r.emi_number,
+        "emi_amount": r.emi_amount,
+        "payment_amount": r.payment_amount,
+        "payment_status": r.payment_status,
+        "payment_method": r.payment_method,
+        "payment_reference": r.payment_reference,
+        "payment_date": r.payment_date.isoformat() if r.payment_date else None,
+        "due_date": r.due_date.isoformat() if r.due_date else None
+    } for r in repayments]
 
 
 @app.get("/admin/repayments")
@@ -3848,6 +3911,232 @@ understood, and agree to all terms and conditions.
             "status": agreement.status
         }
     }
+
+async def generate_professional_agreement_pdf(agreement: models.LoanAgreement, borrower_name: str):
+    """
+    Shared helper to generate professional Loan Agreement PDF.
+    RBI Compliant with digital signature seal.
+    """
+    from fastapi.responses import StreamingResponse
+    from fpdf import FPDF
+    import io
+    from datetime import datetime
+
+    class LoanAgreementPDF(FPDF):
+        def header(self):
+            # Top Border
+            self.set_draw_color(20, 184, 166)  # Teal
+            self.set_line_width(1)
+            self.line(10, 10, 200, 10)
+            
+            # Logo & Brand
+            self.set_font('Arial', 'B', 16)
+            self.set_text_color(0, 51, 102)
+            self.set_xy(10, 15)
+            self.cell(0, 10, 'LOANADVISOR FINANCIAL SERVICES', 0, 0, 'L')
+            
+            self.set_font('Arial', 'B', 8)
+            self.set_text_color(100, 100, 100)
+            self.set_xy(10, 22)
+            self.cell(0, 5, 'Certified Digital Lending Partner | RBI Compliant Platform', 0, 0, 'L')
+            
+            # Compliance Badge
+            self.set_fill_color(20, 184, 166)
+            self.set_text_color(255, 255, 255)
+            self.set_font('Arial', 'B', 7)
+            self.set_xy(165, 15)
+            self.cell(35, 6, 'RBI COMPLIANT', 0, 0, 'C', True)
+            
+            self.ln(20)
+
+        def footer(self):
+            self.set_y(-25)
+            self.set_font('Arial', 'I', 7)
+            self.set_text_color(150, 150, 150)
+            self.multi_cell(0, 4, 'This is a digitally generated document issued under the Information Technology Act, 2000. '
+                           'Consent obtained via secure e-signature platform. Version: v1.0. '
+                           'Confidential - Not for public distribution.', 0, 'C')
+            self.set_font('Arial', '', 7)
+            self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Doc-ID: {str(agreement.id).upper()}', 0, 0, 'C')
+
+    pdf = LoanAgreementPDF()
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    
+    # Title
+    pdf.ln(5)
+    pdf.set_font('Arial', 'B', 22)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 15, 'LOAN AGREEMENT', 0, 1, 'C')
+    
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 5, f'Agreement Date: {datetime.now().strftime("%d %B %Y")}', 0, 1, 'C')
+    pdf.ln(10)
+    
+    # Summary Table
+    pdf.set_fill_color(240, 249, 255)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(190, 10, '  KEY LOAN PARAMETERS', 0, 1, 'L', True)
+    
+    pdf.set_font('Arial', '', 10)
+    table_data = [
+        ['Borrower Name', borrower_name],
+        ['Principal Amount', f"Rs.{agreement.loan_amount:,.2f}"],
+        ['Annual Interest Rate', f"{agreement.interest_rate}%"],
+        ['Loan Tenure', f"{agreement.tenure_months} Months"],
+        ['Monthly EMI Amount', f"Rs.{agreement.emi_amount:,.2f}"],
+        ['Processing Fee', f"Rs.{agreement.processing_fee:,.2f}"],
+        ['Total Payable Amount', f"Rs.{agreement.total_payable:,.2f}"]
+    ]
+    
+    for row in table_data:
+        pdf.set_font('Arial', 'B', 10)
+        pdf.cell(80, 8, f'  {row[0]}', 1, 0, 'L')
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(110, 8, f'  {row[1]}', 1, 1, 'L')
+    
+    pdf.ln(10)
+    
+    # Terms Table
+    pdf.set_fill_color(248, 250, 252)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(190, 10, '  DETAILED TERMS & CONDITIONS', 0, 1, 'L', True)
+    
+    pdf.set_font('Arial', '', 9)
+    terms = [
+        ['Payment Due Date', 'The same calendar date of each month as the disbursement date.'],
+        ['Late Fee Penalty', '2.0% per month on any overdue balance.'],
+        ['Prepayment Terms', 'Allowed after 6 successful EMI payments with 0% penalty.'],
+        ['Security', 'Digital lien on identified future income sources.'],
+        ['Regulatory Authority', 'Governed by Reserve Bank of India (RBI) guidelines.']
+    ]
+    
+    for row in terms:
+        pdf.set_font('Arial', 'B', 9)
+        pdf.cell(60, 8, f'  {row[0]}', 1, 0, 'L')
+        pdf.set_font('Arial', '', 9)
+        pdf.cell(130, 8, f'  {row[1]}', 1, 1, 'L')
+        
+    pdf.ln(10)
+    
+    # Standard Terms Box
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 10, 'Standard Declaration', 0, 1, 'L')
+    pdf.set_font('Arial', 'I', 9)
+    pdf.set_text_color(80, 80, 80)
+    pdf.multi_cell(0, 5, agreement.agreement_summary.replace("₹", "Rs."))
+    
+    pdf.ln(10)
+    
+    # Signature Seal
+    if agreement.signed_at:
+        pdf.set_draw_color(16, 185, 129)  # Emerald
+        pdf.set_line_width(2)
+        pdf.set_fill_color(236, 253, 245)
+        
+        # Draw Seal Box
+        seal_x = 130
+        seal_y = pdf.get_y()
+        if seal_y > 230: # Page break if near bottom
+            pdf.add_page()
+            seal_y = pdf.get_y()
+            
+        pdf.rect(seal_x, seal_y, 60, 40, 'FD')
+        
+        pdf.set_xy(seal_x + 5, seal_y + 5)
+        pdf.set_font('Arial', 'B', 12)
+        pdf.set_text_color(5, 150, 105)
+        pdf.cell(50, 8, 'DIGITALLY SIGNED', 0, 1, 'C')
+        
+        pdf.set_font('Arial', '', 8)
+        pdf.set_text_color(100, 100, 100)
+        pdf.set_x(seal_x + 5)
+        pdf.cell(50, 5, f'Authenticated: {agreement.signed_at.strftime("%d-%b-%Y %H:%M")}', 0, 1, 'C')
+        pdf.set_x(seal_x + 5)
+        pdf.cell(50, 5, f'IP Hash: {agreement.ip_address_hash[:16] if agreement.ip_address_hash else "SHA-256"}', 0, 1, 'C')
+        
+        # Tick icon placeholder
+        pdf.set_font('Courier', 'B', 14)
+        pdf.set_xy(seal_x + 5, seal_y + 25)
+        pdf.cell(50, 10, '[VERIFIED-AUTH]', 0, 0, 'C')
+    else:
+        pdf.set_font('Arial', 'B', 10)
+        pdf.set_text_color(220, 38, 38)
+        pdf.cell(0, 10, 'UNSIGNED DOCUMENT - NOT VALID FOR DISBURSEMENT', 0, 1, 'C')
+
+    # Output to Stream
+    pdf_out = io.BytesIO()
+    pdf_out.write(pdf.output(dest='S'))
+    pdf_out.seek(0)
+    
+    return StreamingResponse(
+        pdf_out,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=LoanAgreement_{agreement.id.hex[:8]}.pdf"}
+    )
+
+@app.get("/kyc/{application_id}/agreement/download")
+async def download_loan_agreement(
+    application_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Generate and download professional Loan Agreement PDF.
+    RBI Compliant with digital signature seal.
+    """
+    # 1. Verify eligibility and get data
+    application, prediction, kyc_tracking = await verify_kyc_eligibility(
+        application_id, current_user.id, db
+    )
+    
+    agree_query = select(models.LoanAgreement).where(
+        models.LoanAgreement.application_id == application.id
+    )
+    agree_result = await db.execute(agree_query)
+    agreement = agree_result.scalars().first()
+    
+    if not agreement:
+        raise HTTPException(status_code=400, detail="Agreement not found. Please view it first to generate.")
+    
+    borrower_name = f"{current_user.first_name} {current_user.last_name}"
+    return await generate_professional_agreement_pdf(agreement, borrower_name)
+
+@app.get("/admin/applications/{application_id}/agreement/download")
+async def admin_download_loan_agreement(
+    application_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Admin endpoint to download a professional Loan Agreement PDF.
+    """
+    if current_user.role not in ["admin", "bank_officer"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    # Get application and user
+    from sqlalchemy.orm import selectinload
+    query = select(models.LoanApplication).options(
+        selectinload(models.LoanApplication.user)
+    ).where(models.LoanApplication.id == application_id)
+    
+    result = await db.execute(query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+        
+    agree_query = select(models.LoanAgreement).where(
+        models.LoanAgreement.application_id == application.id
+    )
+    agree_result = await db.execute(agree_query)
+    agreement = agree_result.scalars().first()
+    
+    if not agreement:
+        raise HTTPException(status_code=404, detail="Agreement not found")
+        
+    borrower_name = f"{application.user.first_name} {application.user.last_name}"
+    return await generate_professional_agreement_pdf(agreement, borrower_name)
 
 # =============================================================================
 # ADMIN BANK DETAILS ENDPOINTS

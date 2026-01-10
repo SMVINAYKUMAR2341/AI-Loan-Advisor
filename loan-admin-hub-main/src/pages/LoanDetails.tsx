@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     ArrowLeft, FileText, User, Mail, Phone, Calendar, CreditCard,
     CheckCircle, XCircle, FileWarning, Loader2, Download, Eye,
-    Building2, TrendingUp, AlertTriangle, Clock
+    Building2, TrendingUp, AlertTriangle, Clock, ShieldCheck
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -129,6 +129,26 @@ export default function LoanDetails() {
         setProcessing(false);
     };
 
+    const handleDownloadAgreement = async () => {
+        try {
+            toast({
+                title: 'Downloading...',
+                description: 'Preparing official loan agreement PDF.',
+            });
+            await adminApi.downloadAgreement(id!);
+            toast({
+                title: 'Success',
+                description: 'Loan agreement downloaded successfully.',
+            });
+        } catch (error: any) {
+            toast({
+                title: 'Download Failed',
+                description: error.message || 'Could not download the agreement.',
+                variant: 'destructive',
+            });
+        }
+    };
+
     if (loading) {
         return (
             <AdminLayout>
@@ -150,7 +170,7 @@ export default function LoanDetails() {
         );
     }
 
-    const { application, customer, prediction, documents, officer_review } = data;
+    const { application, customer, prediction, documents, officer_review, agreement } = data;
 
     return (
         <AdminLayout>
@@ -429,6 +449,72 @@ export default function LoanDetails() {
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Professional Agreement Panel */}
+                        {agreement && (
+                            <Card className="bg-gray-900 border-teal-500/30 rounded-2xl overflow-hidden relative group">
+                                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                    <ShieldCheck className="h-24 w-24 text-teal-400" />
+                                </div>
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="h-5 w-5 text-teal-400" />
+                                            Professional Loan Agreement
+                                        </div>
+                                        <Badge className={agreement.consent_given ? 'bg-teal-500/20 text-teal-400 border-teal-500/30' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'}>
+                                            {agreement.status}
+                                        </Badge>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="p-3 rounded-xl bg-gray-800/50 border border-gray-700">
+                                            <p className="text-xs text-gray-500 mb-1">Loan Amount</p>
+                                            <p className="text-white font-bold">{formatCurrency(agreement.loan_amount)}</p>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-800/50 border border-gray-700">
+                                            <p className="text-xs text-gray-500 mb-1">Interest Rate</p>
+                                            <p className="text-teal-400 font-bold">{agreement.interest_rate}% p.a.</p>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-800/50 border border-gray-700">
+                                            <p className="text-xs text-gray-500 mb-1">Monthly EMI</p>
+                                            <p className="text-yellow-400 font-bold">{formatCurrency(agreement.emi_amount)}</p>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-800/50 border border-gray-700">
+                                            <p className="text-xs text-gray-500 mb-1">Total Payable</p>
+                                            <p className="text-white font-bold">{formatCurrency(agreement.total_payable)}</p>
+                                        </div>
+                                    </div>
+
+                                    {agreement.signed_at && (
+                                        <div className="p-4 rounded-2xl bg-teal-500/5 border border-teal-500/20 flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <p className="text-teal-400 font-bold flex items-center gap-2 text-sm">
+                                                    <ShieldCheck className="h-4 w-4" />
+                                                    DIGITALLY AUTHENTICATED
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    Consent secured via RBI compliant digital signature process.
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-400">Signed On</p>
+                                                <p className="text-xs text-white font-medium">{new Date(agreement.signed_at).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <Button
+                                        onClick={handleDownloadAgreement}
+                                        className="w-full bg-teal-600 hover:bg-teal-700 text-white h-12 rounded-xl shadow-lg shadow-teal-900/20 transition-all active:scale-95"
+                                    >
+                                        <Download className="h-5 w-5 mr-3" />
+                                        Download Official PDF Agreement
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {/* Quick Actions */}
                         <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">

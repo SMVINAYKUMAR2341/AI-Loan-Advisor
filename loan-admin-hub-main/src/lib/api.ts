@@ -148,7 +148,6 @@ export const adminApi = {
             { method: 'POST' }
         ),
 
-    // Loan Agreements
     getAgreement: (appId: string) =>
         apiFetch<{
             id: string;
@@ -165,6 +164,9 @@ export const adminApi = {
             signed_at: string | null;
             status: string;
         }>(`/admin/applications/${appId}/agreement`),
+
+    downloadAgreement: (appId: string) =>
+        downloadFile(`/admin/applications/${appId}/agreement/download`, `Loan_Agreement_${appId.substring(0, 8)}.pdf`),
 
     // Admin Profile
     getProfile: () =>

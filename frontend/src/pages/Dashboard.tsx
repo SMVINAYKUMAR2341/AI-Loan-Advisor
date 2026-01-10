@@ -197,6 +197,42 @@ export default function Dashboard() {
         setRepaymentsLoading(false);
     };
 
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
+
+    const handleMakePayment = async (repayment: RepaymentItem) => {
+        setPaymentProcessing(true);
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/repayments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    application_id: repayment.application_id,
+                    amount: repayment.emi_amount,
+                    payment_method: 'UPI',
+                    transaction_ref: `PYMT-${Date.now()}`,
+                    emi_number: repayment.emi_number
+                })
+            });
+
+            if (response.ok) {
+                alert("Payment Successful!");
+                fetchRepayments();
+                fetchLoanApplications();
+            } else {
+                const error = await response.json();
+                alert(`Payment Failed: ${error.detail || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error("Payment error:", error);
+            alert("Payment error occurred.");
+        }
+        setPaymentProcessing(false);
+    };
+
     const fetchLoanApplications = async () => {
         setLoanApplicationsLoading(true);
         try {
@@ -886,6 +922,10 @@ export default function Dashboard() {
             fetchDisbursements();
             fetchAdminBanks();
         }
+        if (key === 'repayments') {
+            fetchRepayments();
+            fetchLoanApplications(); // Need loan details for EMI amounts
+        }
         if (isMobile) setSidebarOpen(false);
     };
 
@@ -1435,6 +1475,77 @@ export default function Dashboard() {
             console.error("Error generating QR code:", error);
             alert("Error generating QR code.");
         }
+    };
+
+    const renderRepaymentsSection = () => {
+        return (
+            <div className="space-y-6">
+                <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-white">Repayments & EMIs</h3>
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-400 text-sm">Next Auto-debit:</span>
+                            <span className="text-white font-medium">5th Jan 2025</span>
+                        </div>
+                    </div>
+
+                    {repaymentsLoading ? (
+                        <p className="text-gray-400">Loading repayment schedule...</p>
+                    ) : repayments.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-dashed border-gray-700">
+                            <CreditCard className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                            <p className="text-gray-400">No active repayment schedule found.</p>
+                            <p className="text-gray-500 text-sm mt-1">Once your loan is disbursed, your EMI schedule will appear here.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-white/10">
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">EMI #</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Due Date</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Amount</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {repayments.map((emi) => (
+                                        <tr key={emi.id} className="border-b border-white/5 hover:bg-white/5 transition">
+                                            <td className="py-4 px-4 text-white font-medium">{emi.emi_number}</td>
+                                            <td className="py-4 px-4 text-white">{new Date(emi.due_date).toLocaleDateString()}</td>
+                                            <td className="py-4 px-4 text-white font-semibold">{formatCurrency(emi.emi_amount)}</td>
+                                            <td className="py-4 px-4">
+                                                <span className={`px-2 py-1 rounded-full text-xs ${emi.payment_status === 'PAID' ? 'bg-green-500/20 text-green-400' :
+                                                        emi.payment_status === 'OVERDUE' ? 'bg-red-500/20 text-red-400' :
+                                                            'bg-yellow-500/20 text-yellow-400'
+                                                    }`}>
+                                                    {emi.payment_status}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                {emi.payment_status !== 'PAID' && (
+                                                    <button
+                                                        onClick={() => handleMakePayment(emi)}
+                                                        disabled={paymentProcessing}
+                                                        className="px-3 py-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition"
+                                                    >
+                                                        Pay Now
+                                                    </button>
+                                                )}
+                                                {emi.payment_status === 'PAID' && (
+                                                    <span className="text-xs text-gray-500">{new Date(emi.payment_date!).toLocaleDateString()}</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     // APPLY FOR LOAN SECTION - Bank-Grade AI Loan Advisor
@@ -2691,76 +2802,81 @@ export default function Dashboard() {
                                     </div>
                                 </div>
 
-                                {/* The "Document" paper */}
-                                <div className="bg-white rounded-xl overflow-hidden shadow-2xl relative">
+                                {/* The "Document" paper - PREMIUM DARK THEME */}
+                                <div className="bg-[#0f172a] rounded-xl overflow-hidden shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border border-white/10 relative">
                                     {/* Watermark */}
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] rotate-[-45deg]">
-                                        <p className="text-black text-9xl font-black">{agreement.status}</p>
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.02] rotate-[-45deg]">
+                                        <p className="text-white text-9xl font-black">{agreement.status || "CONFIDENTIAL"}</p>
                                     </div>
 
-                                    <div className="p-8 md:p-12 text-gray-800 space-y-8 relative z-10">
+                                    <div className="p-8 md:p-12 text-gray-200 space-y-8 relative z-10">
                                         <div className="flex justify-between items-start">
                                             <div className="space-y-1">
-                                                <h4 className="font-black text-3xl text-gray-900 tracking-tighter">LoanAdvisor</h4>
-                                                <p className="text-sm text-gray-500">Financial Services Pvt. Ltd.</p>
+                                                <h4 className="font-black text-3xl text-white tracking-tighter flex items-center gap-2">
+                                                    <Sparkles className="w-6 h-6 text-teal-400" />
+                                                    LoanAdvisor
+                                                </h4>
+                                                <p className="text-xs text-gray-500 font-medium">Certified Digital Lending Partner</p>
                                             </div>
                                             <div className="text-right space-y-1">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Issue Date</p>
-                                                <p className="font-bold text-sm">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                                                <div className="inline-flex flex-col items-end">
+                                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Digital Issue Date</p>
+                                                    <p className="font-bold text-sm text-white">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="h-px bg-gray-200" />
+                                        <div className="h-px bg-white/10" />
 
-                                        {/* Summary Grid */}
+                                        {/* Summary Grid - High Tech Look */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Principal Amount</p>
-                                                <p className="text-xl font-black text-gray-900">{formatCurrency(agreement.loan_amount)}</p>
+                                            <div className="p-5 bg-white/5 rounded-xl border border-white/10 hover:border-teal-500/30 transition-colors group">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-2 group-hover:text-teal-400 transition-colors">Principal Amount</p>
+                                                <p className="text-2xl font-black text-white">{formatCurrency(agreement.loan_amount)}</p>
                                             </div>
-                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Interest Rate (p.a)</p>
-                                                <p className="text-xl font-black text-teal-600">{agreement.interest_rate}%</p>
+                                            <div className="p-5 bg-white/5 rounded-xl border border-white/10 hover:border-teal-500/30 transition-colors group">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-2 group-hover:text-teal-400 transition-colors">Interest Rate (p.a)</p>
+                                                <p className="text-2xl font-black text-teal-400">{agreement.interest_rate}%</p>
                                             </div>
-                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tenure</p>
-                                                <p className="text-xl font-black text-gray-900">{agreement.tenure_months} Months</p>
+                                            <div className="p-5 bg-white/5 rounded-xl border border-white/10 hover:border-teal-500/30 transition-colors group">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-2 group-hover:text-teal-400 transition-colors">Tenure</p>
+                                                <p className="text-2xl font-black text-white">{agreement.tenure_months} Months</p>
                                             </div>
-                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Monthly EMI</p>
-                                                <p className="text-xl font-black text-emerald-600">{formatCurrency(agreement.emi_amount)}</p>
+                                            <div className="p-5 bg-white/5 rounded-xl border border-white/10 hover:border-emerald-500/30 transition-colors group">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-2 group-hover:text-emerald-400 transition-colors">Monthly EMI</p>
+                                                <p className="text-2xl font-black text-emerald-400">{formatCurrency(agreement.emi_amount)}</p>
                                             </div>
                                         </div>
 
-                                        {/* Detailed Terms Table */}
-                                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                                        {/* Detailed Terms Table - Dark Variant */}
+                                        <div className="overflow-hidden border border-white/10 rounded-xl bg-white/[0.02]">
                                             <table className="w-full text-sm text-left">
-                                                <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold">
+                                                <thead className="bg-white/5 text-gray-400 uppercase text-[10px] font-bold tracking-wider">
                                                     <tr>
-                                                        <th className="px-6 py-3">Description</th>
-                                                        <th className="px-6 py-3">Details / Terms</th>
+                                                        <th className="px-6 py-4">Description</th>
+                                                        <th className="px-6 py-4">Details / Terms</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-gray-100">
-                                                    <tr>
-                                                        <td className="px-6 py-4 font-bold text-gray-600">Processing Fee</td>
-                                                        <td className="px-6 py-4 text-gray-900">{formatCurrency(agreement.processing_fee)} (Deducted from disbursement)</td>
+                                                <tbody className="divide-y divide-white/5">
+                                                    <tr className="hover:bg-white/[0.02] transition-colors">
+                                                        <td className="px-6 py-4 font-semibold text-gray-400">Processing Fee</td>
+                                                        <td className="px-6 py-4 text-white font-medium">{formatCurrency(agreement.processing_fee)} <span className="text-gray-500 text-xs ml-2 font-normal">(Deducted from disbursement)</span></td>
                                                     </tr>
-                                                    <tr>
-                                                        <td className="px-6 py-4 font-bold text-gray-600">Total Repayment</td>
-                                                        <td className="px-6 py-4 font-bold text-gray-900">{formatCurrency(agreement.total_payable)}</td>
+                                                    <tr className="hover:bg-white/[0.02] transition-colors">
+                                                        <td className="px-6 py-4 font-semibold text-gray-400">Total Repayment</td>
+                                                        <td className="px-6 py-4 font-bold text-white text-lg">{formatCurrency(agreement.total_payable)}</td>
                                                     </tr>
-                                                    <tr>
-                                                        <td className="px-6 py-4 font-bold text-gray-600">Late Payment Penalty</td>
-                                                        <td className="px-6 py-4 text-rose-600 font-medium">2% per month on overdue amount</td>
+                                                    <tr className="hover:bg-white/[0.02] transition-colors">
+                                                        <td className="px-6 py-4 font-semibold text-gray-400">Late Payment Penalty</td>
+                                                        <td className="px-6 py-4 text-rose-400 font-bold">2.0% per month on overdue amount</td>
                                                     </tr>
-                                                    <tr>
-                                                        <td className="px-6 py-4 font-bold text-gray-600">Prepayment Option</td>
-                                                        <td className="px-6 py-4 text-emerald-600 font-medium">Allowed after 6 EMIs with 0% penalty</td>
+                                                    <tr className="hover:bg-white/[0.02] transition-colors">
+                                                        <td className="px-6 py-4 font-semibold text-gray-400">Prepayment Option</td>
+                                                        <td className="px-6 py-4 text-emerald-400 font-bold italic">Allowed after 6 EMIs with 0% NIL penalty</td>
                                                     </tr>
-                                                    <tr>
-                                                        <td className="px-6 py-4 font-bold text-gray-600">Governing Law</td>
-                                                        <td className="px-6 py-4 text-gray-900">Information Technology Act, 2000 (Digital Execution)</td>
+                                                    <tr className="hover:bg-white/[0.02] transition-colors">
+                                                        <td className="px-6 py-4 font-semibold text-gray-400">Governing Law</td>
+                                                        <td className="px-6 py-4 text-gray-300">Information Technology Act, 2000 (Secured Digital Signature)</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
@@ -2768,47 +2884,59 @@ export default function Dashboard() {
 
                                         {/* Full Text Area */}
                                         <div className="space-y-4">
-                                            <h5 className="font-bold text-gray-900 text-lg border-l-4 border-teal-500 pl-3">Standard Terms & Conditions</h5>
-                                            <div className="p-6 bg-gray-50 rounded-xl border border-gray-200 max-h-64 overflow-y-auto font-serif leading-relaxed text-gray-600 text-sm italic">
+                                            <h5 className="font-bold text-white text-lg flex items-center gap-3">
+                                                <div className="h-6 w-1 bg-teal-500 rounded-full" />
+                                                Standard Terms & Conditions
+                                            </h5>
+                                            <div className="p-6 bg-black/30 rounded-xl border border-white/5 max-h-64 overflow-y-auto font-serif leading-relaxed text-gray-400 text-sm italic scrollbar-thin scrollbar-thumb-white/10">
                                                 {agreement.agreement_text}
                                             </div>
                                         </div>
 
-                                        {/* Admin Bank Details (Where to pay) */}
+                                        {/* Admin Bank Details (Dark Emerald Theme) */}
                                         {adminBanks.length > 0 && (
-                                            <div className="p-6 bg-emerald-50 rounded-xl border border-emerald-100 space-y-4">
-                                                <h5 className="font-bold text-emerald-900 flex items-center gap-2">
+                                            <div className="p-6 bg-emerald-950/20 rounded-xl border border-emerald-500/20 space-y-4 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]">
+                                                <h5 className="font-bold text-emerald-400 flex items-center gap-2">
                                                     <Landmark className="w-5 h-5" />
-                                                    Official Payment/Disbursement Accounts
+                                                    Official Disbursement Accounts
                                                 </h5>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {adminBanks.map(bank => (
-                                                        <div key={bank.id} className="p-3 bg-white rounded-lg border border-emerald-200 shadow-sm text-xs">
-                                                            <p className="font-bold text-emerald-800 mb-1">{bank.bank_name}</p>
-                                                            <div className="grid grid-cols-2 gap-2 text-gray-600">
-                                                                <span>A/C: <span className="font-mono">{bank.account_number}</span></span>
-                                                                <span>IFSC: <span className="font-mono">{bank.ifsc_code}</span></span>
+                                                        <div key={bank.id} className="p-4 bg-[#0f172a] rounded-xl border border-emerald-500/10 hover:border-emerald-500/30 transition-all shadow-lg group">
+                                                            <p className="font-bold text-emerald-400 mb-2 group-hover:text-white transition-colors">{bank.bank_name}</p>
+                                                            <div className="space-y-1">
+                                                                <div className="flex justify-between text-[11px]">
+                                                                    <span className="text-gray-500 uppercase font-bold">A/C Number</span>
+                                                                    <span className="text-gray-200 font-mono tracking-wider">{bank.account_number}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-[11px]">
+                                                                    <span className="text-gray-500 uppercase font-bold">IFSC Code</span>
+                                                                    <span className="text-gray-200 font-mono tracking-wider">{bank.ifsc_code}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <p className="text-[10px] text-emerald-600 italic">* All loan disbursements and repayments are processed through these bank accounts only.</p>
+                                                <p className="text-[10px] text-emerald-500/60 italic font-medium flex items-center gap-2">
+                                                    <ShieldCheck className="w-3 h-3" />
+                                                    All transactions are end-to-end encrypted and RBI complaint.
+                                                </p>
                                             </div>
                                         )}
 
-                                        <div className="flex flex-col md:flex-row justify-between items-end gap-8 pt-8 border-t border-gray-100">
-                                            <div className="max-w-xs space-y-4">
-                                                <label className="flex items-start gap-3 cursor-pointer group">
+                                        <div className="flex flex-col lg:flex-row justify-between items-end gap-12 pt-8 border-t border-white/10">
+                                            <div className="max-w-md w-full space-y-5">
+                                                <label className="flex items-start gap-4 cursor-pointer group p-4 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/10">
                                                     <div className="relative flex items-center mt-1">
                                                         <input
                                                             type="checkbox"
                                                             checked={agreementConsent}
                                                             onChange={(e) => setAgreementConsent(e.target.checked)}
-                                                            className="w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                                                            className="w-5 h-5 rounded-md border-white/20 bg-gray-800 text-teal-500 focus:ring-teal-500/50 transition-all"
                                                         />
                                                     </div>
-                                                    <p className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">
-                                                        I, as the borrower, hereby confirm that I have read, understood and agree to be bound by the terms and conditions set forth in this loan agreement.
+                                                    <p className="text-[11px] leading-relaxed text-gray-400 group-hover:text-gray-200 transition-colors font-medium">
+                                                        I, the borrower, hereby certify that I have read, understood and agree to the digital execution of this loan agreement. I acknowledge that my digital signature carries the same legal weight as a physical signature under the IT Act, 2000.
                                                     </p>
                                                 </label>
 
@@ -2816,30 +2944,68 @@ export default function Dashboard() {
                                                     <button
                                                         onClick={() => signAgreement(applicationId)}
                                                         disabled={!agreementConsent || agreement.signed_at !== null}
-                                                        className="flex-1 py-4 bg-gray-900 disabled:opacity-30 rounded-xl text-white font-black text-sm tracking-widest uppercase hover:bg-black transition-all shadow-xl shadow-gray-200"
+                                                        className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-30 disabled:from-gray-700 disabled:to-gray-800 rounded-xl text-white font-black text-xs tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_20px_-10px_rgba(20,184,166,0.3)] flex items-center justify-center gap-3 group"
                                                     >
-                                                        {agreement.signed_at ? "SIGNED & SECURED" : "Sign Agreement"}
+                                                        {agreement.signed_at ? (
+                                                            <>
+                                                                <Lock className="w-4 h-4" />
+                                                                SIGNED & TRANSMITTED
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <PenTool className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                                                                Digitally Sign Now
+                                                            </>
+                                                        )}
                                                     </button>
                                                     <button
-                                                        onClick={() => window.print()}
-                                                        className="p-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+                                                                const response = await fetch(`${API_BASE_URL}/kyc/${applicationId}/agreement/download`, {
+                                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                                });
+                                                                if (!response.ok) throw new Error('Download failed');
+                                                                const blob = await response.blob();
+                                                                const url = window.URL.createObjectURL(blob);
+                                                                const a = document.createElement('a');
+                                                                a.href = url;
+                                                                a.download = `LoanAgreement_${applicationId.slice(0, 8)}.pdf`;
+                                                                document.body.appendChild(a);
+                                                                a.click();
+                                                                window.URL.revokeObjectURL(url);
+                                                            } catch (err) {
+                                                                console.error("Download error:", err);
+                                                                alert("Failed to download agreement. Please try again.");
+                                                            }
+                                                        }}
+                                                        className="px-6 bg-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all border border-white/10 group"
+                                                        title="Download Official Agreement"
                                                     >
-                                                        <Download className="w-5 h-5" />
+                                                        <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
                                                     </button>
                                                 </div>
                                             </div>
 
                                             {agreement.signed_at ? (
                                                 <div className="relative">
-                                                    <div className="p-6 border-4 border-emerald-500 rounded-lg rotate-[-12deg] bg-white shadow-xl flex flex-col items-center justify-center">
-                                                        <CheckCircle className="w-12 h-12 text-emerald-500 mb-2" />
-                                                        <p className="font-black text-emerald-500 text-xl tracking-tighter">DIGITALLY SIGNED</p>
-                                                        <p className="text-[10px] text-gray-400 font-mono mt-1">{new Date(agreement.signed_at).toLocaleString()}</p>
+                                                    {/* OFFICIAL SEAL */}
+                                                    <div className="p-8 border-[6px] border-emerald-500/50 rounded-2xl rotate-[-15deg] bg-emerald-950/40 backdrop-blur-md shadow-[0_0_40px_rgba(16,185,129,0.2)] flex flex-col items-center justify-center relative overflow-hidden group">
+                                                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent pointer-events-none" />
+                                                        <div className="absolute top-0 right-0 p-2 opacity-20">
+                                                            <Landmark className="w-12 h-12" />
+                                                        </div>
+                                                        <CheckCircle className="w-16 h-16 text-emerald-400 mb-2 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
+                                                        <p className="font-black text-emerald-400 text-2xl tracking-tighter text-center leading-tight">DIGITALLY<br />AUTHENTICATED</p>
+                                                        <div className="h-px w-full bg-emerald-500/30 my-3" />
+                                                        <p className="text-[10px] text-emerald-200/60 font-mono uppercase tracking-[0.2em]">{new Date(agreement.signed_at).toLocaleString()}</p>
+                                                        <p className="text-[9px] text-emerald-500/40 font-mono mt-1 mt-2">SECURE-KEY: {agreement.id.slice(0, 12).toUpperCase()}</p>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="w-48 h-24 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-gray-300 text-xs font-medium italic">
-                                                    Awaiting Digital Signature
+                                                <div className="w-48 h-32 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center text-gray-600 space-y-2 opacity-50 bg-white/[0.01]">
+                                                    <PenTool className="w-8 h-8 opacity-20" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-center">Awaiting<br />Digital Signature</span>
                                                 </div>
                                             )}
                                         </div>
