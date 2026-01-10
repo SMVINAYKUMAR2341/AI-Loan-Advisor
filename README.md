@@ -8,31 +8,6 @@ This project contains a comprehensive banking system comprising a **Secure Ident
 - `backend/`: FastAPI application for loan prediction and user management.
 - `sql/`: Database scripts.
 
----
-
-## Inspiration
-Driven by the vision to democratize credit access, I engineered this system to dismantle the 'black box' of traditional lending. My goal was to leverage high-precision AI to provide applicants with extreme transparency and actionable financial intelligence, turning a standardized process into a personalized experience.
-
-## What it does
-This solo-engineered ecosystem features a high-fidelity **Customer Identity Hub** for real-time risk assessment and a secure **Bank Admin Dashboard** for lifecycle management. By integrating **Explainable AI (XAI)**, it provides users with instantaneous, transparent credit decisions while offering bank officers a streamlined, institutional-grade workflow for document verification and disbursement.
-
-## How I built it
-I architected the entire platform from scratch using a modern, scalable stack: **FastAPI** for the core logic, **React/TypeScript** for the dual-dashboard frontend, and **PostgreSQL/NeonDB** for robust data persistence. The intelligence engine is powered by **XGBoost** for predictive accuracy and **SHAP** for real-time model interpretability, all wrapped in a premium UI with custom **WebGL shaders**.
-
-## Challenges I ran into
-Orchestrating secure 3-factor authentication across independent dashboards while maintaining a unified backend state was a significant architectural challenge. Additionally, translating multi-dimensional SHAP weights into human-readable narratives required the development of a custom interpretive logic layer to ensure absolute clarity for the end-user.
-
-## Accomplishments that I'm proud of
-I am proud of successfully delivering a production-ready, full-stack fintech solution single-handedly. This includes the implementation of an automated, RBI-compliant PDF reporting system and a WebGL-enhanced UI that elevates the standard of financial applications.
-
-## What I learned
-This project deepened my expertise in **Financial Risk Modeling** and **Enterprise Security Architecture**. I learned that true technical excellence in fintech lies at the intersection of extreme precision and user-centric transparency—where a user understands not just 'what' the decision is, but the 'why' behind it.
-
-## What's next for AI Powered Loan Eligibility Advisor
-The roadmap includes live integration with global credit bureaus, the launch of native mobile applications for real-time monitoring, and the implementation of blockchain-based decentralized identity verification (DID) to further secure customer KYC.
-
----
-
 ## Prerequisites
 
 - **Python 3.8+**

@@ -123,9 +123,8 @@ export default function Dashboard() {
         loan_details: { amount: number; duration_months: number; duration_years: number };
         income_analysis: { monthly_income: number; annual_income: number; debt_to_income_ratio: number; emi_to_income_ratio: number };
         coapplicant: { suggested: boolean; reason: string; provided: boolean };
-        explanations: Array<{ factor: string; impact: string; description: string }>;
+        explanations: Array<{ factor: string; impact: string; description: string; shap_value?: number }>;
         kyc_required: boolean;
-        next_steps: string[];
         next_steps: string[];
         application_id?: string;  // Added for KYC workflow
         tracking_id?: string;     // Unified human-readable ID
@@ -306,6 +305,16 @@ export default function Dashboard() {
         gender?: string;
         kyc_verified: boolean;
         created_at: string;
+        pan_number?: string;
+        address_line1?: string;
+        address_line2?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
+        role?: string;
+        terms_consent?: boolean;
+        privacy_consent?: boolean;
+        data_consent?: boolean;
     }
 
     // Account & Security State (moved here to comply with Rules of Hooks)
@@ -491,6 +500,8 @@ export default function Dashboard() {
         location: string;
         device_type?: string;
         is_active: boolean;
+        is_new_device?: boolean;
+        last_activity?: string;
     }
 
     const [activityTab, setActivityTab] = useState<"all" | "security" | "loans" | "kyc" | "payments" | "profile" | "sessions">("all");
@@ -1438,10 +1449,10 @@ export default function Dashboard() {
                                     <div className="space-y-3 mt-4">
                                         {(() => {
                                             const factors = advisorResult.explanations.slice(0, 5);
-                                            const totalImpact = factors.reduce((sum: number, f: any) =>
+                                            const totalImpact = factors.reduce((sum: number, f) =>
                                                 sum + Math.abs(f.shap_value || 0.15) * 100, 0);
 
-                                            return factors.map((f: any, idx: number) => {
+                                            return factors.map((f, idx: number) => {
                                                 const impactValue = Math.abs(f.shap_value || 0.15) * 100;
                                                 const normalizedPercent = (impactValue / totalImpact) * 100;
                                                 return (
@@ -1514,7 +1525,7 @@ export default function Dashboard() {
                                             </text>
                                             <Tooltip
                                                 contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                                                formatter={(value: any, name: string) => name === 'Remaining' ? null : [`${value}%`, 'ML Confidence']}
+                                                formatter={(value: number, name: string) => name === 'Remaining' ? null : [`${value}%`, 'ML Confidence']}
                                             />
                                         </PieChart>
                                     </ResponsiveContainer>
@@ -1568,14 +1579,14 @@ export default function Dashboard() {
                                                     color: '#1F2937'
                                                 }}
                                                 wrapperStyle={{ zIndex: 1000 }}
-                                                formatter={(value: any, name: string) => [`₹${value.toLocaleString()}`, name]}
+                                                formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
                                                 labelStyle={{ color: '#1F2937', fontWeight: 'bold' }}
                                                 itemStyle={{ color: '#374151' }}
                                             />
                                             <Legend
                                                 verticalAlign="bottom"
                                                 iconType="circle"
-                                                formatter={(value: string, entry: Record<string, unknown>) => {
+                                                formatter={(value: string, entry: { payload: { value: number } }) => {
                                                     const percent = ((entry.payload.value / advisorResult.emi.total_repayment) * 100).toFixed(0);
                                                     return <span style={{ color: '#D1D5DB' }}>{value}: {percent}%</span>;
                                                 }}

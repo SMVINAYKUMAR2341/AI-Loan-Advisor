@@ -190,7 +190,7 @@ export interface ActivityEvent {
     entity_type: string | null;
     description: string | null;
     created_at: string;
-    extra_data: Record<string, any> | null;
+    extra_data: Record<string, unknown> | null;
 }
 
 export interface ApplicationItem {
@@ -325,7 +325,7 @@ export async function getEligibility(): Promise<EligibilityResponse> {
 // LOAN APPLICATIONS
 // =============================================================================
 
-export async function submitLoanApplication(data: Record<string, any>): Promise<any> {
+export async function submitLoanApplication(data: Record<string, unknown>): Promise<ApplicationItem> {
     const response = await authFetch(`${API_BASE_URL}/loan-application`, {
         method: 'POST',
         body: JSON.stringify(data),
@@ -346,7 +346,7 @@ export async function getMyApplications(): Promise<ApplicationItem[]> {
     return response.json();
 }
 
-export async function getApplicationDetail(applicationId: string): Promise<any> {
+export async function getApplicationDetail(applicationId: string): Promise<ApplicationItem> {
     const response = await authFetch(`${API_BASE_URL}/application/${applicationId}`);
     if (!response.ok) {
         const error: ApiError = await response.json();
@@ -368,7 +368,7 @@ export async function getEMISchedule(applicationId: string): Promise<EMISchedule
     return response.json();
 }
 
-export async function makePayment(repaymentId: string, paymentMethod: string): Promise<any> {
+export async function makePayment(repaymentId: string, paymentMethod: string): Promise<{ message: string; transaction_id: string }> {
     const response = await authFetch(`${API_BASE_URL}/repayments/pay`, {
         method: 'POST',
         body: JSON.stringify({ repayment_id: repaymentId, payment_method: paymentMethod }),
@@ -439,7 +439,7 @@ export async function getAllApplications(): Promise<ApplicationItem[]> {
     return response.json();
 }
 
-export async function submitReview(applicationId: string, decision: string, justification: string): Promise<any> {
+export async function submitReview(applicationId: string, decision: string, justification: string): Promise<{ message: string; review_id: string }> {
     const response = await authFetch(`${API_BASE_URL}/review`, {
         method: 'POST',
         body: JSON.stringify({
