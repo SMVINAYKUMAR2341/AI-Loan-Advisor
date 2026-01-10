@@ -1,5 +1,5 @@
 import { UserProfile } from '@/types/profile';
-import { maskEmail, maskPhone, formatDate } from '@/data/mockProfileData';
+import { formatDate } from '@/data/mockProfileData';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Avatar, AvatarFallback } from '@/components/ui/core';
 import { User, Mail, Phone, Calendar, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 
@@ -51,21 +51,21 @@ export function ProfileOverview({ user }: ProfileOverviewProps) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Masked Email */}
+              {/* Email */}
               <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                 <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-0.5">
                   <p className="text-xs text-muted-foreground">Email Address</p>
-                  <p className="text-sm font-medium text-foreground">{maskEmail(user.email)}</p>
+                  <p className="text-sm font-medium text-foreground">{user.email}</p>
                 </div>
               </div>
 
-              {/* Masked Phone */}
+              {/* Phone */}
               <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                 <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-0.5">
                   <p className="text-xs text-muted-foreground">Mobile Number</p>
-                  <p className="text-sm font-medium text-foreground">{maskPhone(user.phone)}</p>
+                  <p className="text-sm font-medium text-foreground">{user.phone}</p>
                 </div>
               </div>
             </div>
@@ -81,8 +81,7 @@ export function ProfileOverview({ user }: ProfileOverviewProps) {
         {/* Notice */}
         <div className="mt-6 p-3 rounded-lg bg-primary/5 border border-primary/10">
           <p className="text-xs text-muted-foreground">
-            <span className="text-primary font-medium">Note:</span> Sensitive information is masked for security.
-            Contact support to update regulated profile details.
+            <span className="text-primary font-medium">Note:</span> Contact support to update regulated profile details.
           </p>
         </div>
       </CardContent>

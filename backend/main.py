@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -615,6 +615,82 @@ async def comprehensive_loan_analysis(request: LoanAdvisorRequest):
 # ML-ALIGNED LOAN APPLICATION ENDPOINTS (WITH DB PERSISTENCE)
 # =====================================================
 
+@app.get("/loan-applications", response_model=List[schemas.ApplicationListItem])
+async def get_my_loan_applications(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all loan applications for the current user.
+    """
+    query = (
+        select(models.LoanApplication, models.LoanPrediction)
+        .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
+        .where(models.LoanApplication.user_id == current_user.id)
+        .order_by(models.LoanApplication.created_at.desc())
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    response = []
+    for app_row, pred_row in rows:
+        # Default values if no prediction exists
+        decision = "PENDING_PROCESSING"
+        prob = 0.0
+        
+        if pred_row:
+            decision = pred_row.decision
+            prob = pred_row.approval_probability
+            
+        response.append(schemas.ApplicationListItem(
+            id=app_row.id,
+            user_id=app_row.user_id,
+            customer_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip(),
+            customer_id=current_user.customer_id,
+            loan_amount=app_row.loan_amount,
+            loan_purpose=app_row.loan_purpose,
+            decision=decision,
+            approval_probability=prob,
+            created_at=app_row.created_at,
+            reviewed=False
+        ))
+        
+    return response
+
+
+async def generate_tracking_id(db: AsyncSession) -> str:
+    """
+    Generate sequential tracking ID: RBI{Year}LA{Seq}
+    Example: RBI2026LA01, RBI2026LA02
+    """
+    current_year = datetime.now().year
+    prefix = f"RBI{current_year}LA"
+    
+    # Find last tracking ID for current year
+    query = (
+        select(models.LoanApplication.tracking_id)
+        .where(models.LoanApplication.tracking_id.like(f"{prefix}%"))
+        .order_by(models.LoanApplication.tracking_id.desc())
+        .limit(1)
+    )
+    result = await db.execute(query)
+    last_id = result.scalars().first()
+    
+    if last_id:
+        # Extract sequence number
+        try:
+            seq_str = last_id.replace(prefix, "")
+            seq = int(seq_str)
+            new_seq = seq + 1
+        except ValueError:
+            new_seq = 1
+    else:
+        new_seq = 1
+        
+    return f"{prefix}{new_seq:02d}"
+
+
 @app.post("/loan-application", response_model=schemas.LoanApplicationResponse)
 async def submit_loan_application(
     application: schemas.LoanApplicationCreate,
@@ -664,9 +740,13 @@ async def submit_loan_application(
             'previous_loan_defaults': application.previous_loan_defaults,  # Yes/No
         }
         
+        # Generate Tracking ID
+        tracking_id = await generate_tracking_id(db)
+        
         # 1. Store ML input features (loan_applications table)
         db_application = models.LoanApplication(
             user_id=current_user.id,
+            tracking_id=tracking_id,
             features_json=features,
             gender=application.gender,
             age=application.age,
@@ -1387,10 +1467,15 @@ async def make_payment(
     # Log audit
     await log_audit(
         db, current_user.id,
-        models.AuditAction.EMI_PAID,
+        models.AuditAction.EMI_PAYMENT_SUCCESS,
         "repayment",
         repayment.id,
-        f"Paid EMI #{repayment.emi_number} of ₹{repayment.emi_amount}"
+        f"Paid EMI #{repayment.emi_number} of ₹{repayment.emi_amount}",
+        extra_data={
+            "amount": repayment.emi_amount, 
+            "emi_number": repayment.emi_number,
+            "payment_method": payment.payment_method
+        }
     )
     
     await db.commit()
@@ -1456,16 +1541,20 @@ async def get_upcoming_emis(
 
 @app.post("/documents/upload", response_model=schemas.KYCDocumentResponse)
 async def upload_document(
-    application_id: str,
-    document_type: str,
+    application_id: str = Form(...),
+    document_type: str = Form(...),
+    file: UploadFile = File(...),
     current_user: models.User = Depends(auth.get_current_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
-    Upload KYC document (metadata only - file upload would be separate).
+    Upload KYC document.
+    Accepts PDF, JPG, PNG. Max 5MB.
     Documents can only be uploaded for APPROVED applications.
     """
     from uuid import UUID as PyUUID
+    import os
+    import aiofiles
     
     try:
         app_uuid = PyUUID(application_id)
@@ -1490,16 +1579,40 @@ async def upload_document(
     if not prediction or prediction.decision != "APPROVED":
         raise HTTPException(status_code=400, detail="Documents can only be uploaded for approved loans")
     
-    # Create document record
+    # Validate file type
+    allowed_types = ["application/pdf", "image/jpeg", "image/png"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: PDF, JPG, PNG")
+    
+    # Validate file size (max 5MB)
+    file_content = await file.read()
+    file_size = len(file_content)
+    if file_size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+    
+    # Create upload directory
+    upload_dir = f"uploads/{current_user.id}/{application_id}"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generate unique filename
     import uuid
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'pdf'
+    unique_filename = f"{document_type}_{uuid.uuid4().hex[:8]}.{ext}"
+    file_path = f"{upload_dir}/{unique_filename}"
+    
+    # Save file
+    async with aiofiles.open(file_path, 'wb') as f:
+        await f.write(file_content)
+    
+    # Create document record
     doc = models.KYCDocument(
         application_id=app_uuid,
         user_id=current_user.id,
         document_type=document_type,
-        file_name=f"{document_type}_{uuid.uuid4().hex[:8]}.pdf",
-        file_path=f"/uploads/{current_user.id}/{document_type}/",
-        file_size=0,
-        mime_type="application/pdf",
+        file_name=unique_filename,
+        file_path=file_path,
+        file_size=file_size,
+        mime_type=file.content_type,
         verification_status="PENDING"
     )
     
@@ -1511,7 +1624,8 @@ async def upload_document(
         models.AuditAction.DOCUMENT_UPLOADED,
         "kyc_document",
         doc.id,
-        f"Uploaded {document_type} document"
+        f"Uploaded {document_type} document: {file.filename}",
+        extra_data={"file_size": file_size, "document_type": document_type}
     )
     
     await db.commit()
@@ -1877,20 +1991,48 @@ async def get_loan_activity(
     result = await db.execute(query)
     logs = result.scalars().all()
     
+    # Enrich with loan application details ("loan forms")
+    events = []
+    
+    # Collect application IDs
+    app_ids = set()
+    for log in logs:
+        if log.entity_type == "loan_application" and log.entity_id:
+            app_ids.add(log.entity_id)
+            
+    # Fetch applications in bulk
+    applications = {}
+    if app_ids:
+        app_query = select(models.LoanApplication).where(models.LoanApplication.id.in_(app_ids))
+        app_result = await db.execute(app_query)
+        apps = app_result.scalars().all()
+        applications = {app.id: app for app in apps}
+
+    for log in logs:
+        app_details = None
+        if log.entity_type == "loan_application" and log.entity_id in applications:
+            app = applications[log.entity_id]
+            app_details = {
+                "loan_amount": app.loan_amount,
+                "loan_purpose": app.loan_purpose,
+                "created_at": app.created_at.isoformat(),
+                "features": app.features_json
+            }
+
+        events.append({
+            "id": str(log.id),
+            "action": log.action,
+            "severity": log.severity,
+            "description": log.description,
+            "timestamp": log.created_at.isoformat(),
+            "application_id": str(log.entity_id) if log.entity_id else None,
+            "extra": log.extra_data,
+            "loan_details": app_details  # The "loan form" data from DB
+        })
+    
     return {
         "category": "Loan Applications",
-        "events": [
-            {
-                "id": str(log.id),
-                "action": log.action,
-                "severity": log.severity,
-                "description": log.description,
-                "timestamp": log.created_at.isoformat(),
-                "application_id": str(log.entity_id) if log.entity_id else None,
-                "extra": log.extra_data
-            }
-            for log in logs
-        ]
+        "events": events
     }
 
 
@@ -2862,7 +3004,10 @@ async def get_report_qr_code(
         # Create shareable URL - Use the current request's base URL for maximum reliability
         # This handles localhost, IP addresses, and production domains (like Render) automatically
         base_url = str(request.base_url).rstrip('/')
-        shareable_url = f"{base_url}/shared-report/{token}"
+        
+        # Embed Tracking ID in the URL for reference/scanning
+        tracking_ref = f"?ref={application.tracking_id}" if getattr(application, "tracking_id", None) else ""
+        shareable_url = f"{base_url}/shared-report/{token}{tracking_ref}"
         
         # Generate QR code - Use version=None for auto-fitting
         qr = qrcode.QRCode(
@@ -3254,7 +3399,893 @@ async def mock_health():
             "/mock/validate-bank-account",
             "/mock/cibil-check",
             "/mock/bank-transactions",
-            "/mock/analyze-statement"
+            "/mock/analyze-statement",
+            "/chat"
         ],
         "description": "Mock validation APIs for demo/testing. No actual API calls are made."
     }
+
+# =====================================================
+# CHATBOT ENDPOINT
+# =====================================================
+
+@app.post("/chat", response_model=schemas.ChatResponse)
+async def chat_endpoint(request: schemas.ChatRequest):
+    """
+    Chat with the AI Credit Advisor.
+    Uses cloud-based LLM via chatbot_model.py
+    """
+    try:
+        # Import here to avoid circular dependencies if any
+        import chatbot_model
+        
+        # Format history for the model
+        history_dicts = []
+        for msg in request.history:
+            history_dicts.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+            
+        # Generate response
+        response_text = chatbot_model.generate_response(
+            user_message=request.message,
+            conversation_history=history_dicts
+        )
+        
+        return schemas.ChatResponse(
+            response=response_text,
+            timestamp=datetime.now()
+        )
+        
+    except Exception as e:
+        print(f"Chat Error: {str(e)}")
+        # Return fallback response on error
+        return schemas.ChatResponse(
+            response="I'm having trouble connecting to the AI service right now. Please try again later.",
+            timestamp=datetime.now()
+        )
+
+
+# =====================================================
+# BANK ADMIN ENDPOINTS
+# =====================================================
+
+def require_admin(current_user: models.User = Depends(auth.get_current_user)):
+    """Dependency to require bank_officer role"""
+    if current_user.role != "bank_officer":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+@app.get("/admin/dashboard/stats")
+async def get_admin_dashboard_stats(
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get dashboard statistics for admin"""
+    # Count applications by status
+    total_result = await db.execute(select(func.count(models.LoanApplication.id)))
+    total_loans = total_result.scalar() or 0
+    
+    pending_result = await db.execute(
+        select(func.count(models.LoanPrediction.id))
+        .where(models.LoanPrediction.decision == "PENDING_REVIEW")
+    )
+    pending_count = pending_result.scalar() or 0
+    
+    approved_result = await db.execute(
+        select(func.count(models.LoanPrediction.id))
+        .where(models.LoanPrediction.decision == "APPROVED")
+    )
+    approved_count = approved_result.scalar() or 0
+    
+    rejected_result = await db.execute(
+        select(func.count(models.LoanPrediction.id))
+        .where(models.LoanPrediction.decision == "REJECTED")
+    )
+    rejected_count = rejected_result.scalar() or 0
+    
+    # Sum disbursed amount
+    disbursed_result = await db.execute(
+        select(func.sum(models.Disbursement.amount))
+        .where(models.Disbursement.status == "COMPLETED")
+    )
+    total_disbursed = disbursed_result.scalar() or 0
+    
+    return {
+        "total_loans": total_loans,
+        "pending_review": pending_count,
+        "approved": approved_count,
+        "rejected": rejected_count,
+        "total_disbursed": total_disbursed,
+        "approval_rate": round((approved_count / total_loans * 100) if total_loans > 0 else 0, 1)
+    }
+
+
+@app.get("/admin/applications")
+async def get_all_applications(
+    status: str = None,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all loan applications with optional status filter"""
+    query = (
+        select(models.LoanApplication, models.LoanPrediction, models.User)
+        .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
+        .join(models.User, models.LoanApplication.user_id == models.User.id)
+        .order_by(models.LoanApplication.created_at.desc())
+    )
+    
+    if status:
+        query = query.where(models.LoanPrediction.decision == status.upper())
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    applications = []
+    for app, pred, user in rows:
+        applications.append({
+            "id": str(app.id),
+            "customer_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or "N/A",
+            "customer_id": user.customer_id,
+            "mobile_number": user.mobile_number,
+            "email": user.email,
+            "loan_amount": app.loan_amount,
+            "loan_purpose": app.loan_purpose,
+            "decision": pred.decision if pred else "PROCESSING",
+            "decision_reason": pred.decision_reason if pred else None,
+            "approval_probability": pred.approval_probability if pred else 0,
+            "interest_rate": pred.interest_rate if pred else 0,
+            "emi": pred.emi if pred else 0,
+            "created_at": app.created_at.isoformat()
+        })
+    
+    return applications
+
+
+@app.get("/admin/applications/{app_id}")
+async def get_application_details(
+    app_id: str,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get detailed application info including features"""
+    query = (
+        select(models.LoanApplication, models.LoanPrediction, models.User)
+        .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
+        .join(models.User, models.LoanApplication.user_id == models.User.id)
+        .where(models.LoanApplication.id == app_id)
+    )
+    
+    result = await db.execute(query)
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    app, pred, user = row
+    
+    return {
+        "id": str(app.id),
+        "customer": {
+            "id": str(user.id),
+            "customer_id": user.customer_id,
+            "name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+            "mobile": user.mobile_number,
+            "email": user.email,
+            "pan": user.pan_number,
+            "kyc_verified": user.kyc_verified
+        },
+        "features": app.features_json,
+        "loan_amount": app.loan_amount,
+        "loan_purpose": app.loan_purpose,
+        "loan_duration": app.loan_duration,
+        "prediction": {
+            "decision": pred.decision if pred else "PROCESSING",
+            "decision_reason": pred.decision_reason if pred else None,
+            "approval_probability": pred.approval_probability if pred else 0,
+            "interest_rate": pred.interest_rate if pred else 0,
+            "emi": pred.emi if pred else 0,
+            "total_repayment": pred.total_repayment if pred else 0,
+            "credit_rating": pred.credit_rating if pred else "N/A"
+        },
+        "created_at": app.created_at.isoformat()
+    }
+
+
+@app.get("/admin/customers")
+async def get_all_customers(
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all customers"""
+    query = select(models.User).where(models.User.role == "customer").order_by(models.User.created_at.desc())
+    result = await db.execute(query)
+    users = result.scalars().all()
+    
+    return [{
+        "id": str(u.id),
+        "customer_id": u.customer_id,
+        "name": f"{u.first_name or ''} {u.last_name or ''}".strip() or "N/A",
+        "mobile": u.mobile_number,
+        "email": u.email,
+        "kyc_verified": u.kyc_verified,
+        "created_at": u.created_at.isoformat() if u.created_at else None
+    } for u in users]
+
+
+@app.post("/admin/disbursements/{app_id}")
+async def process_disbursement(
+    app_id: str,
+    transaction_ref: str,
+    remarks: str = None,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Process disbursement for an approved loan"""
+    # Get the application
+    app_result = await db.execute(
+        select(models.LoanApplication, models.LoanPrediction)
+        .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
+        .where(models.LoanApplication.id == app_id)
+    )
+    row = app_result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    app, pred = row
+    
+    if not pred or pred.decision != "APPROVED":
+        raise HTTPException(status_code=400, detail="Only approved loans can be disbursed")
+    
+    # Check if already disbursed
+    existing = await db.execute(
+        select(models.Disbursement).where(models.Disbursement.application_id == app_id)
+    )
+    if existing.scalar():
+        raise HTTPException(status_code=400, detail="Loan already disbursed")
+    
+    # Create disbursement record
+    disbursement = models.Disbursement(
+        application_id=app.id,
+        user_id=app.user_id,
+        amount=app.loan_amount,
+        transaction_ref=transaction_ref,
+        status="COMPLETED",
+        processed_by=admin.id,
+        remarks=remarks,
+        processed_at=datetime.now()
+    )
+    
+    db.add(disbursement)
+    
+    # GENERATE COMPLETE EMI SCHEDULE
+    # Create Repayment entries for the full tenure with status "DUE"
+    from dateutil.relativedelta import relativedelta
+    
+    # Convert loan duration (months) to integer
+    duration_months = int(app.loan_duration) if app.loan_duration else 12
+    emi_amount = pred.emi if pred.emi else (app.loan_amount / duration_months) # Fallback simple calculation
+    
+    # Calculate interest component (simplified amortization)
+    # For a real bank, this would use the exact amortization schedule. 
+    # Here we use flat interest for simplicity or the stored values if available.
+    
+    start_date = datetime.now().date()
+    
+    for i in range(1, duration_months + 1):
+        # Due date is exactly i months from today
+        due_date = start_date + relativedelta(months=i)
+        
+        repayment = models.Repayment(
+            user_id=app.user_id,
+            emi_number=i,
+            due_date=due_date,
+            emi_amount=emi_amount,
+            principal_component=emi_amount * 0.8, # Estimated
+            interest_component=emi_amount * 0.2, # Estimated
+            outstanding_principal=app.loan_amount - (emi_amount * 0.8 * i), # Estimated
+            payment_status="DUE",
+            payment_date=None,
+            late_fee=0
+        )
+        db.add(repayment)
+
+    await db.commit()
+    
+    return {"message": "Disbursement processed successfully", "disbursement_id": str(disbursement.id)}
+
+
+@app.get("/admin/disbursements")
+async def get_all_disbursements(
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all disbursements"""
+    query = (
+        select(models.Disbursement, models.LoanApplication, models.User)
+        .join(models.LoanApplication, models.Disbursement.application_id == models.LoanApplication.id)
+        .join(models.User, models.Disbursement.user_id == models.User.id)
+        .order_by(models.Disbursement.created_at.desc())
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(d.id),
+        "application_id": str(d.application_id),
+        "customer_name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
+        "amount": d.amount,
+        "transaction_ref": d.transaction_ref,
+        "status": d.status,
+        "processed_at": d.processed_at.isoformat() if d.processed_at else None
+    } for d, app, u in rows]
+
+
+@app.post("/admin/notifications/send")
+async def send_notification(
+    user_id: str,
+    notification_type: str,  # sms, email
+    trigger: str,  # emi_reminder, disbursement_confirmation, etc.
+    message: str,
+    application_id: str = None,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Send notification to a customer"""
+    notification = models.Notification(
+        user_id=user_id,
+        type=notification_type,
+        trigger=trigger,
+        message=message,
+        application_id=application_id,
+        status="sent"
+    )
+    
+    db.add(notification)
+    await db.commit()
+    
+    return {"message": "Notification sent", "notification_id": str(notification.id)}
+
+
+@app.get("/admin/notifications")
+async def get_all_notifications(
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all sent notifications"""
+    query = (
+        select(models.Notification, models.User)
+        .join(models.User, models.Notification.user_id == models.User.id)
+        .order_by(models.Notification.sent_at.desc())
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(n.id),
+        "customer_name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
+        "type": n.type,
+        "trigger": n.trigger,
+        "message": n.message,
+        "status": n.status,
+        "sent_at": n.sent_at.isoformat() if n.sent_at else None
+    } for n, u in rows]
+
+
+@app.get("/notifications/me")
+async def get_my_notifications(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get notifications for current customer"""
+    query = (
+        select(models.Notification)
+        .where(models.Notification.user_id == current_user.id)
+        .order_by(models.Notification.sent_at.desc())
+    )
+    
+    result = await db.execute(query)
+    notifications = result.scalars().all()
+    
+    return [{
+        "id": str(n.id),
+        "type": n.type,
+        "trigger": n.trigger,
+        "message": n.message,
+        "status": n.status,
+        "sent_at": n.sent_at.isoformat() if n.sent_at else None
+    } for n in notifications]
+
+
+@app.get("/disbursements/me")
+async def get_my_disbursements(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get disbursements for current customer"""
+    query = (
+        select(models.Disbursement, models.LoanApplication)
+        .join(models.LoanApplication, models.Disbursement.application_id == models.LoanApplication.id)
+        .where(models.Disbursement.user_id == current_user.id)
+        .order_by(models.Disbursement.created_at.desc())
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(d.id),
+        "application_id": str(d.application_id),
+        "amount": d.amount,
+        "transaction_ref": d.transaction_ref,
+        "status": d.status,
+        "loan_purpose": app.loan_purpose,
+        "processed_at": d.processed_at.isoformat() if d.processed_at else None
+    } for d, app in rows]
+
+
+@app.get("/admin/repayments")
+async def get_admin_repayments(
+    admin: models.User = Depends(auth.require_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all EMI repayments from customers for admin dashboard"""
+    query = (
+        select(models.Repayment, models.User)
+        .join(models.User, models.Repayment.user_id == models.User.id)
+        .order_by(models.Repayment.payment_date.desc().nulls_last(), models.Repayment.due_date.asc())
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(r.id),
+        "user_id": str(r.user_id),  # Ensure user_id is on Repayment model or joined correctly
+        "customer_name": u.full_name or f"Customer {u.mobile_number}",
+        "mobile_number": u.mobile_number,
+        "emi_number": r.emi_number,
+        "amount": r.emi_amount,  # Scheduled amount
+        "payment_amount": r.payment_amount, # Actual paid amount
+        "payment_method": r.payment_method,
+        "status": r.payment_status,
+        "paid_at": r.payment_date.isoformat() if r.payment_date else None,
+        "due_date": r.due_date.isoformat() if r.due_date else None
+    } for r, u in rows]
+
+
+@app.get("/admin/applications/search", response_model=List[schemas.ApplicationListItem])
+async def search_applications(
+    tracking_id: str,
+    current_user: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Search applications by Tracking ID (e.g., RBI2026LA01)"""
+    query = (
+        select(models.LoanApplication)
+        .where(models.LoanApplication.tracking_id == tracking_id)
+    )
+    result = await db.execute(query)
+    applications = result.scalars().all()
+    
+    response = []
+    for app in applications:
+        # Get user info
+        user_query = select(models.User).where(models.User.id == app.user_id)
+        user_result = await db.execute(user_query)
+        user = user_result.scalars().first()
+        
+        # Get prediction
+        pred_query = select(models.LoanPrediction).where(
+            models.LoanPrediction.application_id == app.id
+        )
+        pred_result = await db.execute(pred_query)
+        prediction = pred_result.scalars().first()
+        
+        response.append(schemas.ApplicationListItem(
+            id=app.id,
+            user_id=app.user_id,
+            customer_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
+            customer_id=user.customer_id if user else None,
+            loan_amount=app.loan_amount,
+            loan_purpose=app.loan_purpose,
+            decision=prediction.decision if prediction else "PENDING",
+            approval_probability=prediction.approval_probability if prediction else 0,
+            created_at=app.created_at,
+            reviewed=False
+        ))
+    return response
+
+
+@app.get("/admin/applications", response_model=List[schemas.ApplicationListItem])
+async def get_admin_applications(
+    status: Optional[str] = None,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all loan applications for admin dashboard"""
+    query = (
+        select(models.LoanApplication)
+        .order_by(models.LoanApplication.created_at.desc())
+    )
+    
+    if status and status != 'all':
+        # Need to join with prediction/decision to filter by status if it's not on the application model directly
+        # Typically status is on the application or computed.
+        # For simplicity, fetching all and filtering in memory or ignoring status for now if complex join needed.
+        # But wait, 'decision' is on LoanPrediction.
+        # Let's just return all for now and let frontend filter, or join prediction.
+        pass
+
+    result = await db.execute(query)
+    applications = result.scalars().all()
+    
+    response = []
+    for app in applications:
+        # Get user info
+        user_query = select(models.User).where(models.User.id == app.user_id)
+        user_result = await db.execute(user_query)
+        user = user_result.scalars().first()
+        
+        # Get prediction
+        pred_query = select(models.LoanPrediction).where(
+            models.LoanPrediction.application_id == app.id
+        )
+        pred_result = await db.execute(pred_query)
+        prediction = pred_result.scalars().first()
+        
+        # Get bank details if available
+        bank_query = select(models.BankAccountDetails).where(
+            models.BankAccountDetails.application_id == app.id
+        )
+        bank_result = await db.execute(bank_query)
+        bank_details = bank_result.scalars().first()
+        
+        response.append(schemas.ApplicationListItem(
+            id=app.id,
+            tracking_id=app.tracking_id,
+            user_id=app.user_id,
+            customer_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
+            customer_id=user.customer_id if user else None,
+            loan_amount=app.loan_amount,
+            loan_purpose=app.loan_purpose,
+            decision=prediction.decision if prediction else "PENDING",
+            approval_probability=prediction.approval_probability if prediction else 0,
+            created_at=app.created_at,
+            reviewed=False,
+            bank_details=schemas.BankDetailsResponse.model_validate(bank_details) if bank_details else None
+        ))
+    return response
+
+
+@app.get("/admin/documents")
+async def get_admin_documents(
+    status: Optional[str] = None,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all KYC documents for admin review"""
+    query = (
+        select(models.KYCDocument, models.User, models.LoanApplication)
+        .join(models.User, models.KYCDocument.user_id == models.User.id)
+        .join(models.LoanApplication, models.KYCDocument.application_id == models.LoanApplication.id)
+        .order_by(models.KYCDocument.uploaded_at.desc())
+    )
+    
+    if status and status != 'all':
+        query = query.where(models.KYCDocument.verification_status == status)
+
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(doc.id),
+        "document_type": doc.document_type,
+        "file_name": doc.file_name,
+        "file_size": doc.file_size,
+        "verification_status": doc.verification_status,
+        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        "customer_name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
+        "customer_id": u.customer_id,
+        "application_id": str(app.id),
+        "tracking_id": app.tracking_id,
+        "loan_amount": app.loan_amount
+    } for doc, u, app in rows]
+
+
+@app.post("/admin/documents/{document_id}/verify")
+async def verify_admin_document(
+    document_id: str,
+    verify_request: schemas.KYCVerifyRequest,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Verify or reject a KYC document"""
+    query = select(models.KYCDocument).where(models.KYCDocument.id == document_id)
+    result = await db.execute(query)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    document.verification_status = verify_request.status
+    document.verification_notes = verify_request.notes
+    document.verified_by = admin.id
+    document.verified_at = datetime.now()
+    
+    # Update KYC Status Tracker if needed
+    # ... logic to update step_1_docs_verified could go here
+    
+    await db.commit()
+    
+@app.get("/admin/applications/{application_id}/download-report")
+async def admin_download_report(
+    application_id: str,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Download loan report PDF for admin review"""
+    from sqlalchemy.orm import selectinload
+    # Fetch application with user and prediction
+    query = select(models.LoanApplication).options(
+        selectinload(models.LoanApplication.user),
+        selectinload(models.LoanApplication.prediction)
+    ).where(models.LoanApplication.id == application_id)
+    
+    result = await db.execute(query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+        
+    if not application.prediction:
+         raise HTTPException(status_code=400, detail="Loan prediction not yet generated")
+
+    try:
+        # Generate report data (reused from shared report logic)
+        pred = application.prediction
+        total_interest = (pred.total_repayment or 0) - (application.loan_amount or 0)
+        monthly_income = application.monthly_income or 50000
+        monthly_debt = application.monthly_debt_payments or 0
+        emi_to_income = (pred.emi / monthly_income * 100) if monthly_income > 0 and pred.emi else 0
+        debt_to_income = ((monthly_debt + (pred.emi or 0)) / monthly_income * 100) if monthly_income > 0 else 0
+        
+        # Calculate credit score
+        from loan_advisor import CreditScoreEstimator
+        credit_profile = {
+            'monthly_income': monthly_income,
+            'debt_to_income_ratio': monthly_debt / monthly_income if monthly_income > 0 else 0.5,
+            'employment_status': application.employment_status or 'Employed',
+            'job_tenure': application.job_tenure or 2,
+            'experience': application.experience or 5,
+            'age': application.age or 30,
+            'home_ownership_status': application.home_ownership_status or 'Rent',
+            'education_level': application.education_level or 'Bachelor',
+        }
+        credit_min, credit_max, credit_rating = CreditScoreEstimator.estimate(credit_profile)
+        credit_score = (credit_min + credit_max) // 2
+        
+        analysis_result = {
+            "decision": pred.decision,
+            "decision_reason": pred.decision_reason,
+            "approval_probability": pred.approval_probability,
+            "loan_details": {
+                "amount": application.loan_amount,
+                "duration_years": application.loan_duration // 12 if application.loan_duration else 0
+            },
+            "loan_purpose": application.loan_purpose,
+            "interest_rate": {"annual": pred.interest_rate},
+            "emi": {
+                "monthly": pred.emi,
+                "total_repayment": pred.total_repayment,
+                "total_interest": total_interest,
+            },
+            "income_analysis": {
+                "monthly_income": monthly_income,
+                "emi_to_income_ratio": emi_to_income,
+                "debt_to_income_ratio": debt_to_income,
+            },
+            "credit_score": {
+                "score": credit_score,
+                "rating": credit_rating,
+            },
+            "explanations": pred.shap_summary if pred.shap_summary else []
+        }
+        
+        # Create AppContext helper class
+        class AppContext:
+            def __init__(self, app_obj):
+                u = app_obj.user
+                self.full_name = f"{u.first_name} {u.last_name}" if u.first_name else "Valued Customer"
+                self.email = u.email
+                self.mobile_number = u.mobile_number
+                self.id = str(app_obj.id)
+                self.tracking_id = getattr(app_obj, "tracking_id", None)
+                self.loan_amount = app_obj.loan_amount
+                self.monthly_income = app_obj.monthly_income
+                self.loan_purpose = app_obj.loan_purpose
+                self.employment_status = app_obj.employment_status
+                self.loan_duration = app_obj.loan_duration
+                self.date_of_birth = u.date_of_birth
+                self.gender = u.gender or app_obj.gender
+                self.age = app_obj.age
+                self.address = f"{u.address_line1 or ''}, {u.city or ''}, {u.state or ''} - {u.pincode or ''}" if u.address_line1 else None
+                self.pan_number = u.pan_number
+                self.customer_id = u.customer_id
+                self.kyc_verified = u.kyc_verified
+
+        app_context = AppContext(application)
+        
+        # Generate PDF
+        pdf_bytes = report_generator.generate_loan_report_pdf(app_context, analysis_result)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Loan_Agreement_{application.tracking_id or application.id[:8]}_{timestamp}.pdf"
+        
+        return Response(
+            content=bytes(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Type": "application/pdf"
+            }
+        )
+    except Exception as e:
+        print(f"Admin Report Download Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ADMIN DOCUMENT MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.get("/admin/documents")
+async def get_admin_documents(
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get all KYC documents with customer details for admin review"""
+    from sqlalchemy.orm import selectinload
+    
+    query = (
+        select(models.KYCDocument, models.User, models.LoanApplication)
+        .join(models.User, models.KYCDocument.user_id == models.User.id)
+        .outerjoin(models.LoanApplication, models.KYCDocument.application_id == models.LoanApplication.id)
+        .order_by(models.KYCDocument.uploaded_at.desc())
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(doc.id),
+        "application_id": str(doc.application_id) if doc.application_id else None,
+        "tracking_id": app.tracking_id if app else None,
+        "customer_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.mobile_number,
+        "customer_id": user.customer_id,
+        "document_type": doc.document_type,
+        "file_name": doc.file_name,
+        "file_size": doc.file_size,
+        "verification_status": doc.verification_status,
+        "verification_notes": doc.verification_notes,
+        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        "verified_at": doc.verified_at.isoformat() if doc.verified_at else None
+    } for doc, user, app in rows]
+
+
+@app.post("/admin/documents/{document_id}/verify")
+async def verify_admin_document(
+    document_id: str,
+    status: str,  # VERIFIED or REJECTED
+    notes: str = None,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Verify or reject a KYC document"""
+    if status not in ["VERIFIED", "REJECTED"]:
+        raise HTTPException(status_code=400, detail="Status must be VERIFIED or REJECTED")
+    
+    query = select(models.KYCDocument).where(models.KYCDocument.id == document_id)
+    result = await db.execute(query)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    document.verification_status = status
+    document.verification_notes = notes
+    document.verified_at = datetime.now()
+    document.verified_by = admin.id
+    
+    await db.commit()
+    
+    return {"message": f"Document {status.lower()}", "id": str(document.id)}
+
+
+@app.get("/admin/applications/{application_id}/agreement")
+async def get_admin_application_agreement(
+    application_id: str,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get signed loan agreement for an application"""
+    from sqlalchemy.orm import selectinload
+    
+    # Fetch agreement
+    query = (
+        select(models.LoanAgreement)
+        .where(models.LoanAgreement.application_id == application_id)
+    )
+    result = await db.execute(query)
+    agreement = result.scalars().first()
+    
+    if not agreement:
+        raise HTTPException(status_code=404, detail="Agreement not found for this application")
+    
+    return {
+        "id": str(agreement.id),
+        "application_id": str(agreement.application_id),
+        "agreement_version": agreement.agreement_version,
+        "loan_amount": agreement.loan_amount,
+        "interest_rate": agreement.interest_rate,
+        "tenure_months": agreement.tenure_months,
+        "emi_amount": agreement.emi_amount,
+        "processing_fee": agreement.processing_fee,
+        "total_payable": agreement.total_payable,
+        "agreement_summary": agreement.agreement_summary,
+        "consent_given": agreement.consent_given,
+        "signed_at": agreement.signed_at.isoformat() if agreement.signed_at else None,
+        "status": agreement.status
+    }
+
+
+# ============================================================================
+# ADMIN PROFILE ENDPOINT
+# ============================================================================
+
+@app.get("/admin/profile")
+async def get_admin_profile(
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get admin user profile"""
+    return {
+        "id": str(admin.id),
+        "customer_id": admin.customer_id,
+        "email": admin.email,
+        "mobile_number": admin.mobile_number,
+        "first_name": admin.first_name,
+        "last_name": admin.last_name,
+        "role": admin.role,
+        "created_at": admin.created_at.isoformat() if admin.created_at else None
+    }
+
+
+@app.put("/admin/profile")
+async def update_admin_profile(
+    first_name: str = None,
+    last_name: str = None,
+    email: str = None,
+    admin: models.User = Depends(auth.require_officer),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Update admin user profile"""
+    if first_name:
+        admin.first_name = first_name
+    if last_name:
+        admin.last_name = last_name
+    if email:
+        admin.email = email
+    
+    await db.commit()
+    
+    return {"message": "Profile updated successfully"}
+
+

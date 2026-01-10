@@ -97,6 +97,9 @@ class LoanApplication(Base):
     property_area = Column(String(20))
     coapplicant_income = Column(Float, default=0)
     
+    # Human-readable tracking ID (format: RBI2026LA01)
+    tracking_id = Column(String(20), unique=True, index=True, nullable=True)
+    
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     
@@ -547,3 +550,60 @@ class AuditAction:
             return "WARNING"
         else:
             return "INFO"
+
+
+class Disbursement(Base):
+    """
+    Loan Disbursement/Transfer Record - Tracks actual fund transfers from bank to customer.
+    Created when admin initiates disbursement for an approved loan.
+    """
+    __tablename__ = "disbursements"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("loan_applications.id"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Transfer Details
+    amount = Column(Float, nullable=False)
+    transaction_ref = Column(String(100), nullable=True)  # Bank transaction reference
+    status = Column(String(30), default="PENDING", index=True)  # PENDING, PROCESSING, COMPLETED, FAILED
+    
+    # Bank Details (snapshot at time of disbursement)
+    bank_name = Column(String(100), nullable=True)
+    account_number_masked = Column(String(20), nullable=True)  # Last 4 digits only
+    ifsc_code = Column(String(15), nullable=True)
+    
+    # Receipt (optional)
+    receipt_path = Column(String(500), nullable=True)
+    
+    # Admin who processed
+    processed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    remarks = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Notification(Base):
+    """
+    Bank Notification/Reminder - Tracks SMS/Email notifications sent to customers.
+    Used for EMI reminders, disbursement confirmations, etc.
+    """
+    __tablename__ = "notifications"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Notification Details
+    type = Column(String(20), nullable=False)  # sms, email
+    trigger = Column(String(50), nullable=False)  # emi_reminder, emi_due, emi_overdue, disbursement_confirmation
+    message = Column(Text, nullable=False)
+    status = Column(String(20), default="sent", index=True)  # sent, delivered, failed
+    
+    # Reference (optional link to loan application)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("loan_applications.id"), nullable=True)
+    
+    # Timestamps
+    sent_at = Column(DateTime(timezone=True), server_default=func.now())
+    delivered_at = Column(DateTime(timezone=True), nullable=True)

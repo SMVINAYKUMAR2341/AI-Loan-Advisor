@@ -10,7 +10,12 @@ from typing import List, Dict, Optional
 # OpenRouter API Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "phi-2-lora/optimized-instruct"
+# Switched to DeepSeek as per user request
+MODEL_NAME = "deepseek/deepseek-chat"
+
+if not OPENROUTER_API_KEY:
+    print("[Chatbot] WARNING: OPENROUTER_API_KEY is missing. Chatbot will use fallback responses.")
+
 
 # System prompt for AI Credit Advisor
 SYSTEM_PROMPT = """You are an AI Credit Advisor for a digital banking loan application platform in India. 
@@ -85,69 +90,4 @@ def generate_response(user_message: str, conversation_history: Optional[List[Dic
 
 def fallback_response(query: str) -> str:
     """Fallback responses when API fails"""
-    q = query.lower()
-    
-    if any(w in q for w in ['eligible', 'qualify', 'can i get', 'loan']):
-        return """Loan Eligibility Factors:
-• Income: Min ₹25,000/month
-• Credit Score: 650+ (750+ for best rates)
-• Employment: Min 1 year stable job
-• Age: 21-60 years
-
-👉 Use our Apply for Loan section for instant AI-powered eligibility check!"""
-    
-    if any(w in q for w in ['credit score', 'cibil', 'improve']):
-        return """Improve Your Credit Score:
-• Keep utilization below 30%
-• Pay all bills on time
-• Don't close old credit cards
-• Avoid multiple loan applications
-
-Score 750+ = Best interest rates!"""
-    
-    if any(w in q for w in ['emi', 'monthly', 'payment', 'calculate']):
-        return """EMI Calculation:
-For ₹5 Lakh @ 12% for 3 years = ~₹16,607/month
-
-Golden Rule: Total EMIs should be < 40% of income
-
-Use our loan calculator for precise estimates!"""
-    
-    if any(w in q for w in ['document', 'required', 'papers', 'kyc']):
-        return """Required Documents:
-• Aadhaar & PAN Card
-• Last 3 salary slips
-• 6 months bank statements
-• Address proof
-
-Upload in the Documents section of your dashboard!"""
-    
-    if any(w in q for w in ['interest', 'rate']):
-        return """Current Interest Rates:
-• Personal Loan: 10.5-24%
-• Home Loan: 8.5-11%
-• Car Loan: 7.5-15%
-• Education Loan: 8-14%
-
-Higher credit score = Lower rate!"""
-    
-    if any(w in q for w in ['hi', 'hello', 'hey', 'help']):
-        return """Hello! 👋 I'm your AI Credit Advisor. 
-
-I can help with:
-• Loan eligibility
-• Credit score tips
-• EMI calculations
-• Document requirements
-• Interest rates
-
-What would you like to know?"""
-    
-    return """I'm your AI Credit Advisor! Ask me about:
-• "Am I eligible for a loan?"
-• "How to improve credit score?"
-• "What documents do I need?"
-• "Calculate my EMI"
-
-For detailed analysis, try our Apply for Loan section!"""
-
+    return "I am currently disconnected from the AI service. Please check your internet connection or try again later. You can also use the 'Apply for Loan' section for a detailed eligibility check."

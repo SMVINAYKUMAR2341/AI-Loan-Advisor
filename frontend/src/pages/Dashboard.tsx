@@ -126,7 +126,9 @@ export default function Dashboard() {
         explanations: Array<{ factor: string; impact: string; description: string }>;
         kyc_required: boolean;
         next_steps: string[];
+        next_steps: string[];
         application_id?: string;  // Added for KYC workflow
+        tracking_id?: string;     // Unified human-readable ID
     }
 
     const [advisorResult, setAdvisorResult] = useState<LoanAdvisorResult | null>(null);
@@ -135,6 +137,63 @@ export default function Dashboard() {
     const [showCoApplicant, setShowCoApplicant] = useState(false);
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const [showQrCode, setShowQrCode] = useState(false);
+
+    // MY LOANS STATE (Real DB data)
+    interface LoanApplicationItem {
+        id: string;
+        loan_amount: number;
+        loan_purpose: string;
+        decision: string;
+        approval_probability: number;
+        created_at: string;
+        tracking_id?: string;
+    }
+    const [loanApplications, setLoanApplications] = useState<LoanApplicationItem[]>([]);
+    const [loanApplicationsLoading, setLoanApplicationsLoading] = useState(false);
+
+    // DISBURSEMENTS STATE - Bank transfers received
+    interface DisbursementItem {
+        id: string;
+        application_id: string;
+        amount: number;
+        transaction_ref: string;
+        status: string;
+        loan_purpose: string;
+        processed_at: string;
+    }
+    const [disbursements, setDisbursements] = useState<DisbursementItem[]>([]);
+
+    const fetchLoanApplications = async () => {
+        setLoanApplicationsLoading(true);
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/loan-applications`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setLoanApplications(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch loan applications:", error);
+        }
+        setLoanApplicationsLoading(false);
+    };
+
+    const fetchDisbursements = async () => {
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/disbursements/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setDisbursements(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch disbursements:", error);
+        }
+    };
 
     // KYC WORKFLOW STATE
     interface KYCStatus {
@@ -247,11 +306,20 @@ export default function Dashboard() {
         setAccountLoading(false);
     };
 
+    // Fetch loans and disbursements when loans section is active
     useEffect(() => {
-        if (activeSection === "security" && !accountData) {
-            fetchAccountData();
+        if (activeSection === "loans") {
+            fetchLoanApplications();
+            fetchDisbursements();
         }
     }, [activeSection]);
+
+    useEffect(() => {
+        if (activeSection === "security") {
+            if (!accountData) fetchAccountData();
+            if (securitySubSection === "security") fetchActivityData("sessions");
+        }
+    }, [activeSection, securitySubSection]);
 
     const handleChangePassword = async () => {
         setChangeError('');
@@ -757,37 +825,126 @@ export default function Dashboard() {
     );
 
     // MY LOANS SECTION
-    const renderLoansSection = () => (
-        <div className="space-y-6">
-            <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
-                <h3 className="text-xl font-semibold text-white mb-6">My Loans</h3>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-white/10">
-                                <th className="text-left py-3 px-4 text-gray-400 font-medium">Loan ID</th>
-                                <th className="text-left py-3 px-4 text-gray-400 font-medium">Type</th>
-                                <th className="text-left py-3 px-4 text-gray-400 font-medium">Amount</th>
-                                <th className="text-left py-3 px-4 text-gray-400 font-medium">Outstanding</th>
-                                <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr className="border-b border-white/5 hover:bg-white/5 transition">
-                                <td className="py-4 px-4 text-white font-mono text-sm">{mockDashboardData.activeLoan.loanId}</td>
-                                <td className="py-4 px-4 text-white">{mockDashboardData.activeLoan.type}</td>
-                                <td className="py-4 px-4 text-white">{formatCurrency(mockDashboardData.activeLoan.sanctionedAmount)}</td>
-                                <td className="py-4 px-4 text-yellow-400">{formatCurrency(mockDashboardData.activeLoan.outstandingAmount)}</td>
-                                <td className="py-4 px-4">
-                                    <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">Active</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+    const renderLoansSection = () => {
+        // Trigger fetch when this section is rendered (via useEffect in parent)
+        if (loanApplications.length === 0 && !loanApplicationsLoading) {
+            fetchLoanApplications();
+        }
+
+        return (
+            <div className="space-y-6">
+                <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
+                    <h3 className="text-xl font-semibold text-white mb-6">My Loan Applications</h3>
+                    {loanApplicationsLoading ? (
+                        <p className="text-gray-400">Loading your loan applications...</p>
+                    ) : loanApplications.length === 0 ? (
+                        <div className="text-center py-8">
+                            <p className="text-gray-400 mb-4">No loan applications found.</p>
+                            <button
+                                onClick={() => setActiveSection('apply')}
+                                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 rounded-lg text-white font-medium transition"
+                            >
+                                Apply for a Loan
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-white/10">
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Application ID</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Purpose</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Amount</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Approval %</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Decision</th>
+                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Applied On</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loanApplications.map((app) => (
+                                        <tr key={app.id} className="border-b border-white/5 hover:bg-white/5 transition">
+                                            <td className="py-4 px-4 text-white font-mono text-sm">{app.tracking_id || app.id.slice(0, 8)}</td>
+                                            <td className="py-4 px-4 text-white">{app.loan_purpose}</td>
+                                            <td className="py-4 px-4 text-white">{formatCurrency(app.loan_amount)}</td>
+                                            <td className="py-4 px-4 text-teal-400">{app.approval_probability.toFixed(1)}%</td>
+                                            <td className="py-4 px-4">
+                                                <span className={`px-3 py-1 rounded-full text-sm ${app.decision === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
+                                                    app.decision === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
+                                                        'bg-yellow-500/20 text-yellow-400'
+                                                    }`}>
+                                                    {app.decision}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-4 text-gray-400 text-sm">{new Date(app.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Bank Transactions - Received Payments */}
+                <div className="p-6 bg-gradient-to-br from-green-900/30 to-teal-900/30 rounded-2xl border border-green-500/30">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-green-500/20 rounded-lg">
+                            <IndianRupee className="w-6 h-6 text-green-400" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-white">Bank Transactions - Amount Received</h3>
+                    </div>
+
+                    {disbursements.length === 0 ? (
+                        <div className="text-center py-8">
+                            <CreditCard className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                            <p className="text-gray-400">No bank transactions yet.</p>
+                            <p className="text-gray-500 text-sm mt-2">Once your loan is approved and disbursed, the transaction details will appear here.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {disbursements.map((disbursement) => (
+                                <div key={disbursement.id} className="p-4 bg-gray-800/50 rounded-xl border border-green-500/20 hover:border-green-500/40 transition">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-green-500/20 rounded-lg">
+                                                <CheckCircle className="w-5 h-5 text-green-400" />
+                                            </div>
+                                            <div>
+                                                <p className="text-white font-semibold">Amount Credited</p>
+                                                <p className="text-gray-400 text-sm">{disbursement.loan_purpose}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-bold text-green-400">+{formatCurrency(disbursement.amount)}</p>
+                                            <span className={`px-2 py-1 rounded-full text-xs ${disbursement.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                                                disbursement.status === 'PROCESSING' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    'bg-gray-500/20 text-gray-400'
+                                                }`}>
+                                                {disbursement.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4 pt-3 border-t border-white/10">
+                                        <div>
+                                            <p className="text-gray-500 text-xs">Transaction Ref</p>
+                                            <p className="text-white font-mono text-sm">{disbursement.transaction_ref || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 text-xs">Application ID</p>
+                                            <p className="text-white font-mono text-sm">{disbursement.application_id.slice(0, 8)}...</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 text-xs">Received On</p>
+                                            <p className="text-white text-sm">{disbursement.processed_at ? new Date(disbursement.processed_at).toLocaleDateString() : 'Pending'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     // Loan form handlers
     const handleLoanFormChange = (field: string, value: string | number) => {
@@ -889,6 +1046,7 @@ export default function Dashboard() {
             setAdvisorResult({
                 application_date: result.created_at,
                 application_id: result.id,  // Store the application ID for KYC
+                tracking_id: result.tracking_id, // Store tracking ID
                 decision: result.decision,
                 decision_reason: result.decision_reason,
                 approval_probability: result.approval_probability,
@@ -1015,7 +1173,7 @@ export default function Dashboard() {
                     {/* Page Title */}
                     <div className="text-center mb-6">
                         <h2 className="text-3xl font-bold text-white mb-2">Loan Analysis Results</h2>
-                        <p className="text-gray-400">Your comprehensive loan eligibility assessment</p>
+                        <p className="text-gray-400">Application Reference: {advisorResult.tracking_id || advisorResult.application_id?.slice(0, 8)}</p>
                     </div>
 
                     {/* Decision Banner - Large and Prominent */}
@@ -1972,11 +2130,14 @@ export default function Dashboard() {
                     Back to Results
                 </button>
 
-                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
                     <Shield className="w-6 h-6 text-green-400" />
                     Complete Your KYC
                     <span className="text-sm font-normal text-gray-300 ml-2">Required for Disbursement</span>
                 </h3>
+                <p className="text-gray-400 mb-6 font-mono text-sm pl-9">
+                    Application Ref: <span className="text-teal-400">{advisorResult?.tracking_id || applicationId.slice(0, 8)}</span>
+                </p>
 
                 {/* KYC Stepper */}
                 <div className="flex items-center justify-between mb-8 relative">
@@ -3204,6 +3365,72 @@ export default function Dashboard() {
 
 
     // Account & Security Functions (Moved to top)
+    const getRealSecurityData = () => {
+        if (sessions && sessions.length > 0) {
+            // Sort by started_at desc if not already
+            const sortedSessions = [...sessions].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+            const latestSession = sortedSessions[0];
+
+            return {
+                lastLogin: latestSession.started_at,
+                lastLoginDevice: {
+                    browser: latestSession.browser || "Unknown",
+                    os: latestSession.os || "Unknown",
+                    location: latestSession.location || "Unknown"
+                },
+                otpLoginEnabled: false, // Default
+                activeSessions: sortedSessions.map((s, index) => ({
+                    id: s.id,
+                    device: `${s.browser || 'Unknown'} on ${s.os || 'Unknown'}`,
+                    location: s.location || "Unknown",
+                    lastActive: s.last_activity || s.started_at,
+                    isCurrent: index === 0 // Approximation
+                }))
+            };
+        }
+        return profileData?.security || mockProfileData.security;
+    };
+
+    const getRealConsentData = () => {
+        if (!accountData) return profileData?.consents || mockProfileData.consents;
+
+        const consentDate = accountData.created_at || new Date().toISOString();
+        const baseConsents = [];
+
+        if (accountData.terms_consent) {
+            baseConsents.push({
+                id: "terms-1",
+                version: "v2.1",
+                purpose: "Terms of Service",
+                acceptedAt: consentDate,
+                consentType: "terms"
+            });
+        }
+        if (accountData.privacy_consent) {
+            baseConsents.push({
+                id: "privacy-1",
+                version: "v1.8",
+                purpose: "Privacy Policy",
+                acceptedAt: consentDate,
+                consentType: "privacy"
+            });
+        }
+        if (accountData.data_consent) {
+            baseConsents.push({
+                id: "credit-1",
+                version: "v1.0",
+                purpose: "Credit Bureau Data Access",
+                acceptedAt: consentDate,
+                consentType: "credit_bureau"
+            });
+        }
+
+        // Always include Marketing as accepted for now if account exists, or omit
+        // using mock defaults if array is empty to avoid broken UI
+        if (baseConsents.length === 0) return profileData?.consents || mockProfileData.consents;
+
+        return baseConsents;
+    };
 
 
     // SECURITY & SETTINGS SECTION (Combined)
@@ -3433,8 +3660,8 @@ export default function Dashboard() {
 
             {/* Sub-section content - Other tabs */}
 
-            {securitySubSection === "security" && <SecurityManagement security={profileData.security} />}
-            {securitySubSection === "consent" && <ConsentPermissions consents={profileData.consents} />}
+            {securitySubSection === "security" && <SecurityManagement security={getRealSecurityData()} />}
+            {securitySubSection === "consent" && <ConsentPermissions consents={getRealConsentData()} />}
             {securitySubSection === "communication" && <CommunicationPreferences preferences={profileData.preferences} />}
         </div>
     );

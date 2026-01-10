@@ -164,7 +164,8 @@ class RBICompliantLoanReport(FPDF):
         
         # First row
         self.cell(85, 6, f'Report Date: {datetime.now().strftime("%d %B %Y")}', 0, 0)
-        self.cell(81, 6, f'Application ID: {str(application.id)[:12]}...', 0, 1)
+        app_id = getattr(application, 'tracking_id', None) or str(application.id)
+        self.cell(81, 6, f'Application ID: {app_id}', 0, 1)
         
         # Second row
         self.set_x(20)
@@ -612,7 +613,8 @@ class RBICompliantLoanReport(FPDF):
         
         # Loan Details
         self.subsection_title('Loan Application Details')
-        self.add_key_value('Loan Account ID', str(application.id))
+        app_id = getattr(application, 'tracking_id', None) or str(application.id)
+        self.add_key_value('Loan Account ID', app_id)
         loan_amount = getattr(application, 'loan_amount', 0) or 0
         self.add_key_value('Loan Amount Applied', f"Rs.{loan_amount:,.0f}")
         loan_duration = getattr(application, 'loan_duration', 0) or 0

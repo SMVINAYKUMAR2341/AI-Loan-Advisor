@@ -102,6 +102,11 @@ class UserResponse(BaseModel):
     role: str = "customer"
     is_active: bool = True
     created_at: datetime
+    
+    # Consents
+    terms_consent: bool = False
+    privacy_consent: bool = False
+    data_consent: bool = False
 
     class Config:
         from_attributes = True
@@ -160,6 +165,7 @@ class LoanApplicationCreate(BaseModel):
 class LoanApplicationResponse(BaseModel):
     """Response after loan application submission - for customer view"""
     id: UUID
+    tracking_id: Optional[str] = None
     created_at: datetime
     
     # ML Decision
@@ -192,6 +198,7 @@ class ApplicationListItem(BaseModel):
     """Summary view for listing applications"""
     id: UUID
     user_id: UUID
+    tracking_id: Optional[str] = None
     customer_name: Optional[str] = None
     customer_id: Optional[str] = None
     loan_amount: float
@@ -200,6 +207,7 @@ class ApplicationListItem(BaseModel):
     approval_probability: float
     created_at: datetime
     reviewed: bool = False
+    bank_details: Optional['BankDetailsResponse'] = None
 
     class Config:
         from_attributes = True
@@ -208,6 +216,7 @@ class ApplicationListItem(BaseModel):
 class ApplicationDetailResponse(BaseModel):
     """Detailed application view - includes features for officer review"""
     id: UUID
+    tracking_id: Optional[str] = None
     user_id: UUID
     customer_name: Optional[str] = None
     customer_id: Optional[str] = None
@@ -523,3 +532,22 @@ class DocumentUploadResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# =============================================================================
+# CHATBOT SCHEMAS
+# =============================================================================
+
+class ChatMessage(BaseModel):
+    role: str  # user or bot
+    content: str
+    timestamp: Optional[str] = None
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[ChatMessage] = []
+
+class ChatResponse(BaseModel):
+    response: str
+    timestamp: datetime
+
