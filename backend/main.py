@@ -908,6 +908,135 @@ async def get_application_full_details(
     }
 
 
+# =====================================================
+# ADMIN DISBURSEMENT ENDPOINTS
+# =====================================================
+
+@app.post("/admin/disbursements/{application_id}")
+async def process_disbursement(
+    application_id: UUID,
+    transaction_ref: str,
+    remarks: Optional[str] = None,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Process loan disbursement - Creates disbursement record and updates loan status.
+    Called by admin after transferring funds to customer's bank account.
+    """
+    # Fetch the application
+    app_query = select(models.LoanApplication).where(models.LoanApplication.id == application_id)
+    result = await db.execute(app_query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found"
+        )
+    
+    # Fetch prediction to check if approved
+    pred_query = select(models.LoanPrediction).where(models.LoanPrediction.application_id == application_id)
+    result = await db.execute(pred_query)
+    prediction = result.scalars().first()
+    
+    if not prediction or prediction.decision not in ["APPROVED", "PENDING_REVIEW"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Application must be APPROVED before disbursement"
+        )
+    
+    # Check if already disbursed
+    existing_query = select(models.Disbursement).where(models.Disbursement.application_id == application_id)
+    result = await db.execute(existing_query)
+    existing = result.scalars().first()
+    
+    if existing and existing.status == "COMPLETED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Loan has already been disbursed"
+        )
+    
+    # Fetch customer bank details
+    bank_query = select(models.BankDetails).where(models.BankDetails.user_id == application.user_id)
+    result = await db.execute(bank_query)
+    bank_details = result.scalars().first()
+    
+    # Create disbursement record
+    disbursement = models.Disbursement(
+        application_id=application_id,
+        user_id=application.user_id,
+        amount=application.loan_amount,
+        transaction_ref=transaction_ref,
+        status="COMPLETED",
+        bank_name=bank_details.bank_name if bank_details else None,
+        account_number_masked=bank_details.account_number_masked if bank_details else None,
+        ifsc_code=bank_details.ifsc_code if bank_details else None,
+        processed_by=current_admin.id,
+        remarks=remarks,
+        processed_at=datetime.now(timezone.utc)
+    )
+    db.add(disbursement)
+    
+    # Update loan prediction to DISBURSED
+    prediction.decision = "DISBURSED"
+    
+    # Create notification for customer
+    try:
+        notification = models.Notification(
+            user_id=application.user_id,
+            notification_type="LOAN_DISBURSED",
+            trigger="DISBURSEMENT_COMPLETED",
+            message=f"Your loan of Rs.{application.loan_amount:,.0f} has been disbursed! Transaction Ref: {transaction_ref}"
+        )
+        db.add(notification)
+    except Exception as e:
+        print(f"Failed to create notification: {e}")
+    
+    await db.commit()
+    
+    return {
+        "message": "Disbursement processed successfully",
+        "disbursement_id": str(disbursement.id),
+        "amount": application.loan_amount,
+        "transaction_ref": transaction_ref
+    }
+
+
+@app.get("/admin/disbursements")
+async def get_all_disbursements(
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all disbursement records for admin view.
+    Returns disbursements with customer info.
+    """
+    query = (
+        select(models.Disbursement, models.LoanApplication, models.User)
+        .join(models.LoanApplication, models.Disbursement.application_id == models.LoanApplication.id)
+        .join(models.User, models.Disbursement.user_id == models.User.id)
+        .order_by(models.Disbursement.processed_at.desc())
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(d.id),
+        "application_id": str(d.application_id),
+        "amount": d.amount,
+        "transaction_ref": d.transaction_ref,
+        "status": d.status,
+        "customer_name": f"{u.first_name} {u.last_name}",
+        "customer_id": u.customer_id,
+        "loan_purpose": loan_app.loan_purpose,
+        "bank_name": d.bank_name,
+        "account_number_masked": d.account_number_masked,
+        "processed_at": d.processed_at.isoformat() if d.processed_at else None,
+        "remarks": d.remarks
+    } for d, loan_app, u in rows]
+
+
 @app.get("/user/me")
 async def read_users_me(current_user: Optional[models.User] = Depends(auth.get_optional_user)):
     """Get current user profile - returns null if not logged in"""
