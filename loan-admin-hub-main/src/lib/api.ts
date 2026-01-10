@@ -1,7 +1,7 @@
 // API Configuration for Bank Admin Hub
 // Connects to the same backend as customer frontend
 
-export const API_BASE_URL = 'http://localhost:8002';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002';
 
 // Helper to get auth token (admin must be logged in)
 export const getAuthHeaders = () => {
