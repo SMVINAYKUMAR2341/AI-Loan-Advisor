@@ -230,6 +230,14 @@ export default function Dashboard() {
     };
 
     // KYC WORKFLOW STATE
+    interface KYCDocumentItem {
+        id: string;
+        document_type: string;
+        file_name: string;
+        verification_status: string;
+        uploaded_at: string;
+    }
+
     interface KYCStatus {
         application_id: string;
         loan_status: string;
@@ -242,7 +250,7 @@ export default function Dashboard() {
         step_3_agreement: string;
         overall_status: string;
         can_proceed_to_disbursement: boolean;
-        documents: any[];
+        documents: KYCDocumentItem[];
     }
 
     interface BankDetails {
@@ -286,8 +294,22 @@ export default function Dashboard() {
     const [agreementConsent, setAgreementConsent] = useState(false);
     const [electronicConsent, setElectronicConsent] = useState(false);
 
+    interface AccountData {
+        customer_id: string;
+        title: string;
+        first_name: string;
+        middle_name?: string;
+        last_name: string;
+        mobile_number: string;
+        email: string;
+        date_of_birth?: string;
+        gender?: string;
+        kyc_verified: boolean;
+        created_at: string;
+    }
+
     // Account & Security State (moved here to comply with Rules of Hooks)
-    const [accountData, setAccountData] = useState<any>(null);
+    const [accountData, setAccountData] = useState<AccountData | null>(null);
     const [accountLoading, setAccountLoading] = useState(false);
     const [passwordForm, setPasswordForm] = useState({ current: '', new_password: '', confirm: '' });
     const [pinForm, setPinForm] = useState({ current: '', new_pin: '', confirm: '' });
@@ -444,10 +466,37 @@ export default function Dashboard() {
     };
 
     // ACTIVITY LOG STATE & FUNCTIONS (Moved to top level)
+    interface ActivityEvent {
+        id: string;
+        category?: string;
+        action?: string;
+        severity?: string;
+        description: string;
+        timestamp: string;
+        device?: string;
+        location?: string;
+        ip_address?: string;
+    }
+
+    interface ActivityData {
+        events: ActivityEvent[];
+        total_events: number;
+    }
+
+    interface SessionItem {
+        id: string;
+        started_at: string;
+        browser: string;
+        os: string;
+        location: string;
+        device_type?: string;
+        is_active: boolean;
+    }
+
     const [activityTab, setActivityTab] = useState<"all" | "security" | "loans" | "kyc" | "payments" | "profile" | "sessions">("all");
-    const [activityData, setActivityData] = useState<any>({ events: [], total_events: 0 });
+    const [activityData, setActivityData] = useState<ActivityData>({ events: [], total_events: 0 });
     const [activityLoading, setActivityLoading] = useState(false);
-    const [sessions, setSessions] = useState<any[]>([]);
+    const [sessions, setSessions] = useState<SessionItem[]>([]);
 
     const fetchActivityData = async (category: string) => {
         setActivityLoading(true);
@@ -1146,7 +1195,7 @@ export default function Dashboard() {
             if (result.coapplicant?.suggested && !result.coapplicant?.provided) {
                 setShowCoApplicant(true);
             }
-        } catch (error: any) {
+        } catch (error) {
             setFormError(error.message || 'Unable to analyze loan. Please try again.');
         } finally {
             setIsSubmitting(false);
@@ -1526,7 +1575,7 @@ export default function Dashboard() {
                                             <Legend
                                                 verticalAlign="bottom"
                                                 iconType="circle"
-                                                formatter={(value: string, entry: any) => {
+                                                formatter={(value: string, entry: Record<string, unknown>) => {
                                                     const percent = ((entry.payload.value / advisorResult.emi.total_repayment) * 100).toFixed(0);
                                                     return <span style={{ color: '#D1D5DB' }}>{value}: {percent}%</span>;
                                                 }}
@@ -1579,7 +1628,7 @@ export default function Dashboard() {
                                             <YAxis domain={[0, 100]} tick={{ fill: '#9CA3AF', fontSize: 10 }} tickFormatter={(v) => `${v}%`} axisLine={{ stroke: '#4B5563' }} />
                                             <Tooltip
                                                 contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                                                formatter={(value: any, name: string) => [`${value.toFixed(1)}%`, name === 'you' ? 'Your Value' : 'Ideal Target']}
+                                                formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name === 'you' ? 'Your Value' : 'Ideal Target']}
                                                 labelStyle={{ color: '#fff', fontWeight: 'bold' }}
                                             />
                                             <Legend
@@ -1611,7 +1660,7 @@ export default function Dashboard() {
                                         <Radar name="Ideal (100)" dataKey="fullMark" stroke="#22C55E" fill="none" strokeWidth={2} strokeDasharray="4 4" />
                                         <Tooltip
                                             contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                                            formatter={(value: any) => [`${value.toFixed(0)}/100`, '']}
+                                            formatter={(value: number) => [`${value.toFixed(0)}/100`, '']}
                                         />
                                         <Legend
                                             wrapperStyle={{ paddingTop: '10px' }}
@@ -2307,7 +2356,7 @@ export default function Dashboard() {
                             <div className="mt-4 p-4 bg-gray-800 rounded-xl">
                                 <h5 className="text-white font-medium mb-2">Uploaded: {kycStatus.step_1_docs_uploaded}/2</h5>
                                 <div className="space-y-2">
-                                    {kycStatus.documents.map((doc: any) => (
+                                    {kycStatus.documents.map((doc: KYCDocumentItem) => (
                                         <div key={doc.id} className="flex items-center justify-between p-2 bg-green-900 rounded-lg">
                                             <span className="text-green-400 text-sm">{doc.document_type}</span>
                                             <span className="text-xs text-gray-400">{doc.verification_status}</span>
@@ -3834,7 +3883,7 @@ export default function Dashboard() {
                     return (
                         <button
                             key={tab.key}
-                            onClick={() => setActivityTab(tab.key as any)}
+                            onClick={() => setActivityTab(tab.key as typeof activityTab)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${isActive
                                 ? "bg-teal-900 text-teal-400 border border-teal-700"
                                 : "text-gray-400 hover:bg-gray-700 hover:text-white"
@@ -3863,7 +3912,7 @@ export default function Dashboard() {
                         <p className="text-gray-400 text-center py-8">No active sessions found</p>
                     ) : (
                         <div className="space-y-4">
-                            {sessions.map((session: any) => (
+                            {sessions.map((session: SessionItem) => (
                                 <div key={session.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 bg-teal-500/20 rounded-full flex items-center justify-center">
@@ -3920,7 +3969,7 @@ export default function Dashboard() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {activityData.events.map((event: any, index: number) => (
+                            {activityData.events.map((event: ActivityEvent, index: number) => (
                                 <div key={event.id || index} className="p-4 bg-white/5 border border-white/10 rounded-xl">
                                     <div className="flex items-start gap-4">
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getSeverityColor(event.severity)}`}>
