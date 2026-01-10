@@ -6,14 +6,15 @@ from database import Base
 
 
 class User(Base):
+    """Customer Users - For loan applicants"""
     __tablename__ = "users"
 
     # Primary Key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     customer_id = Column(String(20), unique=True, index=True, nullable=True)  # Generated on successful signup
     
-    # Role - customer or bank_officer
-    role = Column(String(20), default="customer", nullable=False)  # customer, bank_officer
+    # Role - customer only (admins are in separate table)
+    role = Column(String(20), default="customer", nullable=False)
     
     # Account Credentials
     mobile_number = Column(String(15), unique=True, index=True, nullable=False)
@@ -64,6 +65,42 @@ class User(Base):
     # Relationships
     loan_applications = relationship("LoanApplication", back_populates="user")
     officer_reviews = relationship("OfficerReview", back_populates="officer", foreign_keys="OfficerReview.officer_id")
+
+
+class AdminUser(Base):
+    """
+    Admin/Bank Officer Users - Separate from customer users
+    For bank officers who manage loan applications
+    """
+    __tablename__ = "admin_users"
+    
+    # Primary Key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    admin_id = Column(String(20), unique=True, index=True, nullable=False)  # LAAD202501 format
+    
+    # Account Credentials
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    pin_hash = Column(String(255), nullable=True)  # 6-digit PIN hashed
+    
+    # Personal Details
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    department = Column(String(100), default="Loan Operations")
+    designation = Column(String(100), default="Bank Officer")
+    
+    # Permissions
+    can_approve_loans = Column(Boolean, default=True)
+    can_disburse = Column(Boolean, default=True)
+    can_verify_kyc = Column(Boolean, default=True)
+    can_send_notifications = Column(Boolean, default=True)
+    
+    # Status & Timestamps
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 
 class LoanApplication(Base):
