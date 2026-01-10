@@ -862,6 +862,7 @@ export default function Dashboard() {
     useEffect(() => {
         if (isAuthenticated && !accountData) {
             fetchAccountData();
+            fetchNotifications();
         }
     }, [isAuthenticated]);
 
@@ -877,6 +878,9 @@ export default function Dashboard() {
 
     const handleSectionChange = (key: SectionKey) => {
         setActiveSection(key);
+        if (key === 'home') {
+            fetchNotifications();
+        }
         if (key === 'loans') {
             fetchLoanApplications();
             fetchDisbursements();
@@ -1085,9 +1089,9 @@ export default function Dashboard() {
                             <div
                                 key={notif.id}
                                 className={`p-4 rounded-xl border flex items-center justify-between ${notif.trigger.includes('overdue') ? 'bg-red-500/10 border-red-500/30' :
-                                        notif.trigger.includes('due') ? 'bg-yellow-500/10 border-yellow-500/30' :
-                                            notif.trigger.includes('disburs') ? 'bg-green-500/10 border-green-500/30' :
-                                                'bg-blue-500/10 border-blue-500/30'
+                                    notif.trigger.includes('due') ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                        notif.trigger.includes('disburs') ? 'bg-green-500/10 border-green-500/30' :
+                                            'bg-blue-500/10 border-blue-500/30'
                                     }`}
                             >
                                 <div className="flex items-center gap-3">
