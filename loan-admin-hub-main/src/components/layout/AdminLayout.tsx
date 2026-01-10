@@ -4,59 +4,11 @@ import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Bell, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SmokeyBackground } from '@/components/ui/SmokeyBackground';
 
 interface AdminLayoutProps {
   children: ReactNode;
 }
-
-// Smokey Background Component - matching customer dashboard
-const SmokeyBackground = ({ className, color = "#14b8a6" }: { className?: string; color?: string }) => {
-  return (
-    <div className={className}>
-      {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800" />
-
-      {/* Animated smokey effects */}
-      <div
-        className="absolute inset-0 opacity-30 animate-pulse"
-        style={{
-          background: `radial-gradient(ellipse at 30% 20%, ${color}20 0%, transparent 50%)`,
-          animationDuration: '4s'
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-20 animate-pulse"
-        style={{
-          background: `radial-gradient(ellipse at 70% 80%, ${color}15 0%, transparent 50%)`,
-          animationDuration: '6s',
-          animationDelay: '2s'
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-15 animate-pulse"
-        style={{
-          background: `radial-gradient(ellipse at 50% 50%, ${color}10 0%, transparent 60%)`,
-          animationDuration: '8s',
-          animationDelay: '1s'
-        }}
-      />
-
-      {/* Additional ambient glow */}
-      <div
-        className="absolute top-0 right-0 w-1/2 h-1/2 opacity-10"
-        style={{
-          background: `radial-gradient(circle at top right, ${color}30 0%, transparent 70%)`
-        }}
-      />
-      <div
-        className="absolute bottom-0 left-0 w-1/2 h-1/2 opacity-10"
-        style={{
-          background: `radial-gradient(circle at bottom left, ${color}20 0%, transparent 70%)`
-        }}
-      />
-    </div>
-  );
-};
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const navigate = useNavigate();
@@ -110,6 +62,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   variant="ghost"
                   size="icon"
                   className="text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                  onClick={() => navigate('/notifications')}
+                  title="Notifications"
                 >
                   <Bell className="h-5 w-5" />
                 </Button>
@@ -117,6 +71,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   variant="ghost"
                   size="icon"
                   className="text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                  onClick={() => navigate('/profile')}
+                  title="Admin Profile"
                 >
                   <User className="h-5 w-5" />
                 </Button>

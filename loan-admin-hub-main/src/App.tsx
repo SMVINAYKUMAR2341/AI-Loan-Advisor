@@ -14,6 +14,7 @@ import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
 import AdminProfile from "./pages/AdminProfile";
 import Tickets from "./pages/Tickets";
+import LoanDetails from "./pages/LoanDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/loans" element={<LoanApplications />} />
+          <Route path="/loans/:id" element={<LoanDetails />} />
           <Route path="/disbursement" element={<LoanDisbursement />} />
           <Route path="/emi" element={<EMITracking />} />
           <Route path="/documents" element={<Documents />} />

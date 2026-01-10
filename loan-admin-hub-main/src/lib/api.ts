@@ -1,7 +1,7 @@
 // API Configuration for Bank Admin Hub
 // Connects to the same backend as customer frontend
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Helper to get auth token (admin must be logged in)
 export const getAuthHeaders = () => {
@@ -84,6 +84,21 @@ export const adminApi = {
 
     getApplicationDetails: (id: string) =>
         apiFetch<any>(`/admin/applications/${id}`),
+
+    getApplicationFullDetails: (id: string) =>
+        apiFetch<any>(`/admin/applications/${id}/details`),
+
+    updateApplicationDecision: (id: string, decision: string, justification: string) =>
+        apiFetch<{ message: string; decision: string; application_id: string }>(
+            `/admin/applications/${id}/decision?decision=${encodeURIComponent(decision)}&justification=${encodeURIComponent(justification)}`,
+            { method: 'PUT' }
+        ),
+
+    requestDocuments: (id: string, documentTypes: string, message: string, requireOfficeVisit: boolean) =>
+        apiFetch<{ message: string; documents_requested: string[]; office_visit_required: boolean }>(
+            `/admin/applications/${id}/request-documents?document_types=${encodeURIComponent(documentTypes)}&message=${encodeURIComponent(message)}&require_office_visit=${requireOfficeVisit}`,
+            { method: 'POST' }
+        ),
 
     downloadReport: (id: string, trackingId?: string) =>
         downloadFile(`/admin/applications/${id}/download-report`, `Loan_Report_${trackingId || id}.pdf`),
@@ -170,6 +185,18 @@ export const adminApi = {
             { method: 'PUT' }
         ),
 
+    changePassword: (currentPassword: string, newPassword: string) =>
+        apiFetch<{ message: string }>(
+            `/admin/change-password?current_password=${encodeURIComponent(currentPassword)}&new_password=${encodeURIComponent(newPassword)}`,
+            { method: 'PUT' }
+        ),
+
+    changePin: (currentPin: string, newPin: string) =>
+        apiFetch<{ message: string }>(
+            `/admin/change-pin?current_pin=${encodeURIComponent(currentPin)}&new_pin=${encodeURIComponent(newPin)}`,
+            { method: 'PUT' }
+        ),
+
     // Support Tickets
     getTickets: (status?: string) => {
         const query = status && status !== 'ALL' ? `?status=${status}` : '';
@@ -204,7 +231,7 @@ export const adminApi = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
             },
             body: JSON.stringify({ message })
         }).then(res => res.json()),
@@ -214,7 +241,7 @@ export const adminApi = {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
             },
             body: JSON.stringify({ status })
         }).then(res => res.json()),
@@ -224,14 +251,14 @@ export const adminApi = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
             }
         }).then(res => res.json()),
 
     getReportsData: () =>
         fetch(`${API_BASE_URL}/admin/reports/stats`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
             }
         }).then(res => res.json()),
 };

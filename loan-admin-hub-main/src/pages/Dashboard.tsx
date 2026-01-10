@@ -143,7 +143,7 @@ export default function Dashboard() {
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Loan Status Distribution - Pie Chart */}
-          <Card className="lg:col-span-1 bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-5">
+          <Card className="lg:col-span-1 bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-5">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
                 <div className="p-2 bg-teal-500/20 rounded-lg">
@@ -195,7 +195,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Monthly Trends - Line Chart */}
-          <Card className="lg:col-span-2 bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-6">
+          <Card className="lg:col-span-2 bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-6">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
                 <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -243,7 +243,7 @@ export default function Dashboard() {
         </div>
 
         {/* EMI Collection Chart */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2 text-white">
               <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -283,7 +283,7 @@ export default function Dashboard() {
         {/* Recent Activity - 3 Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Loan Applications */}
-          <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+          <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
                 <div className="p-2 bg-teal-500/20 rounded-lg">
@@ -315,7 +315,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Recent Notifications */}
-          <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+          <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
                 <div className="p-2 bg-blue-500/20 rounded-lg">

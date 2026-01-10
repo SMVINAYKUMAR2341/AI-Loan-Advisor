@@ -159,7 +159,7 @@ export default function Customers() {
         </div>
 
         {/* Filters - Enhanced */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-4">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-4">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
@@ -186,7 +186,7 @@ export default function Customers() {
         </Card>
 
         {/* Customers Table - Enhanced */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <div className="p-2 bg-cyan-500/20 rounded-lg">
@@ -284,7 +284,7 @@ export default function Customers() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-900/95 border border-gray-700/50">
                     <div className="p-2 bg-blue-500/20 rounded-lg">
                       <Mail className="h-5 w-5 text-blue-400" />
                     </div>
@@ -293,7 +293,7 @@ export default function Customers() {
                       <p className="font-medium text-white">{selectedCustomer.email || 'N/A'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-900/95 border border-gray-700/50">
                     <div className="p-2 bg-green-500/20 rounded-lg">
                       <Phone className="h-5 w-5 text-green-400" />
                     </div>

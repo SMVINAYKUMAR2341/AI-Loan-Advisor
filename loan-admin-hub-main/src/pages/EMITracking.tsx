@@ -253,14 +253,14 @@ export default function EMITracking() {
               placeholder="Search by customer name or mobile..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
+              className="pl-10 bg-gray-900/95 border-gray-700 text-white placeholder:text-gray-500"
             />
           </div>
         </div>
 
         {/* Tabs & Table - Enhanced */}
         <Tabs defaultValue="upcoming" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="bg-gray-800/50 border border-gray-700/50">
+          <TabsList className="bg-gray-900/95 border border-gray-700/50">
             <TabsTrigger value="upcoming" className="gap-2 data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
               Upcoming <Badge className="ml-1 bg-blue-500/20 text-blue-400 border-blue-500/30">{pendingRepayments.length}</Badge>
             </TabsTrigger>
@@ -272,7 +272,7 @@ export default function EMITracking() {
             </TabsTrigger>
           </TabsList>
 
-          <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+          <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
             <CardContent className="pt-6">
               {loading ? (
                 <div className="flex justify-center p-8">

@@ -1,54 +1,163 @@
-import React from 'react';
+"use client";
+import { useEffect, useRef } from "react";
 
-interface SmokeyBackgroundProps {
-    className?: string;
-    color?: string;
+// Vertex shader source code
+const vertexSmokeySource = `
+  attribute vec4 a_position;
+  void main() {
+    gl_Position = a_position;
+  }
+`;
+
+// Fragment shader source code for the smokey background effect
+const fragmentSmokeySource = `
+precision mediump float;
+
+uniform vec2 iResolution;
+uniform float iTime;
+uniform vec2 iMouse;
+uniform vec3 u_color;
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord){
+    vec2 uv = fragCoord / iResolution;
+    vec2 centeredUV = (2.0 * fragCoord - iResolution.xy) / min(iResolution.x, iResolution.y);
+
+    float time = iTime * 0.5;
+
+    // Normalize mouse input (0.0 - 1.0) and remap to -1.0 ~ 1.0
+    vec2 mouse = iMouse / iResolution;
+    vec2 rippleCenter = 2.0 * mouse - 1.0;
+
+    vec2 distortion = centeredUV;
+    // Apply distortion for a wavy, smokey effect
+    for (float i = 1.0; i < 4.0; i++) {
+        distortion.x += 0.5 / i * cos(i * 2.0 * distortion.y + time + rippleCenter.x * 3.1415);
+        distortion.y += 0.5 / i * cos(i * 2.0 * distortion.x + time + rippleCenter.y * 3.1415);
+    }
+
+    // Create a glowing wave pattern
+    float wave = abs(sin(distortion.x + distortion.y + time));
+    float glow = smoothstep(0.9, 0.2, wave);
+
+    fragColor = vec4(u_color * glow, 1.0);
 }
 
-export const SmokeyBackground = ({ className, color = "#14b8a6" }: SmokeyBackgroundProps) => {
+void main() {
+    mainImage(gl_FragColor, gl_FragCoord.xy);
+}
+`;
+
+interface SmokeyBackgroundProps {
+    color?: string;
+    className?: string;
+}
+
+export function SmokeyBackground({
+    color = "#14b8a6", // Teal color
+    className = "",
+}: SmokeyBackgroundProps) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Helper to convert hex color to RGB (0-1 range)
+    const hexToRgb = (hex: string): [number, number, number] => {
+        const r = parseInt(hex.substring(1, 3), 16) / 255;
+        const g = parseInt(hex.substring(3, 5), 16) / 255;
+        const b = parseInt(hex.substring(5, 7), 16) / 255;
+        return [r, g, b];
+    };
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const gl = canvas.getContext("webgl");
+        if (!gl) {
+            console.error("WebGL not supported");
+            return;
+        }
+
+        const compileShader = (type: number, source: string): WebGLShader | null => {
+            const shader = gl.createShader(type);
+            if (!shader) return null;
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error("Shader compilation error:", gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        };
+
+        const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSmokeySource);
+        const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSmokeySource);
+        if (!vertexShader || !fragmentShader) return;
+
+        const program = gl.createProgram();
+        if (!program) return;
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error("Program linking error:", gl.getProgramInfoLog(program));
+            return;
+        }
+
+        gl.useProgram(program);
+
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+
+        const positionLocation = gl.getAttribLocation(program, "a_position");
+        gl.enableVertexAttribArray(positionLocation);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+        const iResolutionLocation = gl.getUniformLocation(program, "iResolution");
+        const iTimeLocation = gl.getUniformLocation(program, "iTime");
+        const iMouseLocation = gl.getUniformLocation(program, "iMouse");
+        const uColorLocation = gl.getUniformLocation(program, "u_color");
+
+        let startTime = Date.now();
+        const [r, g, b] = hexToRgb(color);
+        gl.uniform3f(uColorLocation, r, g, b);
+
+        let animationId: number;
+
+        const render = () => {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+
+            // Only resize if dimensions changed
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+                gl.viewport(0, 0, width, height);
+            }
+
+            const currentTime = (Date.now() - startTime) / 1000;
+
+            gl.uniform2f(iResolutionLocation, width, height);
+            gl.uniform1f(iTimeLocation, currentTime);
+            gl.uniform2f(iMouseLocation, width / 2, height / 2);
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            animationId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+            cancelAnimationFrame(animationId);
+        };
+    }, [color]);
+
     return (
-        <div className={`fixed inset-0 overflow-hidden pointer-events-none ${className}`}>
-            {/* Base gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800" />
-
-            {/* Animated smokey effects */}
-            <div
-                className="absolute inset-0 opacity-30 animate-pulse"
-                style={{
-                    background: `radial-gradient(ellipse at 30% 20%, ${color}20 0%, transparent 50%)`,
-                    animationDuration: '4s'
-                }}
-            />
-            <div
-                className="absolute inset-0 opacity-20 animate-pulse"
-                style={{
-                    background: `radial-gradient(ellipse at 70% 80%, ${color}15 0%, transparent 50%)`,
-                    animationDuration: '6s',
-                    animationDelay: '2s'
-                }}
-            />
-            <div
-                className="absolute inset-0 opacity-15 animate-pulse"
-                style={{
-                    background: `radial-gradient(ellipse at 50% 50%, ${color}10 0%, transparent 60%)`,
-                    animationDuration: '8s',
-                    animationDelay: '1s'
-                }}
-            />
-
-            {/* Additional ambient glow */}
-            <div
-                className="absolute top-0 right-0 w-1/2 h-1/2 opacity-10"
-                style={{
-                    background: `radial-gradient(circle at top right, ${color}30 0%, transparent 70%)`
-                }}
-            />
-            <div
-                className="absolute bottom-0 left-0 w-1/2 h-1/2 opacity-10"
-                style={{
-                    background: `radial-gradient(circle at bottom left, ${color}20 0%, transparent 70%)`
-                }}
-            />
+        <div className={`absolute inset-0 w-full h-full overflow-hidden ${className}`}>
+            <canvas ref={canvasRef} className="w-full h-full" />
+            <div className="absolute inset-0 backdrop-blur-sm"></div>
         </div>
     );
-};
+}

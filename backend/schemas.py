@@ -605,3 +605,39 @@ class TicketResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# =============================================================================
+# ADMIN REPORT SCHEMAS
+# =============================================================================
+
+class StatusDist(BaseModel):
+    name: str
+    value: int
+    color: str
+
+class MonthlyTrend(BaseModel):
+    month: str
+    applications: int
+    disbursements: float
+    emiCollected: float
+
+class ReportStats(BaseModel):
+    totalLoans: int
+    approvalRate: float
+    totalDisbursed: float
+    activeUsers: int
+
+class NotificationCreate(BaseModel):
+    user_id: str
+    notification_type: str
+    trigger: str
+    message: str
+
+class AdminDashboardStats(BaseModel):
+    stats: ReportStats
+    monthlyTrends: List[MonthlyTrend]
+    statusDistribution: List[StatusDist]
+
+    class Config:
+        from_attributes = True
+

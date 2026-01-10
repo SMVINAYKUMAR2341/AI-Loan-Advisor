@@ -182,7 +182,7 @@ export default function Tickets() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                                 <Input
                                     placeholder="Search tickets..."
-                                    className="pl-9 bg-gray-800/50 border-gray-700 h-9"
+                                    className="pl-9 bg-gray-900/95 border-gray-700 h-9"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
@@ -217,7 +217,7 @@ export default function Tickets() {
                                     <div
                                         key={ticket.id}
                                         onClick={() => handleTicketSelect(ticket.id)}
-                                        className={`p-4 cursor-pointer hover:bg-gray-800/50 transition-colors ${selectedTicket?.id === ticket.id ? 'bg-teal-500/5 border-l-2 border-teal-500' : 'border-l-2 border-transparent'}`}
+                                        className={`p-4 cursor-pointer hover:bg-gray-900/95 transition-colors ${selectedTicket?.id === ticket.id ? 'bg-teal-500/5 border-l-2 border-teal-500' : 'border-l-2 border-transparent'}`}
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <span className="font-mono text-xs text-gray-500">{ticket.ticket_id}</span>
@@ -348,7 +348,7 @@ export default function Tickets() {
                         </>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-                            <div className="w-16 h-16 bg-gray-800/50 rounded-full flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-gray-900/95 rounded-full flex items-center justify-center mb-4">
                                 <MessageSquare className="h-8 w-8 opacity-50" />
                             </div>
                             <h3 className="text-lg font-medium text-white mb-1">Select a Ticket</h3>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,6 +62,7 @@ export default function LoanApplications() {
   const [loans, setLoans] = useState<LoanApp[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchLoans();
@@ -163,7 +165,7 @@ export default function LoanApplications() {
         </div>
 
         {/* Filters - Enhanced */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-1">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-1">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
@@ -195,7 +197,7 @@ export default function LoanApplications() {
         </Card>
 
         {/* Loans Table - Enhanced */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-2">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-2">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -270,7 +272,7 @@ export default function LoanApplications() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelectedLoan(loan)}
+                          onClick={() => navigate(`/loans/${loan.id}`)}
                           className="text-gray-400 hover:text-white hover:bg-white/10"
                         >
                           <Eye className="h-4 w-4" />
@@ -363,7 +365,7 @@ export default function LoanApplications() {
                     </div>
                   </div>
                   {selectedLoan.decision_reason && (
-                    <div className="mt-4 p-3 rounded-lg bg-gray-800/50">
+                    <div className="mt-4 p-3 rounded-lg bg-gray-900/95">
                       <p className="text-sm text-gray-400 mb-1">Decision Reason:</p>
                       <p className="text-sm text-white">{selectedLoan.decision_reason}</p>
                     </div>

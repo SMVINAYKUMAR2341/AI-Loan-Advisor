@@ -131,5 +131,79 @@ The frontend will be available at `http://localhost:5173`.
 - 24-hour expiration for security
 - Works across all devices
 
+---
+
+## Bank Admin Dashboard
+
+The Admin Dashboard is a separate interface for bank officers to manage loan applications, process disbursements, and monitor customer activities.
+
+### Admin Features
+- **Secure 3-Factor Login**: Admin ID, Password, and 6-digit Security PIN
+- **Loan Application Review**: View all customer applications with AI approval scores
+- **Approve/Reject/Request Documents**: Make decisions with mandatory justification
+- **Loan Disbursement**: Process fund transfers for approved loans
+- **Customer Management**: Access customer database and profiles
+- **Reports & Analytics**: View loan statistics and trends
+- **EMI Tracking**: Monitor repayment schedules
+- **Support Tickets**: Handle customer queries
+
+### Admin Screenshots
+
+#### 1. Admin Secure Login
+![Admin Login](screenshots/admin-login.jpg)
+- 3-Factor authentication (Admin ID + Email + Password + Security PIN)
+- Secure login portal for bank officers
+- RBI-compliant encryption
+- Animated WebGL background matching customer portal
+
+#### 2. Admin Dashboard Overview
+![Admin Dashboard](screenshots/admin-dashboard.jpg)
+- **Total Loans**: Count of all loan applications in the system
+- **Total Disbursed**: Sum of all disbursed loan amounts
+- **Pending Review**: Applications awaiting officer decision
+- **Approval Rate**: Percentage of approved applications
+- **Loan Status Distribution**: Visual pie chart (Disbursed, Approved, Pending, Rejected)
+- **Monthly Trends**: Line chart showing application and approval trends
+- **EMI Collection Trend**: Track repayment performance
+
+#### 3. Loan Applications Management
+![Loan Applications](screenshots/admin-loan-applications.jpg)
+- Comprehensive table with all loan applications
+- **Loan ID & Reference ID**: Unique identifiers for tracking
+- **Customer Name**: Linked to customer profile
+- **Amount & Purpose**: Loan details at a glance
+- **AI Score**: Machine learning approval probability (percentage)
+- **Decision Status**: APPROVED, REJECTED, PENDING_REVIEW badges
+- **Date**: Application submission timestamp
+- **Actions**: Quick access to view details
+
+#### 4. Loan Application Details & Decision
+![Loan Details](screenshots/admin-loan-details.png)
+- **Customer Information**: Full customer profile (Name, ID, Email, Phone, Account Created)
+- **Loan Details**: Amount (₹5,00,000), Purpose, Tenure, Interest Rate, Monthly EMI
+- **AI Analysis Section**: 
+  - Approval Probability (68%)
+  - Decision Reason with AI explanation
+  - Credit Rating assessment
+  - Total Repayment calculation
+- **Take Action Panel**:
+  - ✅ **Approve** button with justification
+  - ❌ **Reject** button with justification
+  - 📄 **Request Documents** with document type selection
+  - ✓ "Require customer to visit branch with hard copies" checkbox
+- **Quick Actions**: Download Report button
+
+#### 5. Loan Disbursement
+![Loan Disbursement](screenshots/admin-loan-disbursement.jpg)
+- **Pending Disbursements Counter**: Number of approved loans awaiting processing
+- **Total Disbursements**: Count of completed disbursements
+- **Total Disbursed Amount**: Sum of all disbursed funds
+- **Approved Loans Table**: 
+  - Loan ID, Customer Name, Amount, Purpose, Contact
+  - One-click "Disburse" button for each loan
+- **Disbursement History**: Tab for viewing completed transactions
+
+---
+
 ## Deployment
 This repository is configured to include the `.env` file for ease of setup. **Do not use these credentials in a production environment.**

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
   Area,
 } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
+import { adminApi } from '@/lib/api';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -178,7 +180,7 @@ export default function Reports() {
         </div>
 
         <Tabs defaultValue="loans" className="space-y-4">
-          <TabsList className="bg-gray-800/50 border border-gray-700/50">
+          <TabsList className="bg-gray-900/95 border border-gray-700/50">
             <TabsTrigger value="loans" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Loan Performance</TabsTrigger>
             <TabsTrigger value="emi" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">EMI Analytics</TabsTrigger>
           </TabsList>
@@ -186,7 +188,7 @@ export default function Reports() {
           <TabsContent value="loans" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Loan Status Distribution */}
-              <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+              <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg text-white flex items-center gap-2">
                     <div className="p-2 bg-purple-500/20 rounded-lg">

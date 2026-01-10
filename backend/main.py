@@ -1,9 +1,12 @@
 import os
 import sys
+import calendar
+from collections import defaultdict
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) # Fix import paths
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from sqlalchemy import or_
 from sqlalchemy.sql import func  # Import func for SQLAlchemy aggregate functions
@@ -435,6 +438,380 @@ async def admin_login(
         "role": "bank_officer",
         "access_token": access_token,
         "token_type": "bearer"
+    }
+
+
+# =====================================================
+# ADMIN PROFILE MANAGEMENT ENDPOINTS
+# =====================================================
+
+@app.get("/admin/profile")
+async def get_admin_profile(
+    current_user: models.AdminUser = Depends(auth.get_current_admin)
+):
+    """
+    Get current admin user's profile information.
+    """
+    return {
+        "id": str(current_user.id),
+        "customer_id": current_user.admin_id,
+        "email": current_user.email,
+        "mobile_number": None,  # AdminUser model doesn't have mobile_number
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "department": current_user.department,
+        "designation": current_user.designation,
+        "role": "bank_officer",
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None
+    }
+
+
+@app.put("/admin/profile")
+async def update_admin_profile(
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    email: Optional[str] = None,
+    current_user: models.AdminUser = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Update admin user's profile fields.
+    """
+    if first_name:
+        current_user.first_name = first_name
+    if last_name:
+        current_user.last_name = last_name
+    if email:
+        current_user.email = email
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return {"message": "Profile updated successfully"}
+
+
+@app.put("/admin/change-password")
+async def change_admin_password(
+    current_password: str,
+    new_password: str,
+    current_user: models.AdminUser = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Change admin user's password. Requires current password verification.
+    """
+    # Verify current password
+    if not auth.verify_password(current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Hash and set new password
+    current_user.password_hash = auth.get_password_hash(new_password)
+    await db.commit()
+    
+    return {"message": "Password changed successfully"}
+
+
+@app.put("/admin/change-pin")
+async def change_admin_pin(
+    current_pin: str,
+    new_pin: str,
+    current_user: models.AdminUser = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Change admin user's 6-digit PIN. Requires current PIN verification.
+    """
+    # Verify current PIN
+    if not current_user.pin_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No PIN set for this account"
+        )
+    
+    if not auth.verify_password(current_pin, current_user.pin_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current PIN is incorrect"
+        )
+    
+    # Validate new PIN
+    if len(new_pin) != 6 or not new_pin.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PIN must be exactly 6 digits"
+        )
+    
+    # Hash and set new PIN
+    current_user.pin_hash = auth.get_password_hash(new_pin)
+    await db.commit()
+    
+    return {"message": "PIN changed successfully"}
+
+
+# =====================================================
+# ADMIN LOAN APPLICATION DECISION ENDPOINTS
+# =====================================================
+
+@app.put("/admin/applications/{application_id}/decision")
+async def update_application_decision(
+    application_id: UUID,
+    decision: str,  # APPROVED, REJECTED, DOCUMENTS_REQUIRED
+    justification: str,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Admin decision on loan application. Updates application status and creates review record.
+    """
+    # Validate decision value
+    valid_decisions = ["APPROVED", "REJECTED", "DOCUMENTS_REQUIRED"]
+    if decision.upper() not in valid_decisions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid decision. Must be one of: {valid_decisions}"
+        )
+    
+    if not justification or len(justification.strip()) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Justification is required and must be at least 10 characters"
+        )
+    
+    # Fetch the application and its prediction
+    app_query = select(models.LoanApplication).where(models.LoanApplication.id == application_id)
+    result = await db.execute(app_query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found"
+        )
+    
+    # Fetch prediction to update decision
+    pred_query = select(models.LoanPrediction).where(models.LoanPrediction.application_id == application_id)
+    result = await db.execute(pred_query)
+    prediction = result.scalars().first()
+    
+    if prediction:
+        prediction.decision = decision.upper()
+    
+    # Create officer review record
+    # Get admin's id - handle both AdminUser and User models
+    admin_id = current_admin.id
+    
+    # Check if review already exists
+    existing_review_query = select(models.OfficerReview).where(
+        models.OfficerReview.application_id == application_id
+    )
+    result = await db.execute(existing_review_query)
+    existing_review = result.scalars().first()
+    
+    if existing_review:
+        # Update existing review
+        existing_review.final_decision = decision.upper()
+        existing_review.justification = justification
+        existing_review.reviewed_at = datetime.now()
+    else:
+        # Create new review - need to use a valid user_id from users table
+        # First check if admin has a corresponding user entry
+        user_query = select(models.User).where(models.User.email == current_admin.email)
+        user_result = await db.execute(user_query)
+        user = user_result.scalars().first()
+        
+        if user:
+            officer_id = user.id
+        else:
+            # Use admin id as fallback (may need to create a user entry for proper FK)
+            officer_id = admin_id
+        
+        new_review = models.OfficerReview(
+            application_id=application_id,
+            officer_id=officer_id,
+            final_decision=decision.upper(),
+            justification=justification
+        )
+        db.add(new_review)
+    
+    await db.commit()
+    
+    # Create notification for customer
+    try:
+        # Fetch user to notify
+        user_query = select(models.User).where(models.User.id == application.user_id)
+        result = await db.execute(user_query)
+        customer = result.scalars().first()
+        
+        if customer:
+            notification_msg = f"Your loan application has been {decision.upper()}. Reason: {justification}"
+            notification = models.Notification(
+                user_id=customer.id,
+                notification_type="LOAN_DECISION",
+                trigger=f"LOAN_{decision.upper()}",
+                message=notification_msg
+            )
+            db.add(notification)
+            await db.commit()
+    except Exception as e:
+        print(f"Failed to create notification: {e}")
+    
+    return {
+        "message": f"Application {decision.upper()} successfully",
+        "decision": decision.upper(),
+        "application_id": str(application_id)
+    }
+
+
+@app.post("/admin/applications/{application_id}/request-documents")
+async def request_documents(
+    application_id: UUID,
+    document_types: str,  # Comma-separated list
+    message: str,
+    require_office_visit: bool = False,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Request additional documents from customer. Optionally require office visit.
+    """
+    # Fetch the application
+    app_query = select(models.LoanApplication).where(models.LoanApplication.id == application_id)
+    result = await db.execute(app_query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found"
+        )
+    
+    # Update prediction status
+    pred_query = select(models.LoanPrediction).where(models.LoanPrediction.application_id == application_id)
+    result = await db.execute(pred_query)
+    prediction = result.scalars().first()
+    
+    if prediction:
+        prediction.decision = "DOCUMENTS_REQUIRED"
+    
+    # Build notification message
+    doc_list = [d.strip() for d in document_types.split(",")]
+    doc_message = f"Additional documents required for your loan application:\n"
+    for doc in doc_list:
+        doc_message += f"• {doc}\n"
+    
+    if require_office_visit:
+        doc_message += "\n⚠️ IMPORTANT: You are required to visit our branch office with the original hard copy documents for verification."
+    
+    if message:
+        doc_message += f"\n\nAdditional Notes: {message}"
+    
+    # Create notification
+    notification = models.Notification(
+        user_id=application.user_id,
+        notification_type="DOCUMENT_REQUEST",
+        trigger="DOCUMENTS_REQUIRED",
+        message=doc_message
+    )
+    db.add(notification)
+    await db.commit()
+    
+    return {
+        "message": "Document request sent to customer",
+        "application_id": str(application_id),
+        "documents_requested": doc_list,
+        "office_visit_required": require_office_visit
+    }
+
+
+@app.get("/admin/applications/{application_id}/details")
+async def get_application_full_details(
+    application_id: UUID,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get comprehensive application details including customer info, loan data, 
+    KYC documents, and prediction details.
+    """
+    # Fetch application
+    app_query = select(models.LoanApplication).where(models.LoanApplication.id == application_id)
+    result = await db.execute(app_query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found"
+        )
+    
+    # Fetch customer details
+    user_query = select(models.User).where(models.User.id == application.user_id)
+    result = await db.execute(user_query)
+    customer = result.scalars().first()
+    
+    # Fetch prediction
+    pred_query = select(models.LoanPrediction).where(models.LoanPrediction.application_id == application_id)
+    result = await db.execute(pred_query)
+    prediction = result.scalars().first()
+    
+    # Fetch KYC documents
+    docs_query = select(models.KYCDocument).where(models.KYCDocument.application_id == application_id)
+    result = await db.execute(docs_query)
+    documents = result.scalars().all()
+    
+    # Fetch officer review if exists
+    review_query = select(models.OfficerReview).where(models.OfficerReview.application_id == application_id)
+    result = await db.execute(review_query)
+    officer_review = result.scalars().first()
+    
+    return {
+        "application": {
+            "id": str(application.id),
+            "tracking_id": application.tracking_id,
+            "loan_amount": application.loan_amount,
+            "loan_purpose": application.loan_purpose,
+            "loan_duration": application.loan_duration,
+            "created_at": application.created_at.isoformat() if application.created_at else None,
+        },
+        "customer": {
+            "id": str(customer.id) if customer else None,
+            "customer_id": customer.customer_id if customer else None,
+            "first_name": customer.first_name if customer else None,
+            "last_name": customer.last_name if customer else None,
+            "email": customer.email if customer else None,
+            "mobile_number": customer.mobile_number if customer else None,
+            "created_at": customer.created_at.isoformat() if customer and customer.created_at else None,
+        } if customer else None,
+        "prediction": {
+            "approval_probability": prediction.approval_probability if prediction else None,
+            "ml_probability": prediction.ml_probability if prediction else None,
+            "decision": prediction.decision if prediction else None,
+            "decision_reason": prediction.decision_reason if prediction else None,
+            "interest_rate": prediction.interest_rate if prediction else None,
+            "emi": prediction.emi if prediction else None,
+            "total_repayment": prediction.total_repayment if prediction else None,
+            "total_interest": prediction.total_interest if prediction else None,
+            "credit_rating": prediction.credit_rating if prediction else None,
+            "shap_summary": prediction.shap_summary if prediction else None,
+        } if prediction else None,
+        "documents": [
+            {
+                "id": str(doc.id),
+                "document_type": doc.document_type,
+                "file_name": doc.file_name,
+                "verified": doc.verified,
+                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+            }
+            for doc in documents
+        ],
+        "officer_review": {
+            "final_decision": officer_review.final_decision if officer_review else None,
+            "justification": officer_review.justification if officer_review else None,
+            "reviewed_at": officer_review.reviewed_at.isoformat() if officer_review and officer_review.reviewed_at else None,
+        } if officer_review else None
     }
 
 
@@ -1130,34 +1507,43 @@ from datetime import datetime
 @app.get("/admin/reports/stats", response_model=schemas.AdminDashboardStats)
 async def get_admin_reports(
     current_user: models.AdminUser = Depends(auth.require_admin),
-    db: Session = Depends(database.get_db)
+    db: AsyncSession = Depends(database.get_db)
 ):
     """
     Get aggregated statistics for Admin Reports Page
     """
     # 1. Total Applications
-    total_loans = db.query(models.LoanApplication).count()
+    result = await db.execute(select(func.count()).select_from(models.LoanApplication))
+    total_loans = result.scalar() or 0
     
     # 2. Approval Rate
-    approved_count = db.query(models.LoanPrediction).filter(models.LoanPrediction.decision == "APPROVED").count()
+    result = await db.execute(
+        select(func.count()).select_from(models.LoanPrediction).where(models.LoanPrediction.decision == "APPROVED")
+    )
+    approved_count = result.scalar() or 0
     approval_rate = round((approved_count / total_loans * 100), 1) if total_loans > 0 else 0
     
     # 3. Total Disbursed
-    # Sum of disbursements where status = COMPLETED (or just all for now if no status flow fully used)
-    # Assuming 'messages' table isn't relevant, checking 'disbursements'
-    disbursed_total = db.query(func.sum(models.Disbursement.amount)).scalar() or 0
+    result = await db.execute(select(func.sum(models.Disbursement.amount)))
+    disbursed_total = result.scalar() or 0
     
     # 4. Active Users (Customers)
-    active_users = db.query(models.User).filter(models.User.role == "customer").count()
+    result = await db.execute(
+        select(func.count()).select_from(models.User).where(models.User.role == "customer")
+    )
+    active_users = result.scalar() or 0
     
     # 5. Loan Status Distribution
-    # Group by decision
-    status_counts = db.query(models.LoanPrediction.decision, func.count(models.LoanPrediction.decision)).group_by(models.LoanPrediction.decision).all()
-    # Map to colors
+    result = await db.execute(
+        select(models.LoanPrediction.decision, func.count(models.LoanPrediction.decision))
+        .group_by(models.LoanPrediction.decision)
+    )
+    status_counts = result.all()
+    
     color_map = {
-        "APPROVED": "#10B981", # Green
-        "REJECTED": "#EF4444", # Red
-        "PENDING_REVIEW": "#F59E0B" # Yellow
+        "APPROVED": "#10B981",
+        "REJECTED": "#EF4444",
+        "PENDING_REVIEW": "#F59E0B"
     }
     
     dist_data = []
@@ -1168,43 +1554,39 @@ async def get_admin_reports(
             color=color_map.get(decision, "#6B7280")
         ))
         
-    # 6. Monthly Trends (Last 6 Months)
-    # For simplicity, we will query all and aggregate in python or efficient SQL
-    # Using SQL for months is database specific (Postgres vs SQLite). Assuming SQLite for dev portability unless specific.
-    # Given 'created_at' is DateTime.
-    # We will fetch recent applications and aggregate py-side for safety across DBs
-    
-    
+    # 6. Monthly Trends
     trends = defaultdict(lambda: {"apps": 0, "disb": 0, "emi": 0})
     
     # Applications
-    recent_apps = db.query(models.LoanApplication.created_at).all()
-    for app in recent_apps:
-        if app.created_at:
-            month_key = app.created_at.strftime("%b") # Jan, Feb
+    result = await db.execute(select(models.LoanApplication.created_at))
+    recent_apps = result.all()
+    for (created_at,) in recent_apps:
+        if created_at:
+            month_key = created_at.strftime("%b")
             trends[month_key]["apps"] += 1
             
     # Disbursements
-    recent_disb = db.query(models.Disbursement.created_at, models.Disbursement.amount).all()
-    for d in recent_disb:
-        if d.created_at:
-            month_key = d.created_at.strftime("%b")
-            trends[month_key]["disb"] += d.amount
+    result = await db.execute(select(models.Disbursement.created_at, models.Disbursement.amount))
+    recent_disb = result.all()
+    for created_at, amount in recent_disb:
+        if created_at:
+            month_key = created_at.strftime("%b")
+            trends[month_key]["disb"] += amount or 0
             
     # EMIs
-    recent_emis = db.query(models.Repayment.payment_date, models.Repayment.payment_amount).filter(models.Repayment.payment_status == "PAID").all()
-    for e in recent_emis:
-        if e.payment_date:
-            month_key = e.payment_date.strftime("%b")
-            trends[month_key]["emi"] += e.payment_amount
+    result = await db.execute(
+        select(models.Repayment.payment_date, models.Repayment.payment_amount)
+        .where(models.Repayment.payment_status == "PAID")
+    )
+    recent_emis = result.all()
+    for payment_date, payment_amount in recent_emis:
+        if payment_date:
+            month_key = payment_date.strftime("%b")
+            trends[month_key]["emi"] += payment_amount or 0
             
-    # Format for chart (Sort by month? simplified for now, just returning dict values)
-    # Ideally sort by date. 
-    # Let's mock the order for current implementation or use current month back 4 months
-    
     sorted_months = []
     curr = datetime.now()
-    for i in range(4): # Last 4 months
+    for i in range(4):
         month_idx = (curr.month - i - 1) % 12 + 1
         month_name = calendar.month_abbr[month_idx]
         sorted_months.insert(0, month_name)
@@ -1232,7 +1614,7 @@ async def get_admin_reports(
 
 @app.post("/admin/notifications/send")
 async def send_notification(
-    notification_req: schemas.NotificationCreate,
+    review: schemas.NotificationCreate,
     current_user: models.AdminUser = Depends(auth.require_admin),
     db: Session = Depends(database.get_db)
 ):

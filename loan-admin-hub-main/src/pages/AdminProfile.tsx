@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Phone, Shield, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Shield, Save, Loader2, Lock, Key, Eye, EyeOff } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +15,8 @@ interface AdminProfileData {
     mobile_number: string;
     first_name: string;
     last_name: string;
+    department?: string;
+    designation?: string;
     role: string;
     created_at: string;
 }
@@ -29,6 +31,24 @@ export default function AdminProfile() {
         last_name: '',
         email: ''
     });
+
+    // Password change state
+    const [passwordForm, setPasswordForm] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
+    const [changingPassword, setChangingPassword] = useState(false);
+    const [showPasswords, setShowPasswords] = useState(false);
+
+    // PIN change state
+    const [pinForm, setPinForm] = useState({
+        currentPin: '',
+        newPin: '',
+        confirmPin: ''
+    });
+    const [changingPin, setChangingPin] = useState(false);
+
     const { toast } = useToast();
 
     useEffect(() => {
@@ -76,6 +96,78 @@ export default function AdminProfile() {
         setSaving(false);
     };
 
+    const handleChangePassword = async () => {
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            toast({
+                title: 'Error',
+                description: 'New passwords do not match.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        if (passwordForm.newPassword.length < 6) {
+            toast({
+                title: 'Error',
+                description: 'Password must be at least 6 characters.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setChangingPassword(true);
+        try {
+            await adminApi.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+            toast({
+                title: 'Success',
+                description: 'Password changed successfully.',
+            });
+            setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (error: any) {
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to change password.',
+                variant: 'destructive',
+            });
+        }
+        setChangingPassword(false);
+    };
+
+    const handleChangePin = async () => {
+        if (pinForm.newPin !== pinForm.confirmPin) {
+            toast({
+                title: 'Error',
+                description: 'New PINs do not match.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        if (pinForm.newPin.length !== 6 || !/^\d+$/.test(pinForm.newPin)) {
+            toast({
+                title: 'Error',
+                description: 'PIN must be exactly 6 digits.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setChangingPin(true);
+        try {
+            await adminApi.changePin(pinForm.currentPin, pinForm.newPin);
+            toast({
+                title: 'Success',
+                description: 'PIN changed successfully.',
+            });
+            setPinForm({ currentPin: '', newPin: '', confirmPin: '' });
+        } catch (error: any) {
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to change PIN.',
+                variant: 'destructive',
+            });
+        }
+        setChangingPin(false);
+    };
+
     if (loading) {
         return (
             <AdminLayout>
@@ -97,20 +189,20 @@ export default function AdminProfile() {
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-white">Admin Profile</h1>
-                            <p className="text-gray-400">Manage your account settings</p>
+                            <p className="text-gray-400">Manage your account and security settings</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Profile Card */}
-                <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+                <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="text-white flex items-center gap-2">
                             <Shield className="h-5 w-5 text-teal-400" />
                             Account Information
                         </CardTitle>
                         <Badge className="bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                            {profile?.role?.toUpperCase()}
+                            {profile?.designation || profile?.role?.toUpperCase()}
                         </Badge>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -123,11 +215,9 @@ export default function AdminProfile() {
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm text-gray-400 flex items-center gap-2">
-                                    <Phone className="h-4 w-4" /> Mobile Number
-                                </label>
+                                <label className="text-sm text-gray-400">Department</label>
                                 <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700 text-white">
-                                    {profile?.mobile_number}
+                                    {profile?.department || 'Loan Operations'}
                                 </div>
                             </div>
                         </div>
@@ -220,7 +310,124 @@ export default function AdminProfile() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Change Password Card */}
+                <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
+                    <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                            <Lock className="h-5 w-5 text-orange-400" />
+                            Change Password
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm text-gray-400">Current Password</label>
+                            <div className="relative">
+                                <Input
+                                    type={showPasswords ? 'text' : 'password'}
+                                    value={passwordForm.currentPassword}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                                    className="bg-gray-900/50 border-gray-700 text-white pr-10"
+                                    placeholder="Enter current password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPasswords(!showPasswords)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                                >
+                                    {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm text-gray-400">New Password</label>
+                                <Input
+                                    type={showPasswords ? 'text' : 'password'}
+                                    value={passwordForm.newPassword}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                                    className="bg-gray-900/50 border-gray-700 text-white"
+                                    placeholder="New password"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm text-gray-400">Confirm Password</label>
+                                <Input
+                                    type={showPasswords ? 'text' : 'password'}
+                                    value={passwordForm.confirmPassword}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                                    className="bg-gray-900/50 border-gray-700 text-white"
+                                    placeholder="Confirm password"
+                                />
+                            </div>
+                        </div>
+                        <Button
+                            onClick={handleChangePassword}
+                            disabled={changingPassword || !passwordForm.currentPassword || !passwordForm.newPassword}
+                            className="w-full bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30"
+                        >
+                            {changingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Lock className="h-4 w-4 mr-2" />}
+                            Change Password
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                {/* Change PIN Card */}
+                <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
+                    <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                            <Key className="h-5 w-5 text-purple-400" />
+                            Change Security PIN
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm text-gray-400">Current PIN (6 digits)</label>
+                            <Input
+                                type="password"
+                                maxLength={6}
+                                value={pinForm.currentPin}
+                                onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value.replace(/\D/g, '') })}
+                                className="bg-gray-900/50 border-gray-700 text-white tracking-widest"
+                                placeholder="••••••"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm text-gray-400">New PIN</label>
+                                <Input
+                                    type="password"
+                                    maxLength={6}
+                                    value={pinForm.newPin}
+                                    onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value.replace(/\D/g, '') })}
+                                    className="bg-gray-900/50 border-gray-700 text-white tracking-widest"
+                                    placeholder="••••••"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm text-gray-400">Confirm PIN</label>
+                                <Input
+                                    type="password"
+                                    maxLength={6}
+                                    value={pinForm.confirmPin}
+                                    onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value.replace(/\D/g, '') })}
+                                    className="bg-gray-900/50 border-gray-700 text-white tracking-widest"
+                                    placeholder="••••••"
+                                />
+                            </div>
+                        </div>
+                        <Button
+                            onClick={handleChangePin}
+                            disabled={changingPin || !pinForm.currentPin || !pinForm.newPin}
+                            className="w-full bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/30"
+                        >
+                            {changingPin ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Key className="h-4 w-4 mr-2" />}
+                            Change PIN
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
         </AdminLayout>
     );
 }
+

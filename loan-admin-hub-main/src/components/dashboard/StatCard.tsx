@@ -15,7 +15,7 @@ interface StatCardProps {
 }
 
 const variantStyles = {
-  default: 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600/50',
+  default: 'bg-gray-900/95 border-gray-700/50 hover:border-gray-600/50',
   primary: 'bg-teal-500/10 border-teal-500/30 hover:border-teal-500/50',
   success: 'bg-green-500/10 border-green-500/30 hover:border-green-500/50',
   warning: 'bg-yellow-500/10 border-yellow-500/30 hover:border-yellow-500/50',

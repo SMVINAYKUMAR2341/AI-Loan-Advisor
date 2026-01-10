@@ -210,13 +210,13 @@ export default function LoanDisbursement() {
 
         {/* Tabs - Enhanced */}
         <Tabs defaultValue="pending" className="space-y-4">
-          <TabsList className="bg-gray-800/50 border border-gray-700/50">
+          <TabsList className="bg-gray-900/95 border border-gray-700/50">
             <TabsTrigger value="pending" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Pending Disbursements</TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Disbursement History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
-            <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+            <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <div className="p-2 bg-yellow-500/20 rounded-lg">
@@ -276,7 +276,7 @@ export default function LoanDisbursement() {
           </TabsContent>
 
           <TabsContent value="history">
-            <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+            <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <div className="p-2 bg-green-500/20 rounded-lg">
@@ -402,7 +402,7 @@ export default function LoanDisbursement() {
                 {selectedLoan && (
                   <div className="space-y-6">
                     {/* Loan Summary */}
-                    <div className="p-4 rounded-xl bg-gray-800/50 border border-gray-700/50 space-y-3">
+                    <div className="p-4 rounded-xl bg-gray-900/95 border border-gray-700/50 space-y-3">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Loan ID</span>
                         <span className="font-medium font-mono text-sm text-white">{selectedLoan.id.slice(0, 12)}...</span>
@@ -424,7 +424,7 @@ export default function LoanDisbursement() {
                     {/* Customer Contact */}
                     <div className="space-y-2">
                       <Label className="text-gray-400">Customer Contact</Label>
-                      <div className="p-4 rounded-xl border border-gray-700 bg-gray-800/50">
+                      <div className="p-4 rounded-xl border border-gray-700 bg-gray-900/95">
                         <p className="font-medium text-white">{selectedLoan.customer_name}</p>
                         <p className="text-sm text-gray-400">
                           Mobile: {selectedLoan.mobile_number}
@@ -478,7 +478,7 @@ export default function LoanDisbursement() {
                       <div className="space-y-2">
                         <Label className="text-gray-400 text-xs uppercase tracking-wider">Beneficiary Details (To)</Label>
                         {selectedLoan.bank_details ? (
-                          <div className="bg-gray-800/50 border border-teal-500/30 rounded-lg p-4 space-y-3 relative overflow-hidden">
+                          <div className="bg-gray-900/95 border border-teal-500/30 rounded-lg p-4 space-y-3 relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-2 bg-teal-500/10 rounded-bl-lg border-b border-l border-teal-500/20">
                               <span className="flex items-center gap-1 text-teal-400 text-xs font-semibold">
                                 <CheckCircle className="w-3 h-3" /> VERIFIED

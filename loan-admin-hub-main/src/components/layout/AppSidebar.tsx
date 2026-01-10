@@ -11,6 +11,7 @@ import {
   Building2,
   ChevronRight,
   MessageSquare,
+  UserCog,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -95,7 +96,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                       >
                         <div className={`p-2 rounded-lg transition-colors ${active
                           ? 'bg-teal-500/20'
-                          : 'bg-gray-800/50 group-hover:bg-teal-500/10'
+                          : 'bg-gray-900/95 group-hover:bg-teal-500/10'
                           }`}>
                           <item.icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-teal-400' : 'text-gray-500 group-hover:text-teal-400'
                             }`} />
@@ -122,17 +123,20 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       <SidebarFooter className="p-4">
         <Separator className="mb-4 bg-white/10" />
 
-        {/* Admin Profile Section */}
+        {/* Admin Profile Section - Clickable to navigate to profile */}
         {!collapsed && (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 mb-3 border border-white/10">
+          <NavLink
+            to="/profile"
+            className="flex items-center gap-3 p-3 rounded-xl bg-white/5 mb-3 border border-white/10 hover:bg-teal-500/10 hover:border-teal-500/30 transition-all cursor-pointer"
+          >
             <div className="w-10 h-10 bg-teal-500/20 rounded-full flex items-center justify-center border border-teal-500/30">
               <span className="text-teal-400 font-semibold text-sm">AD</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">Bank Admin</p>
-              <p className="text-gray-500 text-xs truncate">Administrator</p>
+              <p className="text-gray-500 text-xs truncate">Account & Security →</p>
             </div>
-          </div>
+          </NavLink>
         )}
 
         <Button

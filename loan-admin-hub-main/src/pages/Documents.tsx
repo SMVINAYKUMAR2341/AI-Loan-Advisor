@@ -166,7 +166,7 @@ export default function Documents() {
         </div>
 
         {/* Filters - Enhanced */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-1">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-1">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
@@ -194,7 +194,7 @@ export default function Documents() {
         </Card>
 
         {/* Documents Table - Enhanced */}
-        <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-2">
+        <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl animate-fade-in-up stagger-2">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <div className="p-2 bg-purple-500/20 rounded-lg">

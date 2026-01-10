@@ -279,14 +279,14 @@ export default function Notifications() {
         </div>
 
         <Tabs defaultValue="log" className="space-y-4">
-          <TabsList className="bg-gray-800/50 border border-gray-700/50">
+          <TabsList className="bg-gray-900/95 border border-gray-700/50">
             <TabsTrigger value="log" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Notification Log</TabsTrigger>
             <TabsTrigger value="templates" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Templates</TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="log">
-            <Card className="bg-gray-800/50 border-gray-700/50 rounded-2xl">
+            <Card className="bg-gray-900/95 border-gray-700/50 rounded-2xl">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <div className="p-2 bg-blue-500/20 rounded-lg">
