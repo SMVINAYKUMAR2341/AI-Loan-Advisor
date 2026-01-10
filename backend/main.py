@@ -1037,6 +1037,245 @@ async def get_all_disbursements(
     } for d, loan_app, u in rows]
 
 
+# =====================================================
+# ADMIN NOTIFICATION ENDPOINTS
+# =====================================================
+
+@app.post("/admin/notifications/send")
+async def send_notification_to_customer(
+    user_id: str,
+    notification_type: str,  # sms or email
+    trigger: str,  # emi_reminder, emi_due, emi_overdue, disbursement_confirmation
+    message: str,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Send notification to a customer.
+    Used for EMI reminders, due alerts, disbursement confirmations, etc.
+    """
+    # Validate user exists
+    user_query = select(models.User).where(models.User.id == user_id)
+    result = await db.execute(user_query)
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Create notification record
+    notification = models.Notification(
+        user_id=user.id,
+        type=notification_type,
+        trigger=trigger,
+        message=message,
+        status="sent"
+    )
+    db.add(notification)
+    await db.commit()
+    await db.refresh(notification)
+    
+    return {
+        "message": "Notification sent successfully",
+        "notification_id": str(notification.id)
+    }
+
+
+@app.get("/admin/notifications")
+async def get_all_notifications(
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all notifications sent by admin for management view.
+    """
+    query = (
+        select(models.Notification, models.User)
+        .join(models.User, models.Notification.user_id == models.User.id)
+        .order_by(models.Notification.sent_at.desc())
+        .limit(100)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(n.id),
+        "user_id": str(n.user_id),
+        "customer_name": f"{u.first_name} {u.last_name}",
+        "customer_id": u.customer_id,
+        "type": n.type,
+        "trigger": n.trigger,
+        "message": n.message,
+        "status": n.status,
+        "sent_at": n.sent_at.isoformat() if n.sent_at else None
+    } for n, u in rows]
+
+
+@app.post("/admin/notifications/bulk-reminders")
+async def send_bulk_emi_reminders(
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Send bulk EMI reminder notifications to all users with upcoming payments.
+    """
+    # This would normally query for users with EMI due in next 3 days
+    # For now, return a placeholder response
+    return {
+        "message": "Bulk reminders feature placeholder",
+        "notifications_sent": 0
+    }
+
+
+# =====================================================
+# CUSTOMER NOTIFICATION ENDPOINTS
+# =====================================================
+
+@app.get("/notifications/me")
+async def get_my_notifications(
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all notifications for the current customer.
+    """
+    query = (
+        select(models.Notification)
+        .where(models.Notification.user_id == user.id)
+        .order_by(models.Notification.sent_at.desc())
+        .limit(50)
+    )
+    result = await db.execute(query)
+    notifications = result.scalars().all()
+    
+    return [{
+        "id": str(n.id),
+        "type": n.type,
+        "trigger": n.trigger,
+        "message": n.message,
+        "status": n.status,
+        "sent_at": n.sent_at.isoformat() if n.sent_at else None
+    } for n in notifications]
+
+
+# =====================================================
+# REPAYMENT ENDPOINTS
+# =====================================================
+
+@app.post("/repayments")
+async def make_emi_payment(
+    application_id: str,
+    emi_number: int,
+    amount: float,
+    payment_method: str = "UPI",  # UPI, NEFT, CARD, CASH
+    payment_reference: Optional[str] = None,
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Customer makes an EMI payment for their loan.
+    """
+    # Validate application belongs to user
+    app_query = select(models.LoanApplication).where(
+        models.LoanApplication.id == application_id,
+        models.LoanApplication.user_id == user.id
+    )
+    result = await db.execute(app_query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found or does not belong to you"
+        )
+    
+    # Check if loan is disbursed
+    pred_query = select(models.LoanPrediction).where(models.LoanPrediction.application_id == application_id)
+    result = await db.execute(pred_query)
+    prediction = result.scalars().first()
+    
+    if not prediction or prediction.decision != "DISBURSED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Loan must be disbursed before making repayments"
+        )
+    
+    # Check if this EMI already paid
+    existing_query = select(models.Repayment).where(
+        models.Repayment.application_id == application_id,
+        models.Repayment.emi_number == emi_number,
+        models.Repayment.payment_status == "PAID"
+    )
+    result = await db.execute(existing_query)
+    existing = result.scalars().first()
+    
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"EMI #{emi_number} has already been paid"
+        )
+    
+    # Create repayment record
+    repayment = models.Repayment(
+        application_id=application_id,
+        emi_number=emi_number,
+        emi_amount=prediction.emi if prediction else amount,
+        payment_amount=amount,
+        payment_status="PAID",
+        payment_date=datetime.now(timezone.utc),
+        payment_method=payment_method,
+        payment_reference=payment_reference or f"PAY{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        due_date=datetime.now(timezone.utc).date()  # For now, set to today
+    )
+    db.add(repayment)
+    await db.commit()
+    await db.refresh(repayment)
+    
+    return {
+        "message": f"EMI #{emi_number} payment successful",
+        "repayment_id": str(repayment.id),
+        "amount": amount,
+        "payment_reference": repayment.payment_reference
+    }
+
+
+@app.get("/admin/repayments")
+async def get_all_repayments(
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Admin view of all EMI repayments across all customers.
+    """
+    query = (
+        select(models.Repayment, models.LoanApplication, models.User)
+        .join(models.LoanApplication, models.Repayment.application_id == models.LoanApplication.id)
+        .join(models.User, models.LoanApplication.user_id == models.User.id)
+        .order_by(models.Repayment.payment_date.desc())
+        .limit(100)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(r.id),
+        "application_id": str(r.application_id),
+        "user_id": str(u.id),
+        "customer_name": f"{u.first_name} {u.last_name}",
+        "customer_id": u.customer_id,
+        "emi_number": r.emi_number,
+        "emi_amount": r.emi_amount,
+        "payment_amount": r.payment_amount,
+        "payment_status": r.payment_status,
+        "payment_method": r.payment_method,
+        "payment_reference": r.payment_reference,
+        "payment_date": r.payment_date.isoformat() if r.payment_date else None,
+        "due_date": r.due_date.isoformat() if r.due_date else None
+    } for r, app, u in rows]
+
+
 @app.get("/user/me")
 async def read_users_me(current_user: Optional[models.User] = Depends(auth.get_optional_user)):
     """Get current user profile - returns null if not logged in"""

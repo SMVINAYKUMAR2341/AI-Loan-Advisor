@@ -548,6 +548,35 @@ export default function Dashboard() {
     const [adminBanks, setAdminBanks] = useState<AdminBank[]>([]);
     const [loadingAdminBanks, setLoadingAdminBanks] = useState(false);
 
+    // NOTIFICATIONS STATE
+    interface NotificationItem {
+        id: string;
+        type: string;
+        trigger: string;
+        message: string;
+        status: string;
+        sent_at: string;
+    }
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [notificationsLoading, setNotificationsLoading] = useState(false);
+
+    const fetchNotifications = async () => {
+        setNotificationsLoading(true);
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/notifications/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setNotifications(data);
+            }
+        } catch (error) {
+            console.error("Fetch notifications error:", error);
+        } finally {
+            setNotificationsLoading(false);
+        }
+    };
 
     const fetchActivityData = async (category: string) => {
         setActivityLoading(true);
@@ -1049,6 +1078,28 @@ export default function Dashboard() {
                                         {alert.action}
                                     </button>
                                 )}
+                            </div>
+                        ))}
+                        {/* Real Notifications from Admin */}
+                        {notifications.slice(0, 3).map((notif) => (
+                            <div
+                                key={notif.id}
+                                className={`p-4 rounded-xl border flex items-center justify-between ${notif.trigger.includes('overdue') ? 'bg-red-500/10 border-red-500/30' :
+                                        notif.trigger.includes('due') ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                            notif.trigger.includes('disburs') ? 'bg-green-500/10 border-green-500/30' :
+                                                'bg-blue-500/10 border-blue-500/30'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    {notif.trigger.includes('overdue') && <AlertCircle className="w-5 h-5 text-red-400" />}
+                                    {notif.trigger.includes('due') && !notif.trigger.includes('overdue') && <Clock className="w-5 h-5 text-yellow-400" />}
+                                    {notif.trigger.includes('disburs') && <CheckCircle className="w-5 h-5 text-green-400" />}
+                                    {!notif.trigger.includes('due') && !notif.trigger.includes('disburs') && <Bell className="w-5 h-5 text-blue-400" />}
+                                    <div>
+                                        <span className="text-white text-sm">{notif.message}</span>
+                                        <p className="text-xs text-gray-500">{new Date(notif.sent_at).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
