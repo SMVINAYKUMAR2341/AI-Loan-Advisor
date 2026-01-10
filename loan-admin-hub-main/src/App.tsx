@@ -13,6 +13,7 @@ import Notifications from "./pages/Notifications";
 import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
 import AdminProfile from "./pages/AdminProfile";
+import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,7 +23,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Dashboard />} />
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/customers" element={<Customers />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<AdminProfile />} />
+          <Route path="/tickets" element={<Tickets />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

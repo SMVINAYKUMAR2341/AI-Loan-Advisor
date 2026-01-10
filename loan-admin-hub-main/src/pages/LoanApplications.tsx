@@ -286,7 +286,7 @@ export default function LoanApplications() {
 
         {/* Loan Details Dialog - Enhanced */}
         <Dialog open={!!selectedLoan} onOpenChange={() => setSelectedLoan(null)}>
-          <DialogContent className="max-w-2xl bg-gray-900 border-gray-700">
+          <DialogContent className="max-w-2xl bg-gray-900 border-gray-700 max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2">
                 <FileText className="h-5 w-5 text-teal-400" />
@@ -373,7 +373,7 @@ export default function LoanApplications() {
                 {/* Download Agreement/Report */}
                 <Button
                   variant="outline"
-                  className="w-full border-gray-700 text-white hover:bg-gray-800"
+                  className="w-full border-gray-700 text-white bg-gray-800 hover:bg-gray-700"
                   onClick={() => handleDownloadReport(selectedLoan.id, selectedLoan.tracking_id)}
                 >
                   <Download className="h-4 w-4 mr-2" />
@@ -383,7 +383,7 @@ export default function LoanApplications() {
                 {/* View Agreement Details */}
                 <Button
                   variant="outline"
-                  className="w-full border-gray-700 text-white hover:bg-gray-800"
+                  className="w-full border-gray-700 text-white bg-gray-800 hover:bg-gray-700"
                   onClick={() => handleViewAgreement(selectedLoan.id)}
                   disabled={loadingAgreement}
                 >

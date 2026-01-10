@@ -231,3 +231,78 @@ async def get_optional_user(
     except HTTPException:
         return None
 
+
+# =============================================================================
+# ADMIN AUTHENTICATION (Separate from customers)
+# =============================================================================
+
+async def get_current_admin(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    FastAPI dependency to get the current authenticated ADMIN user.
+    Checks the admin_users table (separate from customers).
+    
+    Raises:
+        HTTPException 401 if token is invalid or admin not found
+    """
+    import models
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate admin credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    # Verify token
+    payload = verify_token(token)
+    if payload is None:
+        raise credentials_exception
+    
+    # Check if this is an admin token
+    user_type = payload.get("user_type", "customer")
+    user_id: str = payload.get("user_id") or payload.get("admin_id")
+    
+    if user_id is None:
+        raise credentials_exception
+    
+    try:
+        from uuid import UUID as PyUUID
+        uuid_obj = PyUUID(user_id)
+        
+        # First try admin_users table
+        if user_type == "admin":
+            query = select(models.AdminUser).where(models.AdminUser.id == uuid_obj)
+            result = await db.execute(query)
+            admin = result.scalars().first()
+            
+            if admin and admin.is_active:
+                return admin
+        
+        # Fallback: Check users table with bank_officer role (backwards compatibility)
+        query = select(models.User).where(
+            models.User.id == uuid_obj,
+            models.User.role == "bank_officer"
+        )
+        result = await db.execute(query)
+        user = result.scalars().first()
+        
+        if user and user.is_active:
+            return user
+        
+        raise credentials_exception
+        
+    except ValueError:
+        raise credentials_exception
+
+
+def require_admin():
+    """
+    Dependency to require admin authentication from admin_users table.
+    """
+    async def admin_checker(admin = Depends(get_current_admin)):
+        return admin
+    return admin_checker
+
+

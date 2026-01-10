@@ -1,8 +1,8 @@
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3,
   TrendingUp,
@@ -10,7 +10,10 @@ import {
   IndianRupee,
   FileText,
   PieChart as PieChartIcon,
-  AlertTriangle
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar
 } from 'lucide-react';
 import {
   dashboardStats,
@@ -62,6 +65,28 @@ const revenueData = [
 
 export default function Reports() {
   const { toast } = useToast();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const res = await adminApi.getReportsData();
+      setData(res);
+    } catch (error) {
+      console.error("Failed to fetch reports:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load report data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExport = (reportType: string) => {
     toast({
@@ -69,6 +94,18 @@ export default function Reports() {
       description: `Generating ${reportType} report as PDF...`,
     });
   };
+
+  if (loading || !data) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-screen">
+          <p className="text-white">Loading reports...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const { stats, monthlyTrends, statusDistribution } = data;
 
   return (
     <AdminLayout>
@@ -99,7 +136,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-400">Total Applications</p>
-                  <p className="text-2xl font-bold text-white">{dashboardStats.totalLoans}</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalLoans}</p>
                 </div>
                 <FileText className="h-8 w-8 text-teal-400/30" />
               </div>
@@ -110,7 +147,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-400">Approval Rate</p>
-                  <p className="text-2xl font-bold text-green-400">{dashboardStats.approvalRate}%</p>
+                  <p className="text-2xl font-bold text-green-400">{stats.approvalRate}%</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-400/30" />
               </div>
@@ -121,7 +158,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-400">Total Disbursed</p>
-                  <p className="text-2xl font-bold text-blue-400">{formatCurrency(dashboardStats.totalDisbursed)}</p>
+                  <p className="text-2xl font-bold text-blue-400">{formatCurrency(stats.totalDisbursed)}</p>
                 </div>
                 <IndianRupee className="h-8 w-8 text-blue-400/30" />
               </div>
@@ -131,8 +168,8 @@ export default function Reports() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">EMI Collection Rate</p>
-                  <p className="text-2xl font-bold text-cyan-400">100%</p>
+                  <p className="text-sm text-gray-400">Active Customers</p>
+                  <p className="text-2xl font-bold text-cyan-400">{stats.activeUsers}</p>
                 </div>
                 <BarChart3 className="h-8 w-8 text-cyan-400/30" />
               </div>
@@ -144,8 +181,6 @@ export default function Reports() {
           <TabsList className="bg-gray-800/50 border border-gray-700/50">
             <TabsTrigger value="loans" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Loan Performance</TabsTrigger>
             <TabsTrigger value="emi" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">EMI Analytics</TabsTrigger>
-            <TabsTrigger value="revenue" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Revenue</TabsTrigger>
-            <TabsTrigger value="risk" className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400">Risk Analysis</TabsTrigger>
           </TabsList>
 
           <TabsContent value="loans" className="space-y-6">
@@ -159,16 +194,13 @@ export default function Reports() {
                     </div>
                     Loan Status Distribution
                   </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => handleExport('Loan Status')} className="text-gray-400 hover:text-white">
-                    <Download className="h-4 w-4" />
-                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={loanStatusDistribution.filter(d => d.value > 0)}
+                          data={statusDistribution}
                           cx="50%"
                           cy="50%"
                           innerRadius={70}
@@ -177,7 +209,7 @@ export default function Reports() {
                           dataKey="value"
                           label={({ name, value }) => `${name}: ${value}`}
                         >
-                          {loanStatusDistribution.map((entry, index) => (
+                          {statusDistribution.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
@@ -198,9 +230,6 @@ export default function Reports() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg">Application Trends</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => handleExport('Application Trends')}>
-                    <Download className="h-4 w-4" />
-                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
@@ -229,6 +258,7 @@ export default function Reports() {
                           fillOpacity={1}
                           fill="url(#colorApps)"
                           strokeWidth={2}
+                          name="Applications"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -237,7 +267,6 @@ export default function Reports() {
               </Card>
             </div>
 
-            {/* Disbursement Trend */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Applications vs Disbursements</CardTitle>
@@ -279,23 +308,9 @@ export default function Reports() {
           <TabsContent value="emi" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">EMI Collection Overview</CardTitle>
+                <CardTitle className="text-lg">EMI Collection Trend</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="p-4 rounded-lg bg-success/10 text-center">
-                    <p className="text-3xl font-bold text-success">{emiSchedules.filter(e => e.status === 'paid').length}</p>
-                    <p className="text-sm text-muted-foreground">Paid EMIs</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-warning/10 text-center">
-                    <p className="text-3xl font-bold text-warning">{emiSchedules.filter(e => e.status === 'upcoming').length}</p>
-                    <p className="text-sm text-muted-foreground">Upcoming</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-destructive/10 text-center">
-                    <p className="text-3xl font-bold text-destructive">{emiSchedules.filter(e => e.status === 'overdue').length}</p>
-                    <p className="text-sm text-muted-foreground">Overdue</p>
-                  </div>
-                </div>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={monthlyTrends}>
@@ -323,133 +338,6 @@ export default function Reports() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="revenue" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Revenue Dashboard</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="p-6 rounded-lg bg-primary/10 border border-primary/20">
-                    <p className="text-sm text-muted-foreground">Total Disbursed</p>
-                    <p className="text-3xl font-bold text-primary">{formatCurrency(2150000)}</p>
-                  </div>
-                  <div className="p-6 rounded-lg bg-success/10 border border-success/20">
-                    <p className="text-sm text-muted-foreground">Total EMI Collected</p>
-                    <p className="text-3xl font-bold text-success">{formatCurrency(235608)}</p>
-                  </div>
-                </div>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }}
-                        formatter={(value: number) => formatCurrency(value)}
-                      />
-                      <Legend />
-                      <Bar
-                        dataKey="disbursed"
-                        fill="hsl(var(--chart-1))"
-                        radius={[4, 4, 0, 0]}
-                        name="Disbursed"
-                      />
-                      <Bar
-                        dataKey="collected"
-                        fill="hsl(var(--chart-2))"
-                        radius={[4, 4, 0, 0]}
-                        name="EMI Collected"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="risk" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Credit Score Distribution */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <PieChartIcon className="h-5 w-5 text-primary" />
-                    Credit Score Distribution
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={creditScoreDistribution} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
-                        <YAxis dataKey="range" type="category" stroke="hsl(var(--muted-foreground))" width={80} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }}
-                        />
-                        <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                          {creditScoreDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Risk Indicators */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-warning" />
-                    Risk Indicators
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <p className="font-medium">Default Rate</p>
-                      <p className="text-sm text-muted-foreground">Current month</p>
-                    </div>
-                    <Badge className="status-approved text-lg px-4 py-2">0%</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <p className="font-medium">Average Credit Score</p>
-                      <p className="text-sm text-muted-foreground">All customers</p>
-                    </div>
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-lg px-4 py-2">750</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <p className="font-medium">High Risk Applications</p>
-                      <p className="text-sm text-muted-foreground">Credit score &lt; 650</p>
-                    </div>
-                    <Badge className="status-approved text-lg px-4 py-2">0</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <p className="font-medium">Overdue Amount</p>
-                      <p className="text-sm text-muted-foreground">Total pending</p>
-                    </div>
-                    <Badge className="status-approved text-lg px-4 py-2">₹0</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>

@@ -10,6 +10,7 @@ import {
   LogOut,
   Building2,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -37,6 +38,7 @@ const menuItems = [
   { title: 'Notifications', url: '/notifications', icon: Bell, description: 'Alerts & messages' },
   { title: 'Customers', url: '/customers', icon: Users, description: 'Customer database' },
   { title: 'Reports', url: '/reports', icon: BarChart3, description: 'Analytics & insights' },
+  { title: 'Support Tickets', url: '/tickets', icon: MessageSquare, description: 'Customer support' },
 ];
 
 interface AppSidebarProps {
@@ -87,13 +89,13 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
                         to={item.url}
                         end={item.url === '/'}
                         className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${active
-                            ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
-                            : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent'
+                          ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                          : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent'
                           }`}
                       >
                         <div className={`p-2 rounded-lg transition-colors ${active
-                            ? 'bg-teal-500/20'
-                            : 'bg-gray-800/50 group-hover:bg-teal-500/10'
+                          ? 'bg-teal-500/20'
+                          : 'bg-gray-800/50 group-hover:bg-teal-500/10'
                           }`}>
                           <item.icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-teal-400' : 'text-gray-500 group-hover:text-teal-400'
                             }`} />

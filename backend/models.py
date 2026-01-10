@@ -644,3 +644,46 @@ class Notification(Base):
     # Timestamps
     sent_at = Column(DateTime(timezone=True), server_default=func.now())
     delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class SupportTicket(Base):
+    """
+    Customer Support Ticket - For tracking customer issues.
+    """
+    __tablename__ = "support_tickets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    ticket_id = Column(String(20), unique=True, index=True, nullable=False) # e.g. TKT-123456
+    subject = Column(String(200), nullable=False)
+    category = Column(String(50), nullable=False) # Technical, Billing, Loan, General
+    priority = Column(String(20), default="Medium") # Low, Medium, High
+    status = Column(String(20), default="OPEN", index=True) # OPEN, IN_PROGRESS, RESOLVED, CLOSED
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="tickets")
+    messages = relationship("TicketMessage", back_populates="ticket", cascade="all, delete-orphan")
+
+
+class TicketMessage(Base):
+    """
+    Message in a support ticket thread.
+    Can be from Customer or Admin.
+    """
+    __tablename__ = "ticket_messages"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    ticket_id = Column(UUID(as_uuid=True), ForeignKey("support_tickets.id"), nullable=False, index=True)
+    
+    sender_id = Column(UUID(as_uuid=True), nullable=False) # ID of User or AdminUser
+    sender_type = Column(String(20), nullable=False) # 'CUSTOMER' or 'ADMIN'
+    message = Column(Text, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    ticket = relationship("SupportTicket", back_populates="messages")

@@ -175,11 +175,23 @@ export default function Notifications() {
     setIsSending(false);
   };
 
-  const handleBulkReminder = () => {
-    toast({
-      title: 'Feature Coming Soon',
-      description: 'Bulk reminder functionality will be available in a future update.',
-    });
+  const handleBulkReminder = async () => {
+    setIsSending(true);
+    try {
+      const res = await adminApi.sendBulkReminders();
+      toast({
+        title: 'Bulk Reminders Sent',
+        description: `Successfully processed ${res.count} reminders.`,
+      });
+      await fetchData();
+    } catch (error) {
+      toast({
+        title: 'Failed to Send',
+        description: 'Could not trigger bulk reminders.',
+        variant: 'destructive',
+      });
+    }
+    setIsSending(false);
   };
 
   return (

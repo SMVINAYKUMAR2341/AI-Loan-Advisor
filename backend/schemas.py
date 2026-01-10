@@ -62,6 +62,15 @@ class UserLogin(BaseModel):
     pin: Optional[str] = None
 
 
+class AdminLogin(BaseModel):
+    """Admin login credentials - Uses separate admin_users table"""
+    admin_id: str
+    email: str
+    password: str
+    pin: str
+
+
+
 class PasswordChange(BaseModel):
     """Request to change password"""
     current_password: str
@@ -550,4 +559,49 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     timestamp: datetime
+
+
+# =============================================================================
+# TICKET SYSTEM SCHEMAS
+# =============================================================================
+
+class TicketMessageCreate(BaseModel):
+    message: str
+
+class TicketMessageResponse(BaseModel):
+    id: UUID
+    ticket_id: UUID
+    sender_id: UUID
+    sender_type: str
+    message: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class TicketCreate(BaseModel):
+    """Customer creating a ticket"""
+    subject: str
+    category: str
+    priority: str = "Medium"
+    initial_message: str
+
+class TicketStatusUpdate(BaseModel):
+    """Admin updating status"""
+    status: str 
+
+class TicketResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    ticket_id: str
+    subject: str
+    category: str
+    priority: str
+    status: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    messages: List[TicketMessageResponse] = []
+    
+    class Config:
+        from_attributes = True
 

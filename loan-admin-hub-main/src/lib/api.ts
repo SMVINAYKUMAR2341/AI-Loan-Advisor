@@ -1,7 +1,7 @@
 // API Configuration for Bank Admin Hub
 // Connects to the same backend as customer frontend
 
-export const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://localhost:8002';
 
 // Helper to get auth token (admin must be logged in)
 export const getAuthHeaders = () => {
@@ -51,6 +51,21 @@ export async function downloadFile(endpoint: string, filename: string) {
 
 // Admin API endpoints
 export const adminApi = {
+    // Auth
+    // Auth
+    login: (credentials: { email: string; password: string; pin: string; admin_id: string }) =>
+        fetch(`${API_BASE_URL}/admin/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(credentials)
+        }).then(async res => {
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Login failed' }));
+                throw new Error(err.detail || 'Login failed');
+            }
+            return res.json();
+        }),
+
     // Dashboard
     getStats: () => apiFetch<{
         total_loans: number;
@@ -154,5 +169,69 @@ export const adminApi = {
             `/admin/profile?${new URLSearchParams(data as Record<string, string>).toString()}`,
             { method: 'PUT' }
         ),
-};
 
+    // Support Tickets
+    getTickets: (status?: string) => {
+        const query = status && status !== 'ALL' ? `?status=${status}` : '';
+        return apiFetch<any[]>(`/admin/tickets${query}`);
+    },
+
+    getTicketDetails: (id: string) =>
+        apiFetch<{
+            id: string;
+            ticket_id: string;
+            subject: string;
+            category: string;
+            priority: string;
+            status: string;
+            created_at: string;
+            user_id: string;
+            messages: Array<{
+                id: string;
+                sender_type: string;
+                message: string;
+                created_at: string;
+            }>;
+            user?: {
+                first_name: string;
+                last_name: string;
+                email: string;
+            };
+        }>(`/admin/tickets/${id}`),
+
+    replyTicket: (ticketId: string, message: string) =>
+        fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+            },
+            body: JSON.stringify({ message })
+        }).then(res => res.json()),
+
+    updateTicketStatus: (ticketId: string, status: string) =>
+        fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+            },
+            body: JSON.stringify({ status })
+        }).then(res => res.json()),
+
+    sendBulkReminders: () =>
+        fetch(`${API_BASE_URL}/admin/notifications/bulk-reminders`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+            }
+        }).then(res => res.json()),
+
+    getReportsData: () =>
+        fetch(`${API_BASE_URL}/admin/reports/stats`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+            }
+        }).then(res => res.json()),
+};
