@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from sqlalchemy import or_
 from sqlalchemy.sql import func  # Import func for SQLAlchemy aggregate functions
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from uuid import UUID
@@ -3411,8 +3411,15 @@ async def get_loan_agreement(
         tenure_months = application.loan_duration or (application.features_json or {}).get("loan_duration", 60)
         
         # Calculate EMI: P * r * (1+r)^n / ((1+r)^n - 1)
-        monthly_rate = interest_rate / 12 / 100
-        emi = loan_amount * monthly_rate * ((1 + monthly_rate) ** tenure_months) / (((1 + monthly_rate) ** tenure_months) - 1)
+        monthly_rate = (interest_rate or 12.0) / 12 / 100
+        
+        # Guard against zero tenure or interest
+        if tenure_months > 0 and monthly_rate > 0:
+            pow_factor = (1 + monthly_rate) ** tenure_months
+            emi = (loan_amount * monthly_rate * pow_factor) / (pow_factor - 1)
+        else:
+            emi = loan_amount / (tenure_months if tenure_months > 0 else 1)
+            
         processing_fee = loan_amount * 0.02  # 2% processing fee
         total_payable = emi * tenure_months
         
@@ -3474,6 +3481,84 @@ understood, and agree to all terms and conditions.
         }
     }
 
+# =============================================================================
+# ADMIN BANK DETAILS ENDPOINTS
+# =============================================================================
+
+@app.get("/admin/bank-details", response_model=List[schemas.AdminBankDetailsResponse])
+async def get_admin_bank_details(
+    db: AsyncSession = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Get all admin bank details. Available to all authenticated users (for payments).
+    """
+    query = select(models.AdminBankDetails).where(models.AdminBankDetails.is_active == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+@app.post("/admin/bank-details", response_model=schemas.AdminBankDetailsResponse)
+async def create_admin_bank_details(
+    bank_data: schemas.AdminBankDetailsCreate,
+    db: AsyncSession = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Create new admin bank details. Admin only.
+    """
+    if current_user.role != "admin" and current_user.role != "bank_officer":
+        raise HTTPException(status_code=403, detail="Only admins can manage bank details")
+        
+    new_bank = models.AdminBankDetails(**bank_data.model_dump())
+    db.add(new_bank)
+    
+    await log_audit(
+        db, current_user.id,
+        models.AuditAction.ADMIN_BANK_ADDED,
+        entity_type="admin_bank",
+        description=f"Added admin bank: {bank_data.bank_name}",
+        extra_data={"bank_name": bank_data.bank_name}
+    )
+    
+    await db.commit()
+    await db.refresh(new_bank)
+    return new_bank
+
+@app.patch("/admin/bank-details/{bank_id}", response_model=schemas.AdminBankDetailsResponse)
+async def update_admin_bank_details(
+    bank_id: str,
+    bank_data: schemas.AdminBankDetailsCreate,
+    db: AsyncSession = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Update admin bank details. Admin only.
+    """
+    if current_user.role != "admin" and current_user.role != "bank_officer":
+        raise HTTPException(status_code=403, detail="Only admins can manage bank details")
+        
+    query = select(models.AdminBankDetails).where(models.AdminBankDetails.id == bank_id)
+    result = await db.execute(query)
+    bank = result.scalars().first()
+    
+    if not bank:
+        raise HTTPException(status_code=404, detail="Bank details not found")
+        
+    for field, value in bank_data.model_dump().items():
+        setattr(bank, field, value)
+        
+    await log_audit(
+        db, current_user.id,
+        models.AuditAction.ADMIN_BANK_UPDATED,
+        entity_type="admin_bank",
+        entity_id=bank.id,
+        description=f"Updated admin bank: {bank.bank_name}"
+    )
+    
+    await db.commit()
+    await db.refresh(bank)
+    return bank
+
 
 @app.post("/kyc/{application_id}/agreement/sign")
 async def sign_loan_agreement(
@@ -3515,7 +3600,7 @@ async def sign_loan_agreement(
     
     agreement.consent_given = True
     agreement.consent_checkbox_text = sign_data.consent_text_acknowledged
-    agreement.signed_at = datetime.utcnow()
+    agreement.signed_at = datetime.now(timezone.utc)
     agreement.ip_address_hash = ip_hash
     agreement.user_agent = request.headers.get("User-Agent", "")
     agreement.status = "SIGNED"

@@ -19,7 +19,8 @@ import {
     Home, Wallet, FileText, TrendingUp, CreditCard, FolderOpen, Shield, History,
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
-    Activity, CheckSquare, Search, AlertTriangle, Download, Plus
+    Activity, CheckSquare, Search, AlertTriangle, Download, Plus,
+    ShieldCheck, Landmark
 } from "lucide-react";
 
 // Charts - Professional visualization
@@ -259,6 +260,15 @@ export default function Dashboard() {
         account_number_masked: string;
         ifsc_code: string;
         is_verified: boolean;
+    }
+
+    interface AdminBank {
+        id: string;
+        bank_name: string;
+        account_holder_name: string;
+        account_number: string;
+        ifsc_code: string;
+        branch_name?: string;
     }
 
     interface LoanAgreement {
@@ -534,6 +544,10 @@ export default function Dashboard() {
     const [showTicketModal, setShowTicketModal] = useState(false);
     const [ticketForm, setTicketForm] = useState({ subject: '', category: 'General', priority: 'Medium', message: '' });
 
+    // ADMIN BANK STATE
+    const [adminBanks, setAdminBanks] = useState<AdminBank[]>([]);
+    const [loadingAdminBanks, setLoadingAdminBanks] = useState(false);
+
 
     const fetchActivityData = async (category: string) => {
         setActivityLoading(true);
@@ -740,6 +754,24 @@ export default function Dashboard() {
         }
     };
 
+    const fetchAdminBanks = async () => {
+        setLoadingAdminBanks(true);
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/admin/bank-details`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setAdminBanks(data);
+            }
+        } catch (error) {
+            console.error("Fetch admin banks error:", error);
+        } finally {
+            setLoadingAdminBanks(false);
+        }
+    };
+
     const completeKyc = async (appId: string) => {
         setKycError('');
         try {
@@ -816,6 +848,11 @@ export default function Dashboard() {
 
     const handleSectionChange = (key: SectionKey) => {
         setActiveSection(key);
+        if (key === 'loans') {
+            fetchLoanApplications();
+            fetchDisbursements();
+            fetchAdminBanks();
+        }
         if (isMobile) setSidebarOpen(false);
     };
 
@@ -2583,300 +2620,178 @@ export default function Dashboard() {
                         )}
 
                         {agreement && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-
-                                {/* Borrower & Loan Snapshot Card */}
-                                <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border border-white/10 shadow-xl">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Borrower Details */}
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2 text-blue-400 font-bold text-sm tracking-wider uppercase mb-3">
-                                                <User className="w-4 h-4" />
-                                                Borrower Details
-                                            </div>
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                                    <span className="text-gray-400 text-sm">Full Name</span>
-                                                    <span className="text-white font-semibold">{accountData?.first_name || 'N/A'} {accountData?.last_name || ''}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                                    <span className="text-gray-400 text-sm">Registered Mobile</span>
-                                                    <span className="text-white font-semibold">****{accountData?.mobile_number?.slice(-4) || '****'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                                    <span className="text-gray-400 text-sm">PAN</span>
-                                                    <span className="text-white font-semibold">{accountData?.pan_number ? accountData.pan_number.substring(0, 4) + '****' + accountData.pan_number.slice(-1) : 'XXXX****X'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center py-2">
-                                                    <span className="text-gray-400 text-sm">Agreement Ref.</span>
-                                                    <span className="text-teal-400 font-mono text-sm">{applicationId?.substring(0, 8).toUpperCase()}-MLA</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Loan Overview */}
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2 text-teal-400 font-bold text-sm tracking-wider uppercase mb-3">
-                                                <Activity className="w-4 h-4" />
-                                                Key Facts Statement (KFS)
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="p-3 bg-white/5 rounded-xl">
-                                                    <p className="text-gray-400 text-xs mb-1">Loan Amount</p>
-                                                    <p className="text-white text-lg font-bold">₹{agreement.loan_amount?.toLocaleString()}</p>
-                                                </div>
-                                                <div className="p-3 bg-white/5 rounded-xl">
-                                                    <p className="text-gray-400 text-xs mb-1">Interest Rate (APR)</p>
-                                                    <p className="text-teal-400 text-lg font-bold">{agreement.interest_rate}% <span className="text-[10px] text-gray-500">Fixed</span></p>
-                                                </div>
-                                                <div className="p-3 bg-white/5 rounded-xl">
-                                                    <p className="text-gray-400 text-xs mb-1">Monthly EMI</p>
-                                                    <p className="text-white text-lg font-bold">₹{agreement.emi_amount?.toLocaleString()}</p>
-                                                </div>
-                                                <div className="p-3 bg-white/5 rounded-xl">
-                                                    <p className="text-gray-400 text-xs mb-1">Tenure</p>
-                                                    <p className="text-white text-lg font-bold">{agreement.tenure_months} Months</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5">
-                                                <div>
-                                                    <p className="text-gray-500 text-[10px] uppercase">Processing Fee</p>
-                                                    <p className="text-gray-300 text-sm font-semibold">₹{agreement.processing_fee?.toLocaleString()}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-gray-500 text-[10px] uppercase">Total Interest</p>
-                                                    <p className="text-gray-300 text-sm font-semibold">₹{(agreement.total_payable - agreement.loan_amount)?.toLocaleString()}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-gray-500 text-[10px] uppercase">Total Payable</p>
-                                                    <p className="text-amber-400 text-sm font-bold">₹{agreement.total_payable?.toLocaleString()}</p>
-                                                </div>
-                                            </div>
-                                        </div>
+                            <div className="space-y-8">
+                                {/* Professional Header */}
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-white/10 pb-6 gap-4">
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                                            <FileText className="w-8 h-8 text-teal-400" />
+                                            Certified Loan Agreement
+                                        </h3>
+                                        <p className="text-gray-400 text-sm mt-1">Agreement ID: <span className="text-teal-400 font-mono">{agreement.id.toUpperCase().slice(0, 8)}</span> | Version {agreement.agreement_version}</p>
+                                    </div>
+                                    <div className="flex items-center gap-3 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/20">
+                                        <ShieldCheck className="w-5 h-5 text-teal-400" />
+                                        <span className="text-teal-400 font-bold text-sm tracking-widest uppercase">VERIFIED SECURE</span>
                                     </div>
                                 </div>
 
-                                {/* Agreement Sections - Clean Document Style */}
-                                <div className="space-y-6">
-                                    {/* Section 1: Interest & Charges */}
-                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
-                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-                                            <span className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400 text-sm font-bold">1</span>
-                                            Interest & Charges
-                                        </h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Loan Type</p>
-                                                <p className="text-white font-medium">Fixed Rate</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Interest Rate (APR)</p>
-                                                <p className="text-purple-400 font-bold text-lg">{agreement.interest_rate}%</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Processing Fee</p>
-                                                <p className="text-white font-medium">₹{agreement.processing_fee?.toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Penal Interest</p>
-                                                <p className="text-white font-medium">2% p.m.</p>
-                                            </div>
-                                        </div>
+                                {/* The "Document" paper */}
+                                <div className="bg-white rounded-xl overflow-hidden shadow-2xl relative">
+                                    {/* Watermark */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] rotate-[-45deg]">
+                                        <p className="text-black text-9xl font-black">{agreement.status}</p>
                                     </div>
 
-                                    {/* Section 2: Repayment Schedule */}
-                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
-                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-                                            <span className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 text-sm font-bold">2</span>
-                                            Repayment Schedule
-                                        </h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Monthly EMI</p>
-                                                <p className="text-blue-400 font-bold text-lg">₹{agreement.emi_amount?.toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Tenure</p>
-                                                <p className="text-white font-medium">{agreement.tenure_months} months</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">EMI Date</p>
-                                                <p className="text-white font-medium">5th of month</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Grace Period</p>
-                                                <p className="text-green-400 font-medium">5 days</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section 3: Your Rights */}
-                                    <div className="bg-gradient-to-r from-emerald-900/30 to-teal-900/20 rounded-xl p-6 border border-emerald-500/30">
-                                        <h4 className="text-emerald-400 font-bold text-lg mb-4 flex items-center gap-2">
-                                            <span className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400 text-sm font-bold">3</span>
-                                            Your Rights as Borrower
-                                            <span className="px-2 py-0.5 bg-emerald-500/20 rounded text-[10px] text-emerald-400 font-bold">PROTECTED</span>
-                                        </h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-gray-300 text-sm">Prepay after 6 EMIs with NIL penalty</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-gray-300 text-sm">Monthly statements provided</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-gray-300 text-sm">Grievance redressal available</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-gray-300 text-sm">No unilateral term changes</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-gray-300 text-sm">Fair collection (8 AM - 7 PM only)</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-gray-300 text-sm">30-day notice for any changes</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section 4: Data & Privacy */}
-                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
-                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-                                            <span className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-400 text-sm font-bold">4</span>
-                                            Data & Privacy
-                                        </h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Data Collected</p>
-                                                <p className="text-gray-300">KYC, bank details, employment, credit bureau</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Sharing</p>
-                                                <p className="text-gray-300">CIBIL, Experian, RBI (as required by law)</p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                                            <p className="text-emerald-400 text-sm flex items-center gap-2">
-                                                <Shield className="w-4 h-4" />
-                                                Your data will never be sold or used for unsolicited marketing
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Section 5: Recovery Terms */}
-                                    <div className="bg-gray-800/40 rounded-xl p-6 border border-white/10">
-                                        <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-                                            <span className="w-8 h-8 bg-rose-500/20 rounded-lg flex items-center justify-center text-rose-400 text-sm font-bold">5</span>
-                                            Recovery & Default Terms
-                                        </h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Recovery Hours</p>
-                                                <p className="text-gray-300">8 AM - 7 PM</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">First Contact</p>
-                                                <p className="text-gray-300">SMS/Email reminder</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Dispute Window</p>
-                                                <p className="text-gray-300">30 days</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-xs mb-1">Practices</p>
-                                                <p className="text-emerald-400">RBI Compliant</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Full Legal Text Scroll */}
-                                <div className="p-4 bg-black/40 rounded-xl border border-white/10 max-h-32 overflow-y-auto custom-scrollbar">
-                                    <p className="text-gray-500 text-[10px] mb-2 font-bold uppercase tracking-widest">Full Legal Text</p>
-                                    <pre className="text-gray-400 text-xs whitespace-pre-wrap font-sans leading-relaxed">
-                                        {agreement.agreement_text}
-                                    </pre>
-                                </div>
-
-                                {/* Consent & Acknowledgement - Critical UX Zone */}
-                                <div className="bg-gradient-to-r from-teal-500/10 to-blue-500/10 p-6 rounded-2xl border border-teal-500/30">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-12 h-12 bg-teal-500 rounded-full flex items-center justify-center shadow-lg shadow-teal-500/20">
-                                            <User className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div>
-                                            <h5 className="text-white font-bold">Digital Signature & Consent</h5>
-                                            <p className="text-gray-400 text-xs uppercase tracking-tighter">Verified eSign as per IT Act, 2000</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        {/* Consent Checkbox */}
-                                        <label className="flex items-start gap-4 p-4 bg-gray-900/60 rounded-xl border border-white/10 cursor-pointer hover:border-teal-500/50 transition-colors">
-                                            <div className="relative flex items-center mt-1">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={agreementConsent}
-                                                    onChange={(e) => setAgreementConsent(e.target.checked)}
-                                                    className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-teal-500 focus:ring-teal-500"
-                                                />
-                                            </div>
+                                    <div className="p-8 md:p-12 text-gray-800 space-y-8 relative z-10">
+                                        <div className="flex justify-between items-start">
                                             <div className="space-y-1">
-                                                <p className="text-white text-sm font-medium">I confirm that I have read, understood, and agree to the loan terms</p>
-                                                <p className="text-gray-500 text-xs leading-tight">
-                                                    I acknowledge the loan amount, interest rate, EMI, charges, and repayment obligations. I consent to electronic execution of this agreement as per IT Act, 2000.
-                                                </p>
+                                                <h4 className="font-black text-3xl text-gray-900 tracking-tighter">LoanAdvisor</h4>
+                                                <p className="text-sm text-gray-500">Financial Services Pvt. Ltd.</p>
                                             </div>
-                                        </label>
-
-                                        {/* CTA Buttons */}
-                                        <div className="flex flex-col md:flex-row gap-4 pt-2">
-                                            <button
-                                                onClick={() => signAgreement(applicationId)}
-                                                disabled={!agreementConsent}
-                                                className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-40 disabled:grayscale rounded-xl text-white font-bold text-lg shadow-xl shadow-teal-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <CheckCircle className="w-5 h-5" />
-                                                Accept Agreement & Proceed
-                                            </button>
-                                            <button
-                                                className="px-6 py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
-                                                onClick={() => window.print()}
-                                            >
-                                                <Download className="w-4 h-4" />
-                                                Download Agreement (PDF)
-                                            </button>
+                                            <div className="text-right space-y-1">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Issue Date</p>
+                                                <p className="font-bold text-sm">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                                            </div>
                                         </div>
 
-                                        {/* Cancel/Exit Option */}
-                                        <div className="text-center pt-2">
-                                            <button
-                                                onClick={() => setKycStep(2)}
-                                                className="text-gray-500 hover:text-gray-300 text-sm underline underline-offset-4 transition-colors"
-                                            >
-                                                Cancel & Exit Without Penalty
-                                            </button>
-                                        </div>
-                                    </div>
+                                        <div className="h-px bg-gray-200" />
 
-                                    {/* Security Indicators */}
-                                    <div className="mt-4 flex items-center justify-center gap-6">
-                                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                                            <Shield className="w-3 h-3" /> Secure 256-bit SSL
+                                        {/* Summary Grid */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Principal Amount</p>
+                                                <p className="text-xl font-black text-gray-900">{formatCurrency(agreement.loan_amount)}</p>
+                                            </div>
+                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Interest Rate (p.a)</p>
+                                                <p className="text-xl font-black text-teal-600">{agreement.interest_rate}%</p>
+                                            </div>
+                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tenure</p>
+                                                <p className="text-xl font-black text-gray-900">{agreement.tenure_months} Months</p>
+                                            </div>
+                                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Monthly EMI</p>
+                                                <p className="text-xl font-black text-emerald-600">{formatCurrency(agreement.emi_amount)}</p>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                                            <Clock className="w-3 h-3" /> {new Date().toLocaleTimeString()} eSign Server
+
+                                        {/* Detailed Terms Table */}
+                                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold">
+                                                    <tr>
+                                                        <th className="px-6 py-3">Description</th>
+                                                        <th className="px-6 py-3">Details / Terms</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    <tr>
+                                                        <td className="px-6 py-4 font-bold text-gray-600">Processing Fee</td>
+                                                        <td className="px-6 py-4 text-gray-900">{formatCurrency(agreement.processing_fee)} (Deducted from disbursement)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="px-6 py-4 font-bold text-gray-600">Total Repayment</td>
+                                                        <td className="px-6 py-4 font-bold text-gray-900">{formatCurrency(agreement.total_payable)}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="px-6 py-4 font-bold text-gray-600">Late Payment Penalty</td>
+                                                        <td className="px-6 py-4 text-rose-600 font-medium">2% per month on overdue amount</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="px-6 py-4 font-bold text-gray-600">Prepayment Option</td>
+                                                        <td className="px-6 py-4 text-emerald-600 font-medium">Allowed after 6 EMIs with 0% penalty</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="px-6 py-4 font-bold text-gray-600">Governing Law</td>
+                                                        <td className="px-6 py-4 text-gray-900">Information Technology Act, 2000 (Digital Execution)</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Full Text Area */}
+                                        <div className="space-y-4">
+                                            <h5 className="font-bold text-gray-900 text-lg border-l-4 border-teal-500 pl-3">Standard Terms & Conditions</h5>
+                                            <div className="p-6 bg-gray-50 rounded-xl border border-gray-200 max-h-64 overflow-y-auto font-serif leading-relaxed text-gray-600 text-sm italic">
+                                                {agreement.agreement_text}
+                                            </div>
+                                        </div>
+
+                                        {/* Admin Bank Details (Where to pay) */}
+                                        {adminBanks.length > 0 && (
+                                            <div className="p-6 bg-emerald-50 rounded-xl border border-emerald-100 space-y-4">
+                                                <h5 className="font-bold text-emerald-900 flex items-center gap-2">
+                                                    <Landmark className="w-5 h-5" />
+                                                    Official Payment/Disbursement Accounts
+                                                </h5>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {adminBanks.map(bank => (
+                                                        <div key={bank.id} className="p-3 bg-white rounded-lg border border-emerald-200 shadow-sm text-xs">
+                                                            <p className="font-bold text-emerald-800 mb-1">{bank.bank_name}</p>
+                                                            <div className="grid grid-cols-2 gap-2 text-gray-600">
+                                                                <span>A/C: <span className="font-mono">{bank.account_number}</span></span>
+                                                                <span>IFSC: <span className="font-mono">{bank.ifsc_code}</span></span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-emerald-600 italic">* All loan disbursements and repayments are processed through these bank accounts only.</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-col md:flex-row justify-between items-end gap-8 pt-8 border-t border-gray-100">
+                                            <div className="max-w-xs space-y-4">
+                                                <label className="flex items-start gap-3 cursor-pointer group">
+                                                    <div className="relative flex items-center mt-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={agreementConsent}
+                                                            onChange={(e) => setAgreementConsent(e.target.checked)}
+                                                            className="w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                                                        />
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">
+                                                        I, as the borrower, hereby confirm that I have read, understood and agree to be bound by the terms and conditions set forth in this loan agreement.
+                                                    </p>
+                                                </label>
+
+                                                <div className="flex gap-4">
+                                                    <button
+                                                        onClick={() => signAgreement(applicationId)}
+                                                        disabled={!agreementConsent || agreement.signed_at !== null}
+                                                        className="flex-1 py-4 bg-gray-900 disabled:opacity-30 rounded-xl text-white font-black text-sm tracking-widest uppercase hover:bg-black transition-all shadow-xl shadow-gray-200"
+                                                    >
+                                                        {agreement.signed_at ? "SIGNED & SECURED" : "Sign Agreement"}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => window.print()}
+                                                        className="p-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+                                                    >
+                                                        <Download className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {agreement.signed_at ? (
+                                                <div className="relative">
+                                                    <div className="p-6 border-4 border-emerald-500 rounded-lg rotate-[-12deg] bg-white shadow-xl flex flex-col items-center justify-center">
+                                                        <CheckCircle className="w-12 h-12 text-emerald-500 mb-2" />
+                                                        <p className="font-black text-emerald-500 text-xl tracking-tighter">DIGITALLY SIGNED</p>
+                                                        <p className="text-[10px] text-gray-400 font-mono mt-1">{new Date(agreement.signed_at).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="w-48 h-24 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-gray-300 text-xs font-medium italic">
+                                                    Awaiting Digital Signature
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Footer – Regulatory Assurance */}
+                                {/* Regulatory Assurance Footer */}
                                 <div className="bg-gray-900/80 p-6 rounded-2xl border border-white/5 space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center md:text-left">
                                         <div>
@@ -2893,16 +2808,9 @@ export default function Dashboard() {
                                         </div>
                                         <div className="md:text-right">
                                             <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Agreement Info</p>
-                                            <p className="text-gray-400 text-xs">Version: v2.4 (RBI Compliant)</p>
-                                            <p className="text-gray-500 text-[10px]">Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                                            <p className="text-gray-400 text-xs">Version: v{agreement.agreement_version} (RBI Compliant)</p>
+                                            <p className="text-gray-500 text-[10px]">Generated: {new Date().toLocaleDateString()}</p>
                                         </div>
-                                    </div>
-                                    <div className="pt-4 border-t border-white/5">
-                                        <p className="text-gray-500 text-[10px] text-center leading-relaxed">
-                                            This loan is subject to terms and conditions. All disputes shall be subject to courts/tribunals having jurisdiction in Bangalore.
-                                            The lender is governed by RBI's Fair Practices Code and Digital Lending Guidelines (2022).
-                                            For complaints, contact RBI Ombudsman at rb.crpc@rbi.org.in
-                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -4148,14 +4056,14 @@ export default function Dashboard() {
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-teal-400 font-mono text-sm">{ticket.ticket_id}</span>
                                         <span className={`px-2 py-0.5 rounded text-xs ${ticket.status === 'OPEN' ? 'bg-green-500/20 text-green-400' :
-                                                ticket.status === 'RESOLVED' ? 'bg-blue-500/20 text-blue-400' :
-                                                    'bg-gray-500/20 text-gray-400'
+                                            ticket.status === 'RESOLVED' ? 'bg-blue-500/20 text-blue-400' :
+                                                'bg-gray-500/20 text-gray-400'
                                             }`}>
                                             {ticket.status}
                                         </span>
                                         <span className={`px-2 py-0.5 rounded text-xs ${ticket.priority === 'High' ? 'bg-red-500/20 text-red-400' :
-                                                ticket.priority === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    'bg-blue-500/20 text-blue-400'
+                                            ticket.priority === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                'bg-blue-500/20 text-blue-400'
                                             }`}>
                                             {ticket.priority}
                                         </span>
@@ -4259,6 +4167,37 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Contact Us Card */}
+            <div className="mt-8 p-6 bg-gradient-to-br from-teal-900/30 to-blue-900/30 rounded-2xl border border-teal-500/30">
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                    <HelpCircle className="w-5 h-5 text-teal-400" />
+                    Contact Us
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-4 bg-white/5 rounded-xl">
+                        <p className="text-gray-400 text-sm mb-1">Customer Care (Toll-Free)</p>
+                        <p className="text-white font-semibold text-lg">1800-XXX-XXXX</p>
+                        <p className="text-gray-500 text-xs mt-1">Mon-Sat: 9 AM - 6 PM</p>
+                    </div>
+                    <div className="p-4 bg-white/5 rounded-xl">
+                        <p className="text-gray-400 text-sm mb-1">Email Support</p>
+                        <p className="text-teal-400 font-medium">support@loanadvisor.com</p>
+                        <p className="text-gray-500 text-xs mt-1">Response within 24 hours</p>
+                    </div>
+                    <div className="p-4 bg-white/5 rounded-xl">
+                        <p className="text-gray-400 text-sm mb-1">Branch Locator</p>
+                        <button className="text-teal-400 font-medium hover:underline">Find Nearest Branch →</button>
+                        <p className="text-gray-500 text-xs mt-1">500+ branches across India</p>
+                    </div>
+                </div>
+                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <p className="text-yellow-400 text-sm flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        For loan disbursement queries, please have your Application ID ready.
+                    </p>
+                </div>
+            </div>
         </div>
     );
 

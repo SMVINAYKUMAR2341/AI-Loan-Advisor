@@ -641,3 +641,28 @@ class AdminDashboardStats(BaseModel):
     class Config:
         from_attributes = True
 
+# =============================================================================
+# ADMIN BANK DETAILS SCHEMAS
+# =============================================================================
+
+class AdminBankDetailsCreate(BaseModel):
+    bank_name: str
+    account_holder_name: str
+    account_number: str
+    ifsc_code: str
+    branch_name: Optional[str] = None
+    is_active: bool = True
+
+class AdminBankDetailsResponse(BaseModel):
+    id: UUID
+    bank_name: str
+    account_holder_name: str
+    account_number: str
+    ifsc_code: str
+    branch_name: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

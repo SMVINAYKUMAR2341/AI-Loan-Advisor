@@ -354,6 +354,23 @@ class LoanAgreement(Base):
     application = relationship("LoanApplication", backref="agreement")
     user = relationship("User")
 
+class AdminBankDetails(Base):
+    """
+    Bank details for the lending institution / admin.
+    Used for showing where customers should send payments or receiving disbursements from.
+    """
+    __tablename__ = "admin_bank_details"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    bank_name = Column(String(100), nullable=False)
+    account_holder_name = Column(String(100), nullable=False)
+    account_number = Column(String(50), nullable=False)
+    ifsc_code = Column(String(20), nullable=False)
+    branch_name = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 class KYCStatusTracking(Base):
     """
@@ -484,6 +501,7 @@ class EventCategory:
     KYC = "KYC"
     PAYMENT = "PAYMENT"
     PROFILE = "PROFILE"
+    ADMIN_BANK = "ADMIN_BANK"
 
 
 # =============================================================================
@@ -543,6 +561,13 @@ class AuditAction:
     CONSENT_REVOKED = "CONSENT_REVOKED"
     PREFERENCES_UPDATED = "PREFERENCES_UPDATED"
     
+    # =========================================================================
+    # ADMIN BANK EVENTS
+    # =========================================================================
+    ADMIN_BANK_ADDED = "ADMIN_BANK_ADDED"
+    ADMIN_BANK_UPDATED = "ADMIN_BANK_UPDATED"
+    ADMIN_BANK_DELETED = "ADMIN_BANK_DELETED"
+    
     # Category mapping
     @staticmethod
     def get_category(action: str) -> str:
@@ -573,6 +598,8 @@ class AuditAction:
             return EventCategory.KYC
         elif action in payment_actions:
             return EventCategory.PAYMENT
+        elif action.startswith("ADMIN_BANK"):
+            return EventCategory.ADMIN_BANK
         else:
             return EventCategory.PROFILE
     
