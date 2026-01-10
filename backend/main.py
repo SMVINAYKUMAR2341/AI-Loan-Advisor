@@ -3783,47 +3783,7 @@ async def get_shared_report(token: str, db: AsyncSession = Depends(database.get_
 # AI CHATBOT ENDPOINT
 # ============================================================================
 
-class ChatRequest(BaseModel):
-    message: str
-    conversation_history: Optional[List[Dict[str, str]]] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    timestamp: str
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat_with_ai(request: ChatRequest):
-    """
-    AI Credit Advisor Chatbot
-    Uses Phi-3 LoRA fine-tuned model for financial/loan queries (fallback to rule-based)
-    """
-    try:
-        # Try to import Phi-3 model, fallback to simple responses if not available
-        try:
-            import chatbot_model_phi3
-            response = chatbot_model_phi3.generate_response(
-                request.message,
-                request.conversation_history
-            )
-        except ImportError:
-            # If torch not installed, use fallback
-            import chatbot_model_phi3
-            response = chatbot_model_phi3.fallback_response(request.message)
-        
-        return ChatResponse(
-            response=response,
-            timestamp=datetime.now().isoformat()
-        )
-        
-    except Exception as e:
-        print(f"[Chatbot API Error]: {e}")
-        # Ultimate fallback response
-        import chatbot_model_phi3
-        fallback = chatbot_model_phi3.fallback_response(request.message)
-        return ChatResponse(
-            response=fallback,
-            timestamp=datetime.now().isoformat()
-        )
+# AI Chatbot endpoint moved further down to consolidate duplicates.
 
 
 # =====================================================
@@ -4008,8 +3968,13 @@ async def mock_health():
 # CHATBOT ENDPOINT
 # =====================================================
 
-@app.post("/chat", response_model=schemas.ChatResponse)
-async def chat_endpoint(request: schemas.ChatRequest):
+# Re-defining ChatRequest to match frontend field names
+class ChatRequest(BaseModel):
+    message: str
+    conversation_history: Optional[List[Dict[str, Any]]] = None
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
     """
     Chat with the AI Credit Advisor.
     Uses cloud-based LLM via chatbot_model.py
@@ -4020,11 +3985,12 @@ async def chat_endpoint(request: schemas.ChatRequest):
         
         # Format history for the model
         history_dicts = []
-        for msg in request.history:
-            history_dicts.append({
-                "role": msg.role,
-                "content": msg.content
-            })
+        if request.conversation_history:
+            for msg in request.conversation_history:
+                history_dicts.append({
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", "")
+                })
             
         # Generate response
         response_text = chatbot_model.generate_response(
@@ -4032,18 +3998,24 @@ async def chat_endpoint(request: schemas.ChatRequest):
             conversation_history=history_dicts
         )
         
-        return schemas.ChatResponse(
-            response=response_text,
-            timestamp=datetime.now()
-        )
+        return {
+            "response": response_text,
+            "timestamp": datetime.now().isoformat()
+        }
         
     except Exception as e:
         print(f"Chat Error: {str(e)}")
-        # Return fallback response on error
-        return schemas.ChatResponse(
-            response="I'm having trouble connecting to the AI service right now. Please try again later.",
-            timestamp=datetime.now()
-        )
+        # Import here just in case chatbot_model import failed
+        try:
+            import chatbot_model
+            fallback = chatbot_model.fallback_response(request.message)
+        except:
+            fallback = "I'm having trouble connecting to the AI service right now. Please try again later."
+            
+        return {
+            "response": fallback,
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 # =====================================================

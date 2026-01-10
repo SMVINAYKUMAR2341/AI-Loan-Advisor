@@ -90,4 +90,4 @@ def generate_response(user_message: str, conversation_history: Optional[List[Dic
 
 def fallback_response(query: str) -> str:
     """Fallback responses when API fails"""
-    return "I am currently disconnected from the AI service. Please check your internet connection or try again later. You can also use the 'Apply for Loan' section for a detailed eligibility check."
+    return "⚠️ Internal Server Error: Unable to connect to AI service. The OpenRouter API may be down or the API key is missing/invalid. Please try again later or contact support."
