@@ -19,7 +19,7 @@ import {
     Home, Wallet, FileText, TrendingUp, CreditCard, FolderOpen, Shield, History,
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
-    Activity, CheckSquare, Search, AlertTriangle, Download
+    Activity, CheckSquare, Search, AlertTriangle, Download, Plus
 } from "lucide-react";
 
 // Charts - Professional visualization
@@ -504,10 +504,36 @@ export default function Dashboard() {
         last_activity?: string;
     }
 
+    // SUPPORT TICKET INTERFACES
+    interface TicketMessage {
+        id: string;
+        sender_type: string;
+        message: string;
+        created_at: string;
+    }
+
+    interface Ticket {
+        id: string;
+        ticket_id: string;
+        subject: string;
+        category: string;
+        priority: string;
+        status: string;
+        created_at: string;
+        messages?: TicketMessage[];
+    }
+
     const [activityTab, setActivityTab] = useState<"all" | "security" | "loans" | "kyc" | "payments" | "profile" | "sessions">("all");
     const [activityData, setActivityData] = useState<ActivityData>({ events: [], total_events: 0 });
     const [activityLoading, setActivityLoading] = useState(false);
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+
+    // SUPPORT TICKET STATE
+    const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [ticketsLoading, setTicketsLoading] = useState(false);
+    const [showTicketModal, setShowTicketModal] = useState(false);
+    const [ticketForm, setTicketForm] = useState({ subject: '', category: 'General', priority: 'Medium', message: '' });
+
 
     const fetchActivityData = async (category: string) => {
         setActivityLoading(true);
@@ -536,6 +562,59 @@ export default function Dashboard() {
             fetchActivityData(activityTab);
         }
     }, [activeSection, activityTab]);
+
+    // SUPPORT TICKET FUNCTIONS
+    const fetchTickets = async () => {
+        setTicketsLoading(true);
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/tickets`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setTickets(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch tickets:", error);
+        }
+        setTicketsLoading(false);
+    };
+
+    useEffect(() => {
+        if (activeSection === "support") {
+            fetchTickets();
+        }
+    }, [activeSection]);
+
+    const handleCreateTicket = async () => {
+        if (!ticketForm.subject || !ticketForm.message) return;
+
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/tickets`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    subject: ticketForm.subject,
+                    category: ticketForm.category,
+                    priority: ticketForm.priority,
+                    initial_message: ticketForm.message
+                })
+            });
+
+            if (response.ok) {
+                setShowTicketModal(false);
+                setTicketForm({ subject: '', category: 'General', priority: 'Medium', message: '' });
+                fetchTickets();
+            }
+        } catch (error) {
+            console.error("Failed to create ticket:", error);
+        }
+    };
 
     // KYC API Functions
     const fetchKycStatus = async (appId: string) => {
@@ -4038,25 +4117,148 @@ export default function Dashboard() {
     // SUPPORT SECTION
     const renderSupportSection = () => (
         <div className="space-y-6">
-            <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
-                <h3 className="text-xl font-semibold text-white mb-6">Support & Help</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button className="p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left transition group">
-                        <HelpCircle className="w-8 h-8 text-teal-400 mb-3 group-hover:scale-110 transition" />
-                        <p className="text-white font-medium">FAQs</p>
-                        <p className="text-gray-400 text-sm">Find answers to common questions</p>
-                    </button>
-                    <button className="p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left transition group">
-                        <FileText className="w-8 h-8 text-teal-400 mb-3 group-hover:scale-110 transition" />
-                        <p className="text-white font-medium">Raise a Ticket</p>
-                        <p className="text-gray-400 text-sm">Submit a support request</p>
-                    </button>
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h3 className="text-xl font-semibold text-white">Support Tickets</h3>
+                    <p className="text-gray-400 text-sm">Track your requests and issues</p>
                 </div>
-                <div className="mt-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
-                    <p className="text-teal-400 font-medium">24/7 Customer Support</p>
-                    <p className="text-gray-300">Call us at: 1800-XXX-XXXX (Toll Free)</p>
-                </div>
+                <button
+                    onClick={() => setShowTicketModal(true)}
+                    className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg flex items-center gap-2 transition"
+                >
+                    <Plus className="w-4 h-4" /> Raise Ticket
+                </button>
             </div>
+
+            {/* Ticket List */}
+            {ticketsLoading ? (
+                <div className="text-center py-8 text-gray-400">Loading tickets...</div>
+            ) : tickets.length === 0 ? (
+                <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
+                    <HelpCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">No support tickets found</p>
+                    <p className="text-sm text-gray-500 mt-1">Need help? Raise a ticket above.</p>
+                </div>
+            ) : (
+                <div className="grid gap-4">
+                    {tickets.map((ticket) => (
+                        <div key={ticket.id} className="p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-teal-500/50 transition">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-teal-400 font-mono text-sm">{ticket.ticket_id}</span>
+                                        <span className={`px-2 py-0.5 rounded text-xs ${ticket.status === 'OPEN' ? 'bg-green-500/20 text-green-400' :
+                                                ticket.status === 'RESOLVED' ? 'bg-blue-500/20 text-blue-400' :
+                                                    'bg-gray-500/20 text-gray-400'
+                                            }`}>
+                                            {ticket.status}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded text-xs ${ticket.priority === 'High' ? 'bg-red-500/20 text-red-400' :
+                                                ticket.priority === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    'bg-blue-500/20 text-blue-400'
+                                            }`}>
+                                            {ticket.priority}
+                                        </span>
+                                    </div>
+                                    <h4 className="text-white font-medium text-lg">{ticket.subject}</h4>
+                                    <p className="text-sm text-gray-400 mt-1">{ticket.category}</p>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                    {new Date(ticket.created_at).toLocaleDateString()}
+                                </span>
+                            </div>
+                            {/* Messages Preview */}
+                            {ticket.messages && ticket.messages.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-gray-700">
+                                    <p className="text-sm text-gray-300 line-clamp-2">
+                                        <span className="text-gray-500">Last message:</span> {ticket.messages[ticket.messages.length - 1].message}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* TICKET MODAL */}
+            {showTicketModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg p-6 shadow-xl relative animate-in fade-in zoom-in duration-200">
+                        <button
+                            onClick={() => setShowTicketModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-teal-400" />
+                            Raise Support Ticket
+                        </h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                                    placeholder="Brief description of issue"
+                                    value={ticketForm.subject}
+                                    onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Category</label>
+                                    <select
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-teal-500 outline-none"
+                                        value={ticketForm.category}
+                                        onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
+                                    >
+                                        <option>General</option>
+                                        <option>Loan Application</option>
+                                        <option>Repayments</option>
+                                        <option>KYC / Documents</option>
+                                        <option>Technical Issue</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                                    <select
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-teal-500 outline-none"
+                                        value={ticketForm.priority}
+                                        onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}
+                                    >
+                                        <option>Low</option>
+                                        <option>Medium</option>
+                                        <option>High</option>
+                                        <option>Critical</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Message</label>
+                                <textarea
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-teal-500 outline-none min-h-[120px]"
+                                    placeholder="Describe your issue in detail..."
+                                    value={ticketForm.message}
+                                    onChange={(e) => setTicketForm({ ...ticketForm, message: e.target.value })}
+                                ></textarea>
+                            </div>
+
+                            <button
+                                onClick={handleCreateTicket}
+                                disabled={!ticketForm.subject || !ticketForm.message}
+                                className="w-full py-3 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition mt-2"
+                            >
+                                Submit Ticket
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 

@@ -31,6 +31,7 @@ Your role:
 Guidelines:
 - Use Indian Rupee (₹) for currency
 - Be concise: 2-4 sentences or bullet points
+- Do NOT use markdown formatting (no asterisks, bold, italics, or headers). Use plain text only.
 - Reference CIBIL score, Aadhaar, PAN
 - Mention "Apply for Loan" section for detailed analysis
 - Be encouraging and actionable
@@ -49,24 +50,24 @@ Quick Reference:
 FINANCIAL_KNOWLEDGE = {
     "loan_eligibility": {
         "keywords": ["eligible", "eligibility", "qualify", "can i get", "am i eligible", "loan approval"],
-        "response": """📊 **Loan Eligibility Factors:**
-• **CIBIL Score**: 650+ required, 750+ for best rates
-• **Income**: Minimum ₹25,000/month for personal loans
-• **Employment**: 1+ year work experience preferred
-• **Age**: 21-60 years
-• **Debt-to-Income**: EMI should be <40% of income
+        "response": """Loan Eligibility Factors:
+• CIBIL Score: 650+ required, 750+ for best rates
+• Income: Minimum ₹25,000/month for personal loans
+• Employment: 1+ year work experience preferred
+• Age: 21-60 years
+• Debt-to-Income: EMI should be <40% of income
 
-💡 Use our 'Apply for Loan' feature for a detailed AI-powered eligibility check!"""
+Use our 'Apply for Loan' feature for a detailed AI-powered eligibility check!"""
     },
     "credit_score": {
         "keywords": ["credit score", "cibil", "credit rating", "improve score", "increase score", "bad credit"],
-        "response": """📈 **Credit Score Guide (CIBIL):**
-• **750-900**: Excellent - Best interest rates
-• **700-749**: Good - Most loans approved
-• **650-699**: Fair - Higher interest rates
-• **Below 650**: Poor - May need secured loans
+        "response": """Credit Score Guide (CIBIL):
+• 750-900: Excellent - Best interest rates
+• 700-749: Good - Most loans approved
+• 650-699: Fair - Higher interest rates
+• Below 650: Poor - May need secured loans
 
-**Tips to Improve:**
+Tips to Improve:
 1. Pay bills on time (35% impact)
 2. Keep credit utilization below 30%
 3. Don't close old credit cards
@@ -75,7 +76,7 @@ FINANCIAL_KNOWLEDGE = {
     },
     "emi_calculation": {
         "keywords": ["emi", "monthly payment", "installment", "calculate emi", "emi formula"],
-        "response": """💰 **EMI Calculation:**
+        "response": """EMI Calculation:
 EMI = P × r × (1+r)^n / ((1+r)^n - 1)
 
 Where:
@@ -83,61 +84,59 @@ Where:
 • r = Monthly interest rate
 • n = Loan tenure in months
 
-**Example**: ₹5,00,000 loan at 12% for 5 years
+Example: ₹5,00,000 loan at 12% for 5 years
 • Monthly EMI ≈ ₹11,122
 • Total Interest ≈ ₹1,67,320
 
-💡 Our AI calculates this automatically when you apply!"""
+Our AI calculates this automatically when you apply!"""
     },
     "documents": {
         "keywords": ["document", "documents", "papers", "kyc", "aadhaar", "pan", "proof"],
-        "response": """📄 **Required Documents for Loan:**
+        "response": """Required Documents for Loan:
 
-**Identity Proof (any one):**
+Identity Proof (any one):
 • Aadhaar Card
 • PAN Card
 • Passport
 
-**Income Proof:**
+Income Proof:
 • Last 3 months salary slips
 • 6 months bank statement
 • Form 16 / ITR
 
-**Address Proof:**
+Address Proof:
 • Utility bills
 • Rental agreement
 
-✅ All documents can be uploaded digitally in our app!"""
+All documents can be uploaded digitally in our app!"""
     },
     "interest_rates": {
         "keywords": ["interest", "rate", "interest rate", "roi", "percentage"],
-        "response": """📊 **Current Interest Rates (2024-25):**
+        "response": """Current Interest Rates (2024-25):
 
-| Loan Type | Rate Range |
-|-----------|------------|
-| Personal Loan | 10.5% - 24% |
-| Home Loan | 8.5% - 11% |
-| Car Loan | 8.5% - 14% |
-| Education Loan | 8% - 15% |
-| Business Loan | 14% - 24% |
+Personal Loan: 10.5% - 24%
+Home Loan: 8.5% - 11%
+Car Loan: 8.5% - 14%
+Education Loan: 8% - 15%
+Business Loan: 14% - 24%
 
-💡 Your actual rate depends on credit score, income, and loan amount."""
+Your actual rate depends on credit score, income, and loan amount."""
     },
     "loan_types": {
         "keywords": ["types of loan", "loan types", "personal loan", "home loan", "car loan", "business loan"],
-        "response": """🏦 **Types of Loans Available:**
+        "response": """Types of Loans Available:
 
-1. **Personal Loan**: For any personal need, no collateral
-2. **Home Loan**: For property purchase, longest tenure
-3. **Car Loan**: Vehicle financing, car as security
-4. **Education Loan**: Study expenses, moratorium period
-5. **Business Loan**: Working capital, expansion
+1. Personal Loan: For any personal need, no collateral
+2. Home Loan: For property purchase, longest tenure
+3. Car Loan: Vehicle financing, car as security
+4. Education Loan: Study expenses, moratorium period
+5. Business Loan: Working capital, expansion
 
 Each has different eligibility criteria and interest rates."""
     },
     "rejection": {
         "keywords": ["rejected", "rejection", "denied", "not approved", "loan refused"],
-        "response": """❌ **Common Reasons for Loan Rejection:**
+        "response": """Common Reasons for Loan Rejection:
 
 1. Low credit score (<650)
 2. High existing debt (FOIR >50%)
@@ -145,7 +144,7 @@ Each has different eligibility criteria and interest rates."""
 4. Incomplete documentation
 5. Too many recent credit inquiries
 
-**What to do next:**
+What to do next:
 • Wait 3-6 months before reapplying
 • Improve credit score
 • Reduce existing debts
@@ -153,7 +152,7 @@ Each has different eligibility criteria and interest rates."""
     },
     "greeting": {
         "keywords": ["hi", "hello", "hey", "good morning", "good evening", "namaste"],
-        "response": """👋 Hello! I'm your AI Credit Advisor.
+        "response": """Hello! I'm your AI Credit Advisor.
 
 I can help you with:
 • Loan eligibility checks
@@ -166,7 +165,7 @@ How can I assist you today?"""
     },
     "thanks": {
         "keywords": ["thank", "thanks", "thank you", "thx", "appreciate"],
-        "response": """😊 You're welcome! Happy to help.
+        "response": """You're welcome! Happy to help.
 
 If you need anything else regarding loans or credit, feel free to ask. 
 

@@ -5211,3 +5211,141 @@ async def admin_update_ticket_status(
     return ticket
 
 
+# =====================================================
+# CUSTOMER SUPPORT TICKET ENDPOINTS
+# =====================================================
+
+@app.post("/tickets", response_model=schemas.TicketResponse)
+async def create_ticket(
+    ticket: schemas.TicketCreate,
+    request: Request,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Create a new support ticket"""
+    # Generate unique ticket ID (TKT-YYYYMMDD-XXXX)
+    today_str = datetime.now().strftime("%Y%m%d")
+    random_suffix = str(uuid.uuid4().int)[:4]
+    ticket_ref_id = f"TKT-{today_str}-{random_suffix}"
+    
+    db_ticket = models.SupportTicket(
+        user_id=current_user.id,
+        ticket_id=ticket_ref_id,
+        subject=ticket.subject,
+        category=ticket.category,
+        priority=ticket.priority,
+        status="OPEN"
+    )
+    db.add(db_ticket)
+    await db.flush()
+    
+    # Add initial message
+    initial_msg = models.TicketMessage(
+        ticket_id=db_ticket.id,
+        sender_id=current_user.id,
+        sender_type="CUSTOMER",
+        message=ticket.initial_message
+    )
+    db.add(initial_msg)
+    
+    # Log audit event
+    await log_audit(
+        db=db,
+        user_id=current_user.id,
+        action="TICKET_CREATED",
+        event_category="SUPPORT",
+        entity_type="SUPPORT_TICKET",
+        entity_id=str(db_ticket.id),
+        description=f"Created support ticket {ticket_ref_id}",
+        request=request
+    )
+    
+    await db.commit()
+    await db.refresh(db_ticket)
+    # Eager load requires re-query or manual fetch if not strictly set
+    # For now, we return the ticket object which might miss messages but that's fine for create
+    return db_ticket
+
+
+@app.get("/tickets", response_model=List[schemas.TicketResponse])
+async def get_my_tickets(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """List all tickets for the current user"""
+    from sqlalchemy.orm import selectinload
+    query = (
+        select(models.SupportTicket)
+        .options(selectinload(models.SupportTicket.messages))
+        .where(models.SupportTicket.user_id == current_user.id)
+        .order_by(models.SupportTicket.created_at.desc())
+    )
+    
+    result = await db.execute(query)
+    tickets = result.scalars().all()
+    return tickets
+
+
+@app.get("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
+async def get_ticket_details(
+    ticket_id: UUID,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Get ticket details with messages"""
+    from sqlalchemy.orm import selectinload
+    query = (
+        select(models.SupportTicket)
+        .options(selectinload(models.SupportTicket.messages))
+        .where(
+            models.SupportTicket.id == ticket_id,
+            models.SupportTicket.user_id == current_user.id
+        )
+    )
+    
+    result = await db.execute(query)
+    ticket = result.scalars().first()
+    
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    return ticket
+
+
+@app.post("/tickets/{ticket_id}/message", response_model=schemas.TicketMessageResponse)
+async def add_ticket_message(
+    ticket_id: UUID,
+    message: schemas.TicketMessageCreate,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """Add a message to an existing ticket"""
+    # Verify ticket ownership
+    query = select(models.SupportTicket).where(
+        models.SupportTicket.id == ticket_id,
+        models.SupportTicket.user_id == current_user.id
+    )
+    result = await db.execute(query)
+    ticket = result.scalars().first()
+    
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+        
+    new_msg = models.TicketMessage(
+        ticket_id=ticket_id,
+        sender_id=current_user.id,
+        sender_type="CUSTOMER",
+        message=message.message
+    )
+    db.add(new_msg)
+    
+    ticket.updated_at = func.now()
+    if ticket.status == "RESOLVED":
+        ticket.status = "OPEN" # Re-open if customer replies
+    
+    await db.commit()
+    await db.refresh(new_msg)
+    
+    return new_msg
+
+
