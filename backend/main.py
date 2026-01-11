@@ -64,6 +64,9 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+import traceback
+from fastapi.exceptions import RequestValidationError
+
 # Custom exception handler to ensure CORS headers are always present
 from fastapi.responses import JSONResponse
 
@@ -96,13 +99,40 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         }
     )
 
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors with 422 instead of 500"""
+    print(f"Validation Error: {exc}")
+    origin = request.headers.get("origin", "*")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc), "errors": exc.errors()},
+        headers={
+            "Access-Control-Allow-Origin": origin if origin else "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    """Handle generic exceptions while preserving CORS headers"""
+    """
+    Handle generic exceptions while preserving CORS headers.
+    Catches ALL unhandled errors to prevent server crashes.
+    """
+    # Log the full traceback for debugging (critical for fixing bugs)
+    print(f"CRITICAL ERROR: {exc}")
+    traceback.print_exc()
+    
     origin = request.headers.get("origin", "*")
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "detail": "An unexpected error occurred. Our team has been notified.",
+            "error_type": type(exc).__name__,
+            "message": str(exc) # Included for debugging purposes as requested
+        },
         headers={
             "Access-Control-Allow-Origin": origin if origin else "*",
             "Access-Control-Allow-Credentials": "true",
@@ -1267,41 +1297,41 @@ async def get_my_repayments(
     """
     Get all repayments and EMI schedule for the current user.
     """
-    # Get all applications for this user
-    apps_query = select(models.LoanApplication).where(models.LoanApplication.user_id == user.id)
-    result = await db.execute(apps_query)
-    applications = result.scalars().all()
-    app_ids = [app.id for app in applications]
-    
-    if not app_ids:
-        return []
+    try:
+        # Get all applications for this user
+        apps_query = select(models.LoanApplication).where(models.LoanApplication.user_id == user.id)
+        result = await db.execute(apps_query)
+        applications = result.scalars().all()
+        app_ids = [app.id for app in applications]
+        
+        if not app_ids:
+            return []
 
-    # Get all repayment records for these applications
-    repayments_query = (
-        select(models.Repayment)
-        .where(models.Repayment.application_id.in_(app_ids))
-        .order_by(models.Repayment.emi_number.asc())
-    )
-    result = await db.execute(repayments_query)
-    repayments = result.scalars().all()
-    
-    # If no repayments found, we should still return the schedule if loan is disbursed
-    # For now, we only return actual repayment records or a generated schedule.
-    # To keep it simple, we'll return the repayment records.
-    # In a real system, we'd generate the schedule from the prediction data.
-    
-    return [{
-        "id": str(r.id),
-        "application_id": str(r.application_id),
-        "emi_number": r.emi_number,
-        "emi_amount": r.emi_amount,
-        "payment_amount": r.payment_amount,
-        "payment_status": r.payment_status,
-        "payment_method": r.payment_method,
-        "payment_reference": r.payment_reference,
-        "payment_date": r.payment_date.isoformat() if r.payment_date else None,
-        "due_date": r.due_date.isoformat() if r.due_date else None
-    } for r in repayments]
+        # Get all repayment records for these applications
+        repayments_query = (
+            select(models.Repayment)
+            .where(models.Repayment.application_id.in_(app_ids))
+            .order_by(models.Repayment.emi_number.asc())
+        )
+        result = await db.execute(repayments_query)
+        repayments = result.scalars().all()
+        
+        return [{
+            "id": str(r.id),
+            "application_id": str(r.application_id),
+            "emi_number": r.emi_number,
+            "emi_amount": r.emi_amount,
+            "payment_amount": r.payment_amount,
+            "payment_status": r.payment_status,
+            "payment_method": r.payment_method,
+            "payment_reference": r.payment_reference,
+            "payment_date": r.payment_date.isoformat() if r.payment_date else None,
+            "due_date": r.due_date.isoformat() if r.due_date else None
+        } for r in repayments]
+    except Exception as e:
+        print(f"Error fetching repayments: {e}")
+        traceback.print_exc()
+        return []
 
 
 @app.get("/admin/repayments")
@@ -2148,105 +2178,120 @@ async def get_admin_reports(
     """
     Get aggregated statistics for Admin Reports Page
     """
-    # 1. Total Applications
-    result = await db.execute(select(func.count()).select_from(models.LoanApplication))
-    total_loans = result.scalar() or 0
-    
-    # 2. Approval Rate
-    result = await db.execute(
-        select(func.count()).select_from(models.LoanPrediction).where(models.LoanPrediction.decision == "APPROVED")
-    )
-    approved_count = result.scalar() or 0
-    approval_rate = round((approved_count / total_loans * 100), 1) if total_loans > 0 else 0
-    
-    # 3. Total Disbursed
-    result = await db.execute(select(func.sum(models.Disbursement.amount)))
-    disbursed_total = result.scalar() or 0
-    
-    # 4. Active Users (Customers)
-    result = await db.execute(
-        select(func.count()).select_from(models.User).where(models.User.role == "customer")
-    )
-    active_users = result.scalar() or 0
-    
-    # 5. Loan Status Distribution
-    result = await db.execute(
-        select(models.LoanPrediction.decision, func.count(models.LoanPrediction.decision))
-        .group_by(models.LoanPrediction.decision)
-    )
-    status_counts = result.all()
-    
-    color_map = {
-        "APPROVED": "#10B981",
-        "REJECTED": "#EF4444",
-        "PENDING_REVIEW": "#F59E0B"
-    }
-    
-    dist_data = []
-    for decision, count in status_counts:
-        dist_data.append(schemas.StatusDist(
-            name=decision.replace("_", " ").title(),
-            value=count,
-            color=color_map.get(decision, "#6B7280")
-        ))
+    try:
+        # 1. Total Applications
+        result = await db.execute(select(func.count()).select_from(models.LoanApplication))
+        total_loans = result.scalar() or 0
         
-    # 6. Monthly Trends
-    trends = defaultdict(lambda: {"apps": 0, "disb": 0, "emi": 0})
-    
-    # Applications
-    result = await db.execute(select(models.LoanApplication.created_at))
-    recent_apps = result.all()
-    for (created_at,) in recent_apps:
-        if created_at:
-            month_key = created_at.strftime("%b")
-            trends[month_key]["apps"] += 1
-            
-    # Disbursements
-    result = await db.execute(select(models.Disbursement.created_at, models.Disbursement.amount))
-    recent_disb = result.all()
-    for created_at, amount in recent_disb:
-        if created_at:
-            month_key = created_at.strftime("%b")
-            trends[month_key]["disb"] += amount or 0
-            
-    # EMIs
-    result = await db.execute(
-        select(models.Repayment.payment_date, models.Repayment.payment_amount)
-        .where(models.Repayment.payment_status == "PAID")
-    )
-    recent_emis = result.all()
-    for payment_date, payment_amount in recent_emis:
-        if payment_date:
-            month_key = payment_date.strftime("%b")
-            trends[month_key]["emi"] += payment_amount or 0
-            
-    sorted_months = []
-    curr = datetime.now()
-    for i in range(4):
-        month_idx = (curr.month - i - 1) % 12 + 1
-        month_name = calendar.month_abbr[month_idx]
-        sorted_months.insert(0, month_name)
+        # 2. Approval Rate
+        result = await db.execute(
+            select(func.count()).select_from(models.LoanPrediction).where(models.LoanPrediction.decision == "APPROVED")
+        )
+        approved_count = result.scalar() or 0
+        approval_rate = round((approved_count / total_loans * 100), 1) if total_loans > 0 else 0
         
-    monthly_data = []
-    for m in sorted_months:
-        data = trends[m]
-        monthly_data.append(schemas.MonthlyTrend(
-            month=m,
-            applications=data["apps"],
-            disbursements=data["disb"],
-            emiCollected=data["emi"]
-        ))
-    
-    return schemas.AdminDashboardStats(
-        stats=schemas.ReportStats(
-            totalLoans=total_loans,
-            approvalRate=approval_rate,
-            totalDisbursed=disbursed_total,
-            activeUsers=active_users
-        ),
-        monthlyTrends=monthly_data,
-        statusDistribution=dist_data
-    )
+        # 3. Total Disbursed
+        result = await db.execute(select(func.sum(models.Disbursement.amount)))
+        disbursed_total = result.scalar() or 0
+        
+        # 4. Active Users (Customers)
+        result = await db.execute(
+            select(func.count()).select_from(models.User).where(models.User.role == "customer")
+        )
+        active_users = result.scalar() or 0
+        
+        # 5. Loan Status Distribution
+        result = await db.execute(
+            select(models.LoanPrediction.decision, func.count(models.LoanPrediction.decision))
+            .group_by(models.LoanPrediction.decision)
+        )
+        status_counts = result.all()
+        
+        color_map = {
+            "APPROVED": "#10B981",
+            "REJECTED": "#EF4444",
+            "PENDING_REVIEW": "#F59E0B"
+        }
+        
+        dist_data = []
+        for decision, count in status_counts:
+            dist_data.append(schemas.StatusDist(
+                name=decision.replace("_", " ").title(),
+                value=count,
+                color=color_map.get(decision, "#6B7280")
+            ))
+            
+        # 6. Monthly Trends
+        trends = defaultdict(lambda: {"apps": 0, "disb": 0, "emi": 0})
+        
+        # Applications
+        result = await db.execute(select(models.LoanApplication.created_at))
+        recent_apps = result.all()
+        for (created_at,) in recent_apps:
+            if created_at:
+                month_key = created_at.strftime("%b")
+                trends[month_key]["apps"] += 1
+                
+        # Disbursements
+        result = await db.execute(select(models.Disbursement.created_at, models.Disbursement.amount))
+        recent_disb = result.all()
+        for created_at, amount in recent_disb:
+            if created_at:
+                month_key = created_at.strftime("%b")
+                trends[month_key]["disb"] += amount or 0
+                
+        # EMIs
+        result = await db.execute(
+            select(models.Repayment.payment_date, models.Repayment.payment_amount)
+            .where(models.Repayment.payment_status == "PAID")
+        )
+        recent_emis = result.all()
+        for payment_date, payment_amount in recent_emis:
+            if payment_date:
+                month_key = payment_date.strftime("%b")
+                trends[month_key]["emi"] += payment_amount or 0
+                
+        sorted_months = []
+        curr = datetime.now()
+        for i in range(4):
+            month_idx = (curr.month - i - 1) % 12 + 1
+            month_name = calendar.month_abbr[month_idx]
+            sorted_months.insert(0, month_name)
+            
+        monthly_data = []
+        for m in sorted_months:
+            data = trends[m]
+            monthly_data.append(schemas.MonthlyTrend(
+                month=m,
+                applications=data["apps"],
+                disbursements=data["disb"],
+                emiCollected=data["emi"]
+            ))
+        
+        return schemas.AdminDashboardStats(
+            stats=schemas.ReportStats(
+                totalLoans=total_loans,
+                approvalRate=approval_rate,
+                totalDisbursed=disbursed_total,
+                activeUsers=active_users
+            ),
+            monthlyTrends=monthly_data,
+            statusDistribution=dist_data
+        )
+    except Exception as e:
+        print(f"Error in get_admin_reports: {e}")
+        traceback.print_exc()
+        # Return empty/zero stats to avoid crash
+        return schemas.AdminDashboardStats(
+            stats=schemas.ReportStats(
+                totalLoans=0,
+                approvalRate=0.0,
+                totalDisbursed=0.0,
+                activeUsers=0
+            ),
+            monthlyTrends=[],
+            statusDistribution=[]
+        )
 
 @app.post("/admin/notifications/send")
 async def send_notification(
@@ -3380,72 +3425,83 @@ async def get_activity_dashboard(
     Get activity dashboard with categorized recent events.
     Shows overview of all activity categories.
     """
-    if current_user is None:
-        return []
-    categories = [
-        models.EventCategory.SECURITY,
-        models.EventCategory.LOAN,
-        models.EventCategory.KYC,
-        models.EventCategory.PAYMENT,
-        models.EventCategory.PROFILE
-    ]
-    
-    dashboard = {}
-    
-    for category in categories:
-        query = select(models.AuditLog).where(
-            models.AuditLog.user_id == current_user.id,
-            models.AuditLog.event_category == category
-        ).order_by(models.AuditLog.created_at.desc()).limit(5)
+    try:
+        if current_user is None:
+            return []
+        categories = [
+            models.EventCategory.SECURITY,
+            models.EventCategory.LOAN,
+            models.EventCategory.KYC,
+            models.EventCategory.PAYMENT,
+            models.EventCategory.PROFILE
+        ]
         
-        result = await db.execute(query)
-        logs = result.scalars().all()
+        dashboard = {}
         
-        # Count total for this category
-        count_query = select(func.count(models.AuditLog.id)).where(
+        for category in categories:
+            query = select(models.AuditLog).where(
+                models.AuditLog.user_id == current_user.id,
+                models.AuditLog.event_category == category
+            ).order_by(models.AuditLog.created_at.desc()).limit(5)
+            
+            result = await db.execute(query)
+            logs = result.scalars().all()
+            
+            # Count total for this category
+            count_query = select(func.count(models.AuditLog.id)).where(
+                models.AuditLog.user_id == current_user.id,
+                models.AuditLog.event_category == category
+            )
+            count_result = await db.execute(count_query)
+            total = count_result.scalar()
+            
+            dashboard[category.lower()] = {
+                "total": total,
+                "recent": [
+                    {
+                        "action": log.action,
+                        "description": log.description,
+                        "severity": log.severity,
+                        "timestamp": log.created_at.isoformat()
+                    }
+                    for log in logs
+                ]
+            }
+        
+        # Get last login
+        last_login_query = select(models.AuditLog).where(
             models.AuditLog.user_id == current_user.id,
-            models.AuditLog.event_category == category
+            models.AuditLog.action == models.AuditAction.LOGIN_SUCCESS
+        ).order_by(models.AuditLog.created_at.desc()).limit(1)
+        
+        last_login_result = await db.execute(last_login_query)
+        last_login = last_login_result.scalars().first()
+        
+        # Get active sessions count
+        session_query = select(func.count(models.UserSession.id)).where(
+            models.UserSession.user_id == current_user.id,
+            models.UserSession.is_active == True
         )
-        count_result = await db.execute(count_query)
-        total = count_result.scalar()
+        session_result = await db.execute(session_query)
+        active_sessions = session_result.scalar() or 0
         
-        dashboard[category.lower()] = {
-            "total": total,
-            "recent": [
-                {
-                    "action": log.action,
-                    "description": log.description,
-                    "severity": log.severity,
-                    "timestamp": log.created_at.isoformat()
-                }
-                for log in logs
-            ]
+        return {
+            "user_id": str(current_user.id),
+            "last_login": last_login.created_at.isoformat() if last_login else None,
+            "last_login_location": f"{last_login.location_city}, {last_login.location_country}" if last_login else None,
+            "active_sessions": active_sessions,
+            "categories": dashboard
         }
-    
-    # Get last login
-    last_login_query = select(models.AuditLog).where(
-        models.AuditLog.user_id == current_user.id,
-        models.AuditLog.action == models.AuditAction.LOGIN_SUCCESS
-    ).order_by(models.AuditLog.created_at.desc()).limit(1)
-    
-    last_login_result = await db.execute(last_login_query)
-    last_login = last_login_result.scalars().first()
-    
-    # Get active sessions count
-    session_query = select(func.count(models.UserSession.id)).where(
-        models.UserSession.user_id == current_user.id,
-        models.UserSession.is_active == True
-    )
-    session_result = await db.execute(session_query)
-    active_sessions = session_result.scalar() or 0
-    
-    return {
-        "user_id": str(current_user.id),
-        "last_login": last_login.created_at.isoformat() if last_login else None,
-        "last_login_location": f"{last_login.location_city}, {last_login.location_country}" if last_login else None,
-        "active_sessions": active_sessions,
-        "categories": dashboard
-    }
+    except Exception as e:
+        print(f"Error fetching activity dashboard: {e}")
+        traceback.print_exc()
+        return {
+            "user_id": str(current_user.id) if current_user else None,
+            "last_login": None,
+            "last_login_location": None,
+            "active_sessions": 0,
+            "categories": {}
+        }
 
 
 # =====================================================
