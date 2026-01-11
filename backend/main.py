@@ -742,7 +742,7 @@ async def update_application_decision(
             notification_msg = f"Your loan application has been {decision.upper()}. Reason: {justification}"
             notification = models.Notification(
                 user_id=customer.id,
-                notification_type="LOAN_DECISION",
+                type="LOAN_DECISION",
                 trigger=f"LOAN_{decision.upper()}",
                 message=notification_msg
             )
@@ -804,7 +804,7 @@ async def request_documents(
     # Create notification
     notification = models.Notification(
         user_id=application.user_id,
-        notification_type="DOCUMENT_REQUEST",
+        type="DOCUMENT_REQUEST",
         trigger="DOCUMENTS_REQUIRED",
         message=doc_message
     )
@@ -1001,7 +1001,7 @@ async def process_disbursement(
     try:
         notification = models.Notification(
             user_id=application.user_id,
-            notification_type="LOAN_DISBURSED",
+            type="LOAN_DISBURSED",
             trigger="DISBURSEMENT_COMPLETED",
             message=f"Your loan of Rs.{application.loan_amount:,.0f} has been disbursed! Transaction Ref: {transaction_ref}"
         )
@@ -1835,13 +1835,22 @@ async def get_all_activity(
     """Get all activity logs for the current user"""
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id
-    ).order_by(models.AuditLog.timestamp.desc()).limit(50)
+    ).order_by(models.AuditLog.created_at.desc()).limit(50)
     
     result = await db.execute(query)
     events = result.scalars().all()
     
     return {
-        "events": events,
+        "events": [
+            {
+                "id": str(e.id),
+                "action": e.action,
+                "category": e.event_category,
+                "description": e.description,
+                "timestamp": e.created_at.isoformat() if e.created_at else None
+            }
+            for e in events
+        ],
         "total_events": len(events)
     }
 
@@ -1866,13 +1875,22 @@ async def get_activity_by_category(
     query = select(models.AuditLog).where(
         models.AuditLog.user_id == current_user.id,
         models.AuditLog.event_category == db_category
-    ).order_by(models.AuditLog.timestamp.desc()).limit(50)
+    ).order_by(models.AuditLog.created_at.desc()).limit(50)
     
     result = await db.execute(query)
     events = result.scalars().all()
     
     return {
-        "events": events,
+        "events": [
+            {
+                "id": str(e.id),
+                "action": e.action,
+                "category": e.event_category,
+                "description": e.description,
+                "timestamp": e.created_at.isoformat() if e.created_at else None
+            }
+            for e in events
+        ],
         "total_events": len(events)
     }
 
