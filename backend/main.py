@@ -900,7 +900,7 @@ async def get_application_full_details(
                 "id": str(doc.id),
                 "document_type": doc.document_type,
                 "file_name": doc.file_name,
-                "verified": doc.verified,
+                "verification_status": doc.verification_status,
                 "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
             }
             for doc in documents
