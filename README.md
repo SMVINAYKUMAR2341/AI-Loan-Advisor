@@ -91,7 +91,7 @@ The frontend will be available at `http://localhost:5173`.
 - Real-time status updates
 
 ### 3. Apply for Loan
-![Apply for Loan](screenshots/loan-analysis.png)
+![Apply for Loan](screenshots/loan-form.png)
 - AI-Powered Loan Eligibility Advisor
 - Personal & Employment information
 - Financial details with automatic calculations
