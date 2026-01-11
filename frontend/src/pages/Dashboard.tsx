@@ -20,7 +20,7 @@ import {
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
     Activity, CheckSquare, Search, AlertTriangle, Download, Plus,
-    ShieldCheck, Landmark
+    ShieldCheck, Landmark, PenTool, Lock
 } from "lucide-react";
 
 // Charts - Professional visualization
@@ -319,6 +319,7 @@ export default function Dashboard() {
         consent_given: boolean;
         signed_at: string | null;
         status: string;
+        agreement_version: string;
     }
 
     const [kycStatus, setKycStatus] = useState<KYCStatus | null>(null);
