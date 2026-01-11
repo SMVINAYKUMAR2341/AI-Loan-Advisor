@@ -5397,65 +5397,57 @@ async def search_applications(
     return response
 
 
-@app.get("/admin/applications", response_model=List[schemas.ApplicationListItem])
+@app.get("/admin/applications")
 async def get_admin_applications(
     status: Optional[str] = None,
-    admin = Depends(auth.require_admin()),
+    admin = Depends(auth.get_current_admin),
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get all loan applications for admin dashboard"""
-    query = (
-        select(models.LoanApplication)
-        .order_by(models.LoanApplication.created_at.desc())
-    )
-    
-    if status and status != 'all':
-        # Need to join with prediction/decision to filter by status if it's not on the application model directly
-        # Typically status is on the application or computed.
-        # For simplicity, fetching all and filtering in memory or ignoring status for now if complex join needed.
-        # But wait, 'decision' is on LoanPrediction.
-        # Let's just return all for now and let frontend filter, or join prediction.
-        pass
-
-    result = await db.execute(query)
-    applications = result.scalars().all()
-    
-    response = []
-    for app in applications:
-        # Get user info
-        user_query = select(models.User).where(models.User.id == app.user_id)
-        user_result = await db.execute(user_query)
-        user = user_result.scalars().first()
-        
-        # Get prediction
-        pred_query = select(models.LoanPrediction).where(
-            models.LoanPrediction.application_id == app.id
+    try:
+        query = (
+            select(models.LoanApplication)
+            .order_by(models.LoanApplication.created_at.desc())
         )
-        pred_result = await db.execute(pred_query)
-        prediction = pred_result.scalars().first()
         
-        # Get bank details if available
-        bank_query = select(models.BankAccountDetails).where(
-            models.BankAccountDetails.application_id == app.id
-        )
-        bank_result = await db.execute(bank_query)
-        bank_details = bank_result.scalars().first()
+        result = await db.execute(query)
+        applications = result.scalars().all()
         
-        response.append(schemas.ApplicationListItem(
-            id=app.id,
-            tracking_id=app.tracking_id,
-            user_id=app.user_id,
-            customer_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
-            customer_id=user.customer_id if user else None,
-            loan_amount=app.loan_amount,
-            loan_purpose=app.loan_purpose,
-            decision=prediction.decision if prediction else "PENDING",
-            approval_probability=prediction.approval_probability if prediction else 0,
-            created_at=app.created_at,
-            reviewed=False,
-            bank_details=schemas.BankDetailsResponse.model_validate(bank_details) if bank_details else None
-        ))
-    return response
+        response = []
+        for app in applications:
+            try:
+                # Get user info
+                user_query = select(models.User).where(models.User.id == app.user_id)
+                user_result = await db.execute(user_query)
+                user = user_result.scalars().first()
+                
+                # Get prediction
+                pred_query = select(models.LoanPrediction).where(
+                    models.LoanPrediction.application_id == app.id
+                )
+                pred_result = await db.execute(pred_query)
+                prediction = pred_result.scalars().first()
+                
+                response.append({
+                    "id": str(app.id),
+                    "tracking_id": app.tracking_id,
+                    "user_id": str(app.user_id),
+                    "customer_name": f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
+                    "customer_id": user.customer_id if user else None,
+                    "loan_amount": app.loan_amount,
+                    "loan_purpose": app.loan_purpose,
+                    "decision": prediction.decision if prediction else "PENDING",
+                    "approval_probability": prediction.approval_probability if prediction else 0,
+                    "created_at": app.created_at.isoformat() if app.created_at else None,
+                    "reviewed": False
+                })
+            except Exception as e:
+                print(f"Error processing application {app.id}: {e}")
+                continue
+        return response
+    except Exception as e:
+        print(f"Error in get_admin_applications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/admin/documents")
