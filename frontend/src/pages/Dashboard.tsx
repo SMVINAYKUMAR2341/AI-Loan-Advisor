@@ -20,14 +20,14 @@ import {
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
     Activity, CheckSquare, Search, AlertTriangle, Download, Plus,
-    ShieldCheck, Landmark, PenTool, Lock
+    ShieldCheck, Landmark, PenTool, Lock, RefreshCw, Loader
 } from "lucide-react";
 
 // Charts - Professional visualization
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, RadialBarChart, RadialBar, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart, Line, CartesianGrid, ReferenceLine } from 'recharts';
 
 // Section Types
-type SectionKey = "home" | "loans" | "apply" | "repayments" | "documents" | "security" | "activity" | "support";
+type SectionKey = "home" | "loans" | "apply" | "repayments" | "notifications" | "documents" | "security" | "activity" | "support";
 
 interface NavItem {
     key: SectionKey;
@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
     { key: "loans", label: "My Loans", icon: Wallet, description: "View your loans" },
     { key: "apply", label: "Apply for Loan", icon: FileText, description: "New loan application" },
     { key: "repayments", label: "Repayments & EMIs", icon: CreditCard, description: "Payment schedule" },
+    { key: "notifications", label: "Notifications", icon: Bell, description: "View all notifications" },
     { key: "documents", label: "Documents", icon: FolderOpen, description: "Upload & manage" },
     { key: "security", label: "Security & Settings", icon: Shield, description: "Profile & security" },
     { key: "activity", label: "Activity & Audit Log", icon: History, description: "Transaction history" },
@@ -4174,6 +4175,75 @@ export default function Dashboard() {
         </div>
     );
 
+    // NOTIFICATIONS SECTION
+    const renderNotificationsSection = () => (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h3 className="text-xl font-semibold text-white">Notifications</h3>
+                    <p className="text-gray-400 text-sm">Stay updated with your loan status and alerts</p>
+                </div>
+                <button
+                    onClick={fetchNotifications}
+                    className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    title="Refresh Notifications"
+                >
+                    <RefreshCw className={`w-5 h-5 ${notificationsLoading ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                {notificationsLoading ? (
+                    <div className="text-center py-12">
+                        <Loader className="w-8 h-8 text-teal-500 animate-spin mx-auto mb-4" />
+                        <p className="text-gray-400">Loading notifications...</p>
+                    </div>
+                ) : notifications.length === 0 ? (
+                    <div className="text-center py-12 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                        <Bell className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-white mb-2">No notifications yet</h3>
+                        <p className="text-gray-400">You're all caught up!</p>
+                    </div>
+                ) : (
+                    notifications.map((notif) => (
+                        <div
+                            key={notif.id}
+                            className={`p-4 rounded-xl border transition-all ${notif.status === 'sent'
+                                ? 'bg-gray-800/80 border-teal-500/30 ring-1 ring-teal-500/20'
+                                : 'bg-gray-800/40 border-gray-700/50'
+                                }`}
+                        >
+                            <div className="flex gap-4">
+                                <div className={`p-2 rounded-lg h-fit ${notif.type === 'LOAN_DECISION' ? 'bg-blue-500/20 text-blue-400' :
+                                    notif.type === 'LOAN_DISBURSED' ? 'bg-green-500/20 text-green-400' :
+                                        notif.type === 'DOCUMENT_REQUEST' ? 'bg-yellow-500/20 text-yellow-400' :
+                                            'bg-gray-700 text-gray-300'
+                                    }`}>
+                                    {notif.type === 'LOAN_DECISION' ? <FileText className="w-5 h-5" /> :
+                                        notif.type === 'LOAN_DISBURSED' ? <Wallet className="w-5 h-5" /> :
+                                            notif.type === 'DOCUMENT_REQUEST' ? <FolderOpen className="w-5 h-5" /> :
+                                                <Bell className="w-5 h-5" />}
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="text-white font-medium mb-1">
+                                        {notif.trigger?.replace(/_/g, ' ') || 'Notification'}
+                                    </h4>
+                                    <p className="text-gray-300 text-sm whitespace-pre-wrap">{notif.message}</p>
+                                    <span className="text-xs text-gray-500 mt-2 block">
+                                        {new Date(notif.sent_at).toLocaleString()}
+                                    </span>
+                                </div>
+                                {notif.status === 'sent' && (
+                                    <div className="w-2 h-2 rounded-full bg-teal-500 mt-2"></div>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+
     // SUPPORT SECTION
     const renderSupportSection = () => (
         <div className="space-y-6">
@@ -4360,6 +4430,7 @@ export default function Dashboard() {
             case "loans": return renderLoansSection();
             case "apply": return renderApplySection();
             case "repayments": return renderRepaymentsSection();
+            case "notifications": return renderNotificationsSection();
             case "documents": return renderDocumentsSection();
             case "security": return renderSecuritySection();
             case "activity": return renderActivitySection();
