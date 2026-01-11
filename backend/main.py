@@ -418,7 +418,7 @@ async def admin_login(
     await db.commit()
     
     # Generate token with special admin type
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=auth.ADMIN_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={
             "sub": admin.email, 
