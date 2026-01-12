@@ -1984,6 +1984,7 @@ async def submit_loan_application(
             request=request,
             session_id=None 
         )
+        await db.commit()  # Commit the audit log entry
 
         return response_model
         
@@ -2017,9 +2018,12 @@ async def get_all_activity(
             {
                 "id": str(e.id),
                 "action": e.action,
-                "category": e.event_category,
-                "description": e.description,
-                "timestamp": e.created_at.isoformat() if e.created_at else None
+                "category": e.event_category or "PROFILE",
+                "severity": e.severity or "INFO",
+                "description": e.description or e.action.replace("_", " ").title(),
+                "timestamp": e.created_at.isoformat() if e.created_at else None,
+                "device": f"{e.browser or 'Unknown'} - {e.os or 'Unknown'}",
+                "location": f"{e.location_city or 'Unknown'}, {e.location_country or 'Unknown'}"
             }
             for e in events
         ],
@@ -2057,14 +2061,18 @@ async def get_activity_by_category(
             {
                 "id": str(e.id),
                 "action": e.action,
-                "category": e.event_category,
-                "description": e.description,
-                "timestamp": e.created_at.isoformat() if e.created_at else None
+                "category": e.event_category or "PROFILE",
+                "severity": e.severity or "INFO",
+                "description": e.description or e.action.replace("_", " ").title(),
+                "timestamp": e.created_at.isoformat() if e.created_at else None,
+                "device": f"{e.browser or 'Unknown'} - {e.os or 'Unknown'}",
+                "location": f"{e.location_city or 'Unknown'}, {e.location_country or 'Unknown'}"
             }
             for e in events
         ],
         "total_events": len(events)
     }
+
 
 @app.get("/sessions", response_model=dict)
 async def get_active_sessions(
