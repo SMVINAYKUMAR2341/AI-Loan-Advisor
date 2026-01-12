@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { Save, FileText } from 'lucide-react';
 
 const triggerLabels: Record<string, string> = {
   emi_reminder: 'EMI Reminder (3 days before)',
@@ -96,6 +97,13 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<Record<string, Record<string, string>>>({
+    emi_reminder: { sms: '', email: '' },
+    emi_due: { sms: '', email: '' },
+    emi_overdue: { sms: '', email: '' },
+    disbursement_confirmation: { sms: '', email: '' },
+  });
   const [newNotif, setNewNotif] = useState({
     customerId: '',
     type: 'sms' as 'sms' | 'email',
@@ -112,6 +120,7 @@ export default function Notifications() {
 
   useEffect(() => {
     fetchData();
+    fetchTemplates();
   }, []);
 
   const fetchData = async () => {
@@ -127,6 +136,74 @@ export default function Notifications() {
       console.error('Failed to fetch data:', error);
     }
     setLoading(false);
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const data = await adminApi.getNotificationTemplates();
+      const templateMap: Record<string, Record<string, string>> = {
+        emi_reminder: { sms: '', email: '' },
+        emi_due: { sms: '', email: '' },
+        emi_overdue: { sms: '', email: '' },
+        disbursement_confirmation: { sms: '', email: '' },
+      };
+      data.forEach(t => {
+        if (templateMap[t.trigger_type]) {
+          templateMap[t.trigger_type][t.channel] = t.template_text;
+        }
+      });
+      setTemplates(templateMap);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+      // Use defaults from notificationTemplates
+      setTemplates(notificationTemplates);
+    }
+  };
+
+  const handleSaveTemplate = async (trigger: string, channel: string) => {
+    setSavingTemplate(`${trigger}-${channel}`);
+    try {
+      await adminApi.updateNotificationTemplate(trigger, channel, templates[trigger][channel]);
+      toast({
+        title: 'Template Saved',
+        description: `${channel.toUpperCase()} template for ${triggerLabels[trigger]} updated successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Save Failed',
+        description: error.message || 'Could not save template.',
+        variant: 'destructive',
+      });
+    }
+    setSavingTemplate(null);
+  };
+
+  const handleUseTemplate = () => {
+    const template = templates[newNotif.trigger]?.[newNotif.type] || '';
+    const customer = customers.find(c => c.id === newNotif.customerId);
+
+    if (!template) {
+      toast({
+        title: 'No Template Found',
+        description: 'Please select a trigger type first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Replace placeholders with actual data
+    let message = template
+      .replace(/{name}/g, customer?.name || '{name}')
+      .replace(/{amount}/g, '10,000')  // Example amount
+      .replace(/{date}/g, new Date().toLocaleDateString())
+      .replace(/{loanId}/g, 'RBI2026LA01')  // Example loan ID
+      .replace(/{txnRef}/g, `TXN${Date.now().toString().slice(-10)}`);
+
+    setNewNotif({ ...newNotif, message });
+    toast({
+      title: 'Template Applied',
+      description: 'Message auto-filled. You can edit before sending.',
+    });
   };
 
   const sentCount = notifs.filter(n => n.status === 'sent' || n.status === 'delivered').length;
@@ -355,34 +432,70 @@ export default function Notifications() {
 
           <TabsContent value="templates">
             <div className="grid gap-4">
-              {Object.entries(notificationTemplates).map(([trigger, templates]) => (
-                <Card key={trigger}>
+              {Object.entries(templates).map(([trigger, channelTemplates]) => (
+                <Card key={trigger} className="bg-gray-900/95 border-gray-700/50">
                   <CardHeader>
-                    <CardTitle className="text-lg">{triggerLabels[trigger]}</CardTitle>
+                    <CardTitle className="text-lg text-white flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-teal-400" />
+                      {triggerLabels[trigger]}
+                    </CardTitle>
+                    <CardDescription>Edit templates and use placeholders: {'{name}'}, {'{amount}'}, {'{date}'}, {'{loanId}'}, {'{txnRef}'}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className="flex items-center gap-2 text-gray-300">
                           <MessageSquare className="h-4 w-4" />
                           SMS Template
                         </Label>
                         <Textarea
-                          value={templates.sms}
-                          readOnly
-                          className="min-h-[100px] bg-muted/50"
+                          value={channelTemplates.sms}
+                          onChange={(e) => setTemplates({
+                            ...templates,
+                            [trigger]: { ...templates[trigger], sms: e.target.value }
+                          })}
+                          className="min-h-[100px] bg-gray-800/50 border-gray-700 text-white"
+                          placeholder="Enter SMS template..."
                         />
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveTemplate(trigger, 'sms')}
+                          disabled={savingTemplate === `${trigger}-sms`}
+                          className="bg-teal-500 hover:bg-teal-600"
+                        >
+                          {savingTemplate === `${trigger}-sms` ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+                          ) : (
+                            <><Save className="h-4 w-4 mr-2" />Save SMS Template</>
+                          )}
+                        </Button>
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className="flex items-center gap-2 text-gray-300">
                           <Mail className="h-4 w-4" />
                           Email Template
                         </Label>
                         <Textarea
-                          value={templates.email}
-                          readOnly
-                          className="min-h-[100px] bg-muted/50"
+                          value={channelTemplates.email}
+                          onChange={(e) => setTemplates({
+                            ...templates,
+                            [trigger]: { ...templates[trigger], email: e.target.value }
+                          })}
+                          className="min-h-[100px] bg-gray-800/50 border-gray-700 text-white"
+                          placeholder="Enter Email template..."
                         />
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveTemplate(trigger, 'email')}
+                          disabled={savingTemplate === `${trigger}-email`}
+                          className="bg-teal-500 hover:bg-teal-600"
+                        >
+                          {savingTemplate === `${trigger}-email` ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+                          ) : (
+                            <><Save className="h-4 w-4 mr-2" />Save Email Template</>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -485,14 +598,29 @@ export default function Notifications() {
               </div>
 
               <div className="space-y-2">
-                <Label>Message *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Message *</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleUseTemplate}
+                    className="border-teal-500 text-teal-400 hover:bg-teal-500/10"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Use Template
+                  </Button>
+                </div>
                 <Textarea
-                  placeholder="Enter your message..."
+                  placeholder="Enter your message or click 'Use Template' to auto-fill..."
                   value={newNotif.message}
                   onChange={(e) => setNewNotif({ ...newNotif, message: e.target.value })}
                   className="min-h-[120px]"
                 />
+                <p className="text-xs text-gray-400">
+                  Placeholders: {'{name}'}, {'{amount}'}, {'{date}'}, {'{loanId}'}, {'{txnRef}'}
+                </p>
               </div>
+
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsSendOpen(false)} disabled={isSending}>Cancel</Button>

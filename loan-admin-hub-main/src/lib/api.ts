@@ -263,4 +263,30 @@ export const adminApi = {
                 'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
             }
         }).then(res => res.json()),
+
+    // Notification Templates
+    getNotificationTemplates: () =>
+        apiFetch<{
+            id: string;
+            trigger_type: string;
+            channel: string;
+            template_text: string;
+            is_active: boolean;
+            updated_at: string | null;
+        }[]>('/admin/notification-templates'),
+
+    updateNotificationTemplate: (trigger: string, channel: string, templateText: string) =>
+        apiFetch<{ message: string; id: string; trigger_type: string; channel: string; template_text: string }>(
+            `/admin/notification-templates/${trigger}/${channel}?template_text=${encodeURIComponent(templateText)}`,
+            { method: 'PUT' }
+        ),
+
+    getNotificationTemplate: (trigger: string, channel: string) =>
+        apiFetch<{
+            id?: string;
+            trigger_type: string;
+            channel: string;
+            template_text: string;
+            is_default?: boolean;
+        }>(`/admin/notification-templates/${trigger}/${channel}`),
 };

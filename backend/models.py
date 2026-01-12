@@ -714,3 +714,33 @@ class TicketMessage(Base):
     
     # Relationships
     ticket = relationship("SupportTicket", back_populates="messages")
+
+
+class NotificationTemplate(Base):
+    """
+    Custom Notification Templates - Editable SMS/Email templates for admin.
+    Supports variable placeholders: {name}, {amount}, {date}, {loanId}, {txnRef}
+    """
+    __tablename__ = "notification_templates"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # Template identification
+    trigger_type = Column(String(50), nullable=False, index=True)  # emi_reminder, emi_due, emi_overdue, disbursement_confirmation
+    channel = Column(String(20), nullable=False)  # sms, email
+    
+    # Template content
+    template_text = Column(Text, nullable=False)
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Unique constraint: one template per trigger+channel combination
+    __table_args__ = (
+        # This ensures only one active template per trigger+channel
+        {},
+    )

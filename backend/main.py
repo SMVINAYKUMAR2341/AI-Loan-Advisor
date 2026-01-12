@@ -1175,6 +1175,148 @@ async def send_bulk_emi_reminders(
     }
 
 
+# Default notification templates
+DEFAULT_TEMPLATES = {
+    "emi_reminder": {
+        "sms": "Dear {name}, your EMI of Rs.{amount} is due on {date}. Please ensure timely payment.",
+        "email": "Dear {name},\n\nThis is a reminder that your EMI of Rs.{amount} for loan {loanId} is due on {date}.\n\nPlease ensure timely payment to avoid any late fees.\n\nThank you,\nBank Admin"
+    },
+    "emi_due": {
+        "sms": "Dear {name}, your EMI of Rs.{amount} is due today. Please make the payment to avoid late fees.",
+        "email": "Dear {name},\n\nYour EMI of Rs.{amount} for loan {loanId} is due today.\n\nPlease make the payment at your earliest convenience.\n\nThank you,\nBank Admin"
+    },
+    "emi_overdue": {
+        "sms": "URGENT: Dear {name}, your EMI of Rs.{amount} is overdue. Please pay immediately to avoid penalties.",
+        "email": "Dear {name},\n\nYour EMI of Rs.{amount} for loan {loanId} is overdue.\n\nPlease make the payment immediately to avoid additional penalties.\n\nThank you,\nBank Admin"
+    },
+    "disbursement_confirmation": {
+        "sms": "Dear {name}, Rs.{amount} has been disbursed to your account. Transaction Ref: {txnRef}",
+        "email": "Dear {name},\n\nWe are pleased to inform you that your loan amount of Rs.{amount} has been disbursed to your bank account.\n\nTransaction Reference: {txnRef}\n\nThank you for choosing us.\n\nBest regards,\nBank Admin"
+    }
+}
+
+
+@app.get("/admin/notification-templates")
+async def get_notification_templates(
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all notification templates. Creates defaults if none exist.
+    """
+    # Check if templates exist
+    query = select(models.NotificationTemplate).order_by(models.NotificationTemplate.trigger_type)
+    result = await db.execute(query)
+    templates = result.scalars().all()
+    
+    # If no templates exist, create defaults
+    if not templates:
+        for trigger, channels in DEFAULT_TEMPLATES.items():
+            for channel, text in channels.items():
+                template = models.NotificationTemplate(
+                    trigger_type=trigger,
+                    channel=channel,
+                    template_text=text,
+                    is_active=True
+                )
+                db.add(template)
+        await db.commit()
+        
+        # Re-fetch
+        result = await db.execute(query)
+        templates = result.scalars().all()
+    
+    return [{
+        "id": str(t.id),
+        "trigger_type": t.trigger_type,
+        "channel": t.channel,
+        "template_text": t.template_text,
+        "is_active": t.is_active,
+        "updated_at": t.updated_at.isoformat() if t.updated_at else None
+    } for t in templates]
+
+
+@app.put("/admin/notification-templates/{trigger}/{channel}")
+async def update_notification_template(
+    trigger: str,
+    channel: str,
+    template_text: str,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Update a notification template by trigger and channel.
+    """
+    query = select(models.NotificationTemplate).where(
+        models.NotificationTemplate.trigger_type == trigger,
+        models.NotificationTemplate.channel == channel
+    )
+    result = await db.execute(query)
+    template = result.scalars().first()
+    
+    if not template:
+        # Create new template
+        template = models.NotificationTemplate(
+            trigger_type=trigger,
+            channel=channel,
+            template_text=template_text,
+            is_active=True
+        )
+        db.add(template)
+    else:
+        # Update existing
+        template.template_text = template_text
+    
+    await db.commit()
+    await db.refresh(template)
+    
+    return {
+        "message": "Template updated successfully",
+        "id": str(template.id),
+        "trigger_type": template.trigger_type,
+        "channel": template.channel,
+        "template_text": template.template_text
+    }
+
+
+@app.get("/admin/notification-templates/{trigger}/{channel}")
+async def get_notification_template(
+    trigger: str,
+    channel: str,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get a specific notification template.
+    """
+    query = select(models.NotificationTemplate).where(
+        models.NotificationTemplate.trigger_type == trigger,
+        models.NotificationTemplate.channel == channel
+    )
+    result = await db.execute(query)
+    template = result.scalars().first()
+    
+    if not template:
+        # Return default template
+        if trigger in DEFAULT_TEMPLATES and channel in DEFAULT_TEMPLATES[trigger]:
+            return {
+                "trigger_type": trigger,
+                "channel": channel,
+                "template_text": DEFAULT_TEMPLATES[trigger][channel],
+                "is_default": True
+            }
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return {
+        "id": str(template.id),
+        "trigger_type": template.trigger_type,
+        "channel": template.channel,
+        "template_text": template.template_text,
+        "is_active": template.is_active,
+        "is_default": False
+    }
+
+
 # =====================================================
 # CUSTOMER NOTIFICATION ENDPOINTS
 # =====================================================
