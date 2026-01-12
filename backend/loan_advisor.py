@@ -510,6 +510,20 @@ class DecisionEngine:
         if credit_score >= 700 and 0.45 <= approval_probability < 0.70:
             return ("PENDING_REVIEW", "Applicant has strong CIBIL score but borderline AI assessment. Case escalated to Senior Credit Manager for discretionary approval.")
         
+        # === EXCELLENT CREDIT OVERRIDE (New Rule) ===
+        # If credit score is excellent (800+) and FOIR is below RBI limit (55%),
+        # the applicant can definitely afford the loan - approve with manual verification
+        monthly_income = profile.get('monthly_income', 0)
+        if credit_score >= 800 and emi_to_income_ratio <= 0.55:
+            # Calculate remaining income after EMI
+            emi_amount = monthly_income * emi_to_income_ratio
+            remaining_income = monthly_income - emi_amount
+            # If remaining income is reasonable (>= Rs.25,000), approve
+            if remaining_income >= 25000:
+                return ("APPROVED", f"Excellent credit score ({credit_score}) with adequate remaining income (Rs.{remaining_income:,.0f}/month). Application approved.")
+            elif remaining_income >= 15000:
+                return ("PENDING_REVIEW", f"Excellent credit score ({credit_score}) but moderate remaining income (Rs.{remaining_income:,.0f}/month). Manual verification recommended.")
+        
         # === ML-BASED FINAL DECISION (RBI Approved Risk Model) ===
         
         if approval_probability >= 0.70:
@@ -961,18 +975,22 @@ class LoanAdvisor:
         elif credit_score < 600:
             calibrated = min(calibrated, 0.40)
             
-        # If Effective DTI is dangerous (> 60%), cap score at 40%
-        # This aligns the Score with the Rejection Decision
-        # If Effective DTI is dangerous (> 60%), cap score at 33% (Clear Rejection)
-        # But allow variability (10-33%) based on their profile strength
-        elif effective_dti > 0.60:
+        # If Effective DTI is dangerous (> 70%) AND credit score is NOT excellent, cap it
+        # For excellent credit (800+), allow higher DTI as they have proven trustworthy
+        elif effective_dti > 0.70:
             calibrated = calibrated * 0.50  # 50% Penalty
-            calibrated = min(calibrated, 0.33)
+            calibrated = min(calibrated, 0.35)
+        # For DTI between 55-70%, apply mild penalty unless excellent credit
+        elif effective_dti > 0.55:
+            if credit_score < 750:
+                calibrated = calibrated * 0.70  # 30% Penalty for non-excellent credit
+                calibrated = min(calibrated, 0.50)
+            # else: Excellent credit - no penalty for moderate DTI
             
-        # If Effective DTI is Borderline (45% - 60%), ensure score reflects "Pending" (Min 45%)
+        # If Effective DTI is Borderline (45% - 55%), ensure score reflects "Pending" (Min 42%)
         # But only if they are not already penalized by Defaults/Credit Score
-        elif 0.45 < effective_dti <= 0.60:
-            calibrated = max(calibrated, 0.45)
+        elif 0.45 < effective_dti <= 0.55:
+            calibrated = max(calibrated, 0.42)
 
         # 3. BOOSTERS (For Excellent Candidates)
         # Only boost if FOIR is strictly SAFE (<= 45%)

@@ -5205,8 +5205,9 @@ async def process_disbursement(
     
     app, pred = row
     
-    if not pred or pred.decision != "APPROVED":
-        raise HTTPException(status_code=400, detail="Only approved loans can be disbursed")
+    # Allow disbursement for APPROVED and PENDING_REVIEW (admin override)
+    if not pred or pred.decision not in ["APPROVED", "PENDING_REVIEW"]:
+        raise HTTPException(status_code=400, detail="Only approved or pending-review loans can be disbursed")
     
     # Check if already disbursed
     existing = await db.execute(
@@ -5229,6 +5230,9 @@ async def process_disbursement(
     
     db.add(disbursement)
     
+    # Update loan prediction to DISBURSED status
+    pred.decision = "DISBURSED"
+    
     # GENERATE COMPLETE EMI SCHEDULE
     # Create Repayment entries for the full tenure with status "DUE"
     from dateutil.relativedelta import relativedelta
@@ -5248,7 +5252,7 @@ async def process_disbursement(
         due_date = start_date + relativedelta(months=i)
         
         repayment = models.Repayment(
-            user_id=app.user_id,
+            application_id=app.id,  # Fixed: use application_id, not user_id
             emi_number=i,
             due_date=due_date,
             emi_amount=emi_amount,

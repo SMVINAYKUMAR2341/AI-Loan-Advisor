@@ -1,0 +1,207 @@
+sequenceDiagram
+    autonumber
+    title Complete AI Loan Advisor System - End-to-End Workflow
+
+    participant C as Customer
+    participant FE as Customer Portal
+    participant BE as Backend API
+    participant ML as ML Engine
+    participant DB as Database
+    participant Admin as Admin Portal
+    participant Bank as Bank System
+
+    %% ============================================
+    %% STAGE 1: CUSTOMER ONBOARDING
+    %% ============================================
+    rect rgb(240, 248, 255)
+        Note over C,DB: 🔐 STAGE 1: Customer Registration & Login
+        C->>FE: Open Application
+        
+        alt New User
+            C->>FE: Register (Mobile, Email, Password)
+            FE->>BE: POST /signup
+            BE->>DB: Create User (Customer ID: LA2025xxxx)
+        else Returning User
+            C->>FE: Login (Mobile + Password)
+            FE->>BE: POST /login
+            BE->>DB: Verify & Get Profile
+        end
+        
+        DB-->>BE: User Data
+        BE-->>FE: JWT Token
+        FE-->>C: Dashboard Access
+    end
+
+    %% ============================================
+    %% STAGE 2: LOAN APPLICATION WITH ML
+    %% ============================================
+    rect rgb(255, 248, 220)
+        Note over C,ML: 📋 STAGE 2: Loan Application & ML Processing
+        C->>FE: Fill Loan Application Form
+        Note right of C: • Loan Amount<br/>• Tenure<br/>• Purpose<br/>• Income<br/>• CIBIL Score
+        
+        FE->>BE: POST /loan-applications
+        BE->>DB: Store Application (Tracking: RBI2026LAxx)
+        BE->>ML: Analyze Application
+        
+        Note over ML: 🤖 ML Analysis:<br/>• Logistic Regression<br/>• Risk Scoring<br/>• Credit Assessment<br/>• EMI Calculation
+        
+        ML-->>BE: Prediction Result
+        BE->>DB: Store Prediction
+    end
+
+    %% ============================================
+    %% STAGE 3: DECISION BRANCHING
+    %% ============================================
+    rect rgb(220, 255, 220)
+        Note over BE,Admin: 🎯 STAGE 3: ML Decision (3 Outcomes)
+        
+        alt ✅ APPROVED (>= 75% confidence)
+            BE-->>FE: Status: APPROVED
+            FE-->>C: Loan Approved! Proceed to KYC
+            Note over C: → Go to STAGE 4
+            
+        else ⏳ PENDING_REVIEW (50-74% confidence)
+            BE-->>FE: Status: PENDING_REVIEW
+            FE-->>C: Under Review
+            
+            Note over Admin: Admin Review Required
+            Admin->>BE: GET /admin/applications/{id}
+            Admin->>BE: POST /admin/decision
+            
+            alt Admin Approves
+                BE->>DB: Status = APPROVED
+                Note over C: → Go to STAGE 4
+            else Admin Rejects
+                BE->>DB: Status = REJECTED
+                Note over C: Application Closed
+            end
+            
+        else ❌ REJECTED (< 50% confidence)
+            BE-->>FE: Status: REJECTED
+            FE-->>C: Rejected (View Reasons)
+            Note over C: Can Re-apply Later
+        end
+    end
+
+    %% ============================================
+    %% STAGE 4: KYC PROCESS (POST-APPROVAL)
+    %% ============================================
+    rect rgb(230, 230, 255)
+        Note over C,Admin: 📄 STAGE 4: KYC Process (3 Steps)
+        
+        Note over C: Step 1: Document Upload
+        C->>FE: Upload ID Proof (PAN/Aadhaar)
+        FE->>BE: POST /kyc/documents
+        BE->>DB: Store Document
+        
+        C->>FE: Upload Address Proof
+        FE->>BE: POST /kyc/documents
+        BE->>DB: Store Document
+        
+        Note over Admin: Document Verification
+        Admin->>BE: POST /admin/documents/{id}/verify
+        BE->>DB: Status = VERIFIED
+        
+        Note over C: Step 2: Bank Details
+        C->>FE: Enter Bank Account Details
+        FE->>BE: POST /kyc/bank-details
+        BE->>DB: Store Encrypted Bank Info
+        
+        Note over C: Step 3: Agreement Signing
+        C->>FE: View Agreement
+        FE->>BE: GET /kyc/agreement/{id}
+        BE-->>FE: Loan Agreement PDF
+        C->>FE: Sign Agreement ✍️
+        FE->>BE: POST /kyc/agreement/{id}/sign
+        BE->>DB: Agreement Signed
+        
+        C->>FE: Complete KYC
+        FE->>BE: POST /kyc/complete
+        BE->>DB: KYC Status = COMPLETED
+    end
+
+    %% ============================================
+    %% STAGE 5: LOAN DISBURSEMENT
+    %% ============================================
+    rect rgb(255, 230, 230)
+        Note over Admin,Bank: 💰 STAGE 5: Loan Disbursement
+        
+        Admin->>BE: GET /admin/applications (KYC_COMPLETED)
+        BE-->>Admin: Ready for Disbursement List
+        
+        Admin->>Admin: Review Customer Bank Details
+        Admin->>Bank: Transfer Loan Amount (NEFT/RTGS)
+        Bank-->>Admin: Transaction Ref: TXNxxxxxxxx
+        
+        Admin->>BE: POST /admin/disbursement/{id}
+        Note right of Admin: transaction_ref: TXNxxxxxxxx
+        
+        BE->>DB: Create Disbursement Record
+        BE->>DB: Update Status = DISBURSED
+        BE->>DB: Generate EMI Schedule
+        BE->>DB: Send Notification to Customer
+        
+        BE-->>Admin: Disbursement Complete
+        DB-->>C: 📱 Notification: Loan Disbursed!
+    end
+
+    %% ============================================
+    %% STAGE 6: EMI REPAYMENTS
+    %% ============================================
+    rect rgb(255, 245, 230)
+        Note over C,DB: 💳 STAGE 6: EMI Repayments
+        
+        C->>FE: View EMI Schedule
+        FE->>BE: GET /emi-schedule/{application_id}
+        BE->>DB: Fetch EMI Schedule
+        DB-->>BE: EMI Details
+        BE-->>FE: EMI Schedule (Monthly Breakdown)
+        FE-->>C: Display EMI Calendar
+        
+        Note over C: Monthly EMI Due
+        C->>FE: Click "Pay EMI"
+        FE->>BE: GET /admin-bank-details
+        BE-->>FE: Admin Bank Account
+        FE-->>C: Show Payment Options
+        
+        C->>Bank: Transfer EMI Amount
+        Bank-->>C: Payment Ref: PAYxxxxxxxx
+        
+        C->>FE: Record Payment
+        FE->>BE: POST /repayments
+        Note right of C: repayment_id, payment_ref
+        
+        BE->>DB: Update Repayment Status = PAID
+        BE->>DB: Log Audit Entry
+        BE-->>FE: Payment Recorded
+        FE-->>C: ✅ EMI Paid Successfully
+        
+        Note over Admin: Monitor Repayments
+        Admin->>BE: GET /admin/repayments
+        BE->>DB: Fetch All Repayments
+        DB-->>BE: Repayment Data
+        BE-->>Admin: Display EMI Tracking
+    end
+
+    %% ============================================
+    %% STAGE 7: LOAN REPORTS
+    %% ============================================
+    rect rgb(230, 255, 245)
+        Note over C,BE: 📊 STAGE 7: Loan Reports
+        
+        C->>FE: Download Loan Report
+        FE->>BE: GET /loan-report/{id}
+        
+        Note over BE: Generate PDF:<br/>• Applicant Info<br/>• Loan Terms<br/>• ML Factors<br/>• CIBIL Comparison<br/>• EMI Schedule
+        
+        BE-->>FE: PDF Report
+        FE-->>C: Download Complete
+        
+        alt QR Code Share
+            C->>FE: Get QR Code
+            FE->>BE: GET /loan-report/{id}/qr
+            BE-->>FE: QR Image
+            FE-->>C: Share via Mobile
+        end
+    end
