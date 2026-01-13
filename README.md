@@ -212,44 +212,62 @@ This repository is configured to include the `.env` file for ease of setup. **Do
 
 ## 🖼️ Complete System Workflow
 
+**Complete 12-phase workflow covering customer loan application through admin disbursement including: Authentication, Loan Submission, ML Decision, Report/QR Download, KYC, Bank Details, Agreement Signing, Admin Review, Document Verification, Disbursement, and Repayment Tracking.**
+
 ![Combined Customer + Admin Workflow](workflow_diagrams/combined_customer_admin_workflow.png)
 
 ---
 
 ### Customer Loan Application Workflow
+**Customer journey from login/signup through loan application, ML analysis, and 3 decision outcomes (Approved ≥75%, Pending 50-74%, Rejected <50%).**
+
 ![Customer Loan Workflow](workflow_diagrams/customer_loan_workflow.png)
 
 ---
 
 ### Admin Loan Disbursement Workflow
+**Bank admin workflow: 3-factor login, application review, approve/reject decisions, KYC document verification, loan disbursement processing, and reporting.**
+
 ![Admin Loan Disbursement Workflow](workflow_diagrams/admin_loan_disbursement_workflow.png)
 
 ---
 
 ### Complete System Workflow
+**End-to-end system overview showing all 7 stages from customer registration to loan repayment with all actors and API endpoints.**
+
 ![Complete System Workflow](workflow_diagrams/complete_system_workflow.png)
 
 ---
 
 ### KYC, Bank Details & Agreement Workflow
+**Customer KYC process: document upload (Aadhaar, PAN), admin verification, bank details submission, and digital loan agreement signing.**
+
 ![KYC Bank Agreement Workflow](workflow_diagrams/kyc_bank_agreement_workflow.png)
 
 ---
 
 ### KYC Verification
+**Admin KYC document verification flow: view documents, verify authenticity, approve or reject with comments.**
+
 ![KYC Verification](workflow_diagrams/kyc_verification.png)
 
 ---
 
 ### Repayment Workflow
+**Customer EMI repayment process: view schedule, make payments, track payment history and outstanding balance.**
+
 ![Repayment Workflow](workflow_diagrams/repayment.png)
 
 ---
 
 ### Ticket System Workflow
+**Customer support ticket flow: create ticket, admin assignment, resolution tracking, and customer notification.**
+
 ![Ticket System](workflow_diagrams/ticket_system.png)
 
 ---
 
 ### System Monitoring
+**Admin system monitoring: dashboard stats, alerts, notifications, and activity logging.**
+
 ![Monitoring](workflow_diagrams/monitoring.png)
