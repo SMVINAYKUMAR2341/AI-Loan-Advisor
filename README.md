@@ -218,27 +218,6 @@ This repository is configured to include the `.env` file for ease of setup. **Do
 
 ---
 
-### Customer Loan Application Workflow
-**Customer journey from login/signup through loan application, ML analysis, and 3 decision outcomes (Approved ≥75%, Pending 50-74%, Rejected <50%).**
-
-![Customer Loan Workflow](workflow_diagrams/customer_loan_workflow.png)
-
----
-
-### Admin Loan Disbursement Workflow
-**Bank admin workflow: 3-factor login, application review, approve/reject decisions, KYC document verification, loan disbursement processing, and reporting.**
-
-![Admin Loan Disbursement Workflow](workflow_diagrams/admin_loan_disbursement_workflow.png)
-
----
-
-### Complete System Workflow
-**End-to-end system overview showing all 7 stages from customer registration to loan repayment with all actors and API endpoints.**
-
-![Complete System Workflow](workflow_diagrams/complete_system_workflow.png)
-
----
-
 ### KYC, Bank Details & Agreement Workflow
 **Customer KYC process: document upload (Aadhaar, PAN), admin verification, bank details submission, and digital loan agreement signing.**
 
