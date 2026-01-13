@@ -2901,7 +2901,7 @@ async def make_payment(
         "repayment",
         repayment.id,
         f"Paid EMI #{repayment.emi_number} of ₹{repayment.emi_amount}",
-        extra_data={
+        metadata={
             "amount": repayment.emi_amount, 
             "emi_number": repayment.emi_number,
             "payment_method": payment.payment_method
@@ -3055,7 +3055,7 @@ async def upload_document(
         "kyc_document",
         doc.id,
         f"Uploaded {document_type} document: {file.filename}",
-        extra_data={"file_size": file_size, "document_type": document_type}
+        metadata={"file_size": file_size, "document_type": document_type}
     )
     
     await db.commit()

@@ -6,14 +6,15 @@ This directory contains comprehensive sequence diagrams illustrating the complet
 
 | File | Description |
 |------|-------------|
-| `complete_system_workflow.mmd` | **Complete End-to-End Flow** - All 7 stages from registration to repayment |
-| `customer_loan_workflow.mmd` | Customer login, loan application, ML processing with 3 outcomes |
-| `kyc_bank_agreement_workflow.mmd` | KYC document upload, bank details, agreement signing |
-| `admin_loan_disbursement_workflow.mmd` | Admin login, application review, document verification, disbursement |
-| `kyc_verification.mmd` | Existing KYC verification workflow |
-| `repayment.mmd` | Existing repayment workflow |
-| `ticket_system.mmd` | Support ticket workflow |
-| `monitoring.mmd` | System monitoring workflow |
+| `complete_system_workflow.png` | **Complete End-to-End Flow** - All 7 stages from registration to repayment |
+| `customer_loan_workflow.png` | Customer login, loan application, ML processing with 3 outcomes |
+| `kyc_bank_agreement_workflow.png` | KYC document upload, bank details, agreement signing |
+| `admin_loan_disbursement_workflow.png` | Admin login, application review, document verification, disbursement |
+| `combined_customer_admin_workflow.png` | **Combined Customer + Admin** - Full journey from registration to repayment |
+| `kyc_verification.png` | Existing KYC verification workflow |
+| `repayment.png` | Existing repayment workflow |
+| `ticket_system.png` | Support ticket workflow |
+| `monitoring.png` | System monitoring workflow |
 
 ## 🔄 System Flow Overview
 
@@ -67,23 +68,13 @@ The ML engine returns one of three decisions based on approval probability:
 
 ## 📊 How to View These Diagrams
 
-### Option 1: Mermaid Live Editor
-1. Go to [Mermaid Live Editor](https://mermaid.live/)
-2. Copy the contents of any `.mmd` file
-3. Paste into the editor to see the rendered diagram
+The diagrams are generated as high-resolution PNG images. You can view them directly in any image viewer or browser.
 
-### Option 2: VS Code Extension
-1. Install "Mermaid Preview" extension in VS Code
-2. Open any `.mmd` file
-3. Press `Ctrl+Shift+V` to preview
+---
 
-### Option 3: GitHub
-GitHub automatically renders Mermaid diagrams in markdown files. You can embed diagrams using:
-```markdown
-```mermaid
-<paste diagram content here>
-```
-```
+## 🖼️ Combined Customer + Admin Workflow
+
+![Combined Customer Admin Workflow](combined_customer_admin_workflow.png)
 
 ## 🏗️ Related Code Files
 
