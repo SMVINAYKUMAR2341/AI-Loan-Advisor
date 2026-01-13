@@ -214,3 +214,42 @@ This repository is configured to include the `.env` file for ease of setup. **Do
 
 ![Combined Customer + Admin Workflow](workflow_diagrams/combined_customer_admin_workflow.png)
 
+---
+
+### Customer Loan Application Workflow
+![Customer Loan Workflow](workflow_diagrams/customer_loan_workflow.png)
+
+---
+
+### Admin Loan Disbursement Workflow
+![Admin Loan Disbursement Workflow](workflow_diagrams/admin_loan_disbursement_workflow.png)
+
+---
+
+### Complete System Workflow
+![Complete System Workflow](workflow_diagrams/complete_system_workflow.png)
+
+---
+
+### KYC, Bank Details & Agreement Workflow
+![KYC Bank Agreement Workflow](workflow_diagrams/kyc_bank_agreement_workflow.png)
+
+---
+
+### KYC Verification
+![KYC Verification](workflow_diagrams/kyc_verification.png)
+
+---
+
+### Repayment Workflow
+![Repayment Workflow](workflow_diagrams/repayment.png)
+
+---
+
+### Ticket System Workflow
+![Ticket System](workflow_diagrams/ticket_system.png)
+
+---
+
+### System Monitoring
+![Monitoring](workflow_diagrams/monitoring.png)
