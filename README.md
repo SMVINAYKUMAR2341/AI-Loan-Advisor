@@ -207,3 +207,10 @@ The Admin Dashboard is a separate interface for bank officers to manage loan app
 
 ## Deployment
 This repository is configured to include the `.env` file for ease of setup. **Do not use these credentials in a production environment.**
+
+---
+
+## 🖼️ Complete System Workflow
+
+![Combined Customer + Admin Workflow](workflow_diagrams/combined_customer_admin_workflow.png)
+
