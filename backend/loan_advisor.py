@@ -524,11 +524,19 @@ class DecisionEngine:
             elif remaining_income >= 15000:
                 return ("PENDING_REVIEW", f"Excellent credit score ({credit_score}) but moderate remaining income (Rs.{remaining_income:,.0f}/month). Manual verification recommended.")
         
+        # === LOAN-TO-INCOME RATIO OVERRIDE (Additional Safety Net) ===
+        # If loan amount is well within annual income and EMI is affordable, approve
+        if loan_to_income_ratio < 0.7 and emi_to_income_ratio < 0.50 and credit_score >= 650:
+            return ("APPROVED", f"Loan amount ({loan_to_income_ratio:.1%} of annual income) is within safe limits. EMI ({emi_to_income_ratio:.1%} of monthly income) is affordable. Application approved.")
+        
+        if loan_to_income_ratio < 1.0 and emi_to_income_ratio < 0.45 and credit_score >= 700:
+            return ("APPROVED", f"Excellent credit score ({credit_score}) with conservative loan exposure ({loan_to_income_ratio:.1%} of income). Application approved.")
+        
         # === ML-BASED FINAL DECISION (RBI Approved Risk Model) ===
         
-        if approval_probability >= 0.70:
+        if approval_probability >= 0.65:  # Lowered from 0.70 to 0.65
             return ("APPROVED", "Application provisionally approved under RBI Fast-Track scheme. Subject to KYC and digital documentation.")
-        elif approval_probability >= 0.40:
+        elif approval_probability >= 0.35:  # Lowered from 0.40 to 0.35
             return ("PENDING_REVIEW", "Credit assessment indicates borderline eligibility. Case referred to Nodal Bank Manager for final appraisal.")
         else:
             return ("REJECTED", "Credit scoring model indicates high risk-weightage. Application does not meet minimum credit benchmark.")

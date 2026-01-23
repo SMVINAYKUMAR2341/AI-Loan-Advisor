@@ -228,10 +228,36 @@ class LoanPredictor:
             proba = self.model.predict_proba(X)[0]
             approval_prob = proba[0] * 100  # Probability of approval (class 0)
             
-            # Determine status based on probability (Granular thresholds)
-            if approval_prob >= 75:
+            # Calculate loan-to-income ratio for override logic
+            monthly_income = float(loan_data.get('monthly_income', 50000))
+            annual_income = monthly_income * 12
+            loan_amount = float(loan_data.get('loan_amount', 100000))
+            loan_to_income_ratio = loan_amount / annual_income if annual_income > 0 else 10
+            
+            # EMI calculation for affordability check (assuming 12% interest rate)
+            loan_duration = int(loan_data.get('loan_duration', 24))
+            monthly_rate = 0.12 / 12
+            if monthly_rate > 0 and loan_duration > 0:
+                emi = (loan_amount * monthly_rate * (1 + monthly_rate) ** loan_duration) / ((1 + monthly_rate) ** loan_duration - 1)
+            else:
+                emi = loan_amount / max(loan_duration, 1)
+            emi_to_income_ratio = emi / monthly_income if monthly_income > 0 else 1
+            
+            credit_score = int(loan_data.get('cibil_score', loan_data.get('credit_score', 650)))
+            
+            # Determine status based on probability (adjusted thresholds)
+            # OVERRIDE 1: Very favorable loan-to-income ratio (< 0.7x) with good credit score
+            if loan_to_income_ratio < 0.7 and credit_score >= 650 and emi_to_income_ratio < 0.50:
                 status = 'APPROVED'
-            elif approval_prob >= 45:
+                approval_prob = max(approval_prob, 75)  # Boost probability display
+            # OVERRIDE 2: Reasonable loan-to-income ratio (< 1.0x) with excellent credit
+            elif loan_to_income_ratio < 1.0 and credit_score >= 700 and emi_to_income_ratio < 0.45:
+                status = 'APPROVED'
+                approval_prob = max(approval_prob, 72)
+            # Standard ML-based thresholds (lowered from 75 to 65)
+            elif approval_prob >= 65:
+                status = 'APPROVED'
+            elif approval_prob >= 40:
                 status = 'PENDING_REVIEW'
             else:
                 status = 'REJECTED'

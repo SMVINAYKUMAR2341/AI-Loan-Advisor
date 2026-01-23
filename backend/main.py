@@ -5342,11 +5342,19 @@ async def process_disbursement(
     db: AsyncSession = Depends(database.get_db)
 ):
     """Process disbursement for an approved loan"""
+    from uuid import UUID as PyUUID
+    
+    # Convert app_id to UUID
+    try:
+        app_uuid = PyUUID(app_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid application ID format")
+    
     # Get the application
     app_result = await db.execute(
         select(models.LoanApplication, models.LoanPrediction)
         .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
-        .where(models.LoanApplication.id == app_id)
+        .where(models.LoanApplication.id == app_uuid)
     )
     row = app_result.first()
     
@@ -5361,7 +5369,7 @@ async def process_disbursement(
     
     # Check if already disbursed
     existing = await db.execute(
-        select(models.Disbursement).where(models.Disbursement.application_id == app_id)
+        select(models.Disbursement).where(models.Disbursement.application_id == app_uuid)
     )
     if existing.scalar():
         raise HTTPException(status_code=400, detail="Loan already disbursed")
@@ -5436,8 +5444,7 @@ async def get_all_disbursements(
     result = await db.execute(query)
     rows = result.all()
     
-    return [{
-        "id": str(d.id),
+    return [{"id": str(d.id),
         "application_id": str(d.application_id),
         "customer_name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
         "amount": d.amount,
@@ -5445,6 +5452,94 @@ async def get_all_disbursements(
         "status": d.status,
         "processed_at": d.processed_at.isoformat() if d.processed_at else None
     } for d, app, u in rows]
+
+
+# =====================================================
+# ADMIN DOCUMENTS (KYC) ENDPOINTS
+# =====================================================
+
+@app.get("/admin/documents")
+async def get_all_documents(
+    status: str = None,
+    admin = Depends(auth.require_admin()),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all KYC documents for admin verification.
+    Optional filter by verification_status: PENDING, VERIFIED, REJECTED
+    """
+    query = (
+        select(models.KYCDocument, models.User, models.LoanApplication)
+        .join(models.User, models.KYCDocument.user_id == models.User.id)
+        .join(models.LoanApplication, models.KYCDocument.application_id == models.LoanApplication.id)
+        .order_by(models.KYCDocument.uploaded_at.desc())
+    )
+    
+    if status:
+        query = query.where(models.KYCDocument.verification_status == status.upper())
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    return [{
+        "id": str(doc.id),
+        "document_type": doc.document_type,
+        "file_name": doc.file_name,
+        "file_size": doc.file_size,
+        "verification_status": doc.verification_status,
+        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        "customer_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or "N/A",
+        "customer_id": user.customer_id or str(user.id)[:8],
+        "application_id": str(doc.application_id),
+        "tracking_id": app.tracking_id,
+        "loan_amount": app.loan_amount
+    } for doc, user, app in rows]
+
+
+@app.post("/admin/documents/{document_id}/verify")
+async def verify_document_admin(
+    document_id: str,
+    status: str,
+    notes: str = None,
+    admin = Depends(auth.require_admin()),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Verify or reject a KYC document.
+    Status must be 'VERIFIED' or 'REJECTED'.
+    """
+    from uuid import UUID as PyUUID
+    
+    # Validate status
+    if status.upper() not in ["VERIFIED", "REJECTED"]:
+        raise HTTPException(status_code=400, detail="Status must be VERIFIED or REJECTED")
+    
+    try:
+        doc_uuid = PyUUID(document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+    
+    query = select(models.KYCDocument).where(models.KYCDocument.id == doc_uuid)
+    result = await db.execute(query)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Update document status
+    document.verification_status = status.upper()
+    document.verification_notes = notes
+    document.verified_by = admin.id
+    document.verified_at = datetime.now()
+    
+    await db.commit()
+    await db.refresh(document)
+    
+    return {
+        "message": f"Document {status.upper()} successfully",
+        "id": str(document.id),
+        "verification_status": document.verification_status
+    }
 
 
 @app.post("/admin/notifications/send")
