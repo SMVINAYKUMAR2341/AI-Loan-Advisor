@@ -38,10 +38,11 @@ interface RepaymentData {
   id: string;
   user_id: string;
   customer_name: string;
-  mobile_number: string;
+  mobile_number: string | null;
   emi_number: number;
   amount: number;
-  payment_method: string;
+  payment_amount: number | null;
+  payment_method: string | null;
   status: string;
   paid_at: string | null;
   due_date: string | null;
@@ -77,20 +78,29 @@ export default function EMITracking() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Categorize Repayments
+  // Categorize Repayments based on backend payment_status values
+  // Backend uses: 'DUE', 'PAID', 'OVERDUE', 'PARTIALLY_PAID'
   const paidRepayments = repayments.filter(r =>
-    ['COMPLETED', 'paid', 'SUCCESS'].includes(r.status)
+    ['PAID', 'paid', 'COMPLETED', 'SUCCESS'].includes(r.status)
   );
 
-  const pendingRepayments = repayments.filter(r =>
-    ['PENDING', 'pending', 'DUE'].includes(r.status) &&
-    (!r.due_date || new Date(r.due_date) >= today)
-  );
+  const pendingRepayments = repayments.filter(r => {
+    const isDue = ['DUE', 'PARTIALLY_PAID'].includes(r.status);
+    // Only show as upcoming if due date is today or in the future
+    if (!isDue) return false;
+    if (!r.due_date) return true; // No due date means it's still upcoming
+    const dueDate = new Date(r.due_date);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate >= today;
+  });
 
-  const overdueRepayments = repayments.filter(r =>
-    ['PENDING', 'pending', 'DUE'].includes(r.status) &&
-    r.due_date && new Date(r.due_date) < today
-  );
+  const overdueRepayments = repayments.filter(r => {
+    const isOverdueStatus = r.status === 'OVERDUE';
+    // Also check for DUE payments that are past due date
+    const isDuePastDate = ['DUE', 'PARTIALLY_PAID'].includes(r.status) &&
+      r.due_date && new Date(r.due_date) < today;
+    return isOverdueStatus || isDuePastDate;
+  });
 
   // Stats
   const totalCollected = paidRepayments.reduce((sum, r) => sum + r.amount, 0);
@@ -139,8 +149,8 @@ export default function EMITracking() {
                 </TableCell>
                 <TableCell>
                   <Badge className={`border ${type === 'paid' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                      type === 'overdue' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                        'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                    type === 'overdue' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                      'bg-blue-500/20 text-blue-400 border-blue-500/30'
                     }`}>
                     {type === 'paid' ? 'PAID' : type === 'overdue' ? 'OVERDUE' : 'UPCOMING'}
                   </Badge>

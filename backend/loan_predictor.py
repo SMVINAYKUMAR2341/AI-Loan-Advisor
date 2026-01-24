@@ -223,10 +223,12 @@ class LoanPredictor:
             X = self.preprocess_input(loan_data)
             
             # Get prediction probability
-            # Class 0 = Non-Default (Approved)
-            # Class 1 = Default (Rejected)
+            # IMPORTANT: In our trained model:
+            # Class 0 = Default (will default on loan - REJECT)
+            # Class 1 = Non-Default (will NOT default - APPROVE)
+            # So we use proba[1] as the approval probability
             proba = self.model.predict_proba(X)[0]
-            approval_prob = proba[0] * 100  # Probability of approval (class 0)
+            approval_prob = proba[1] * 100  # Probability of NOT defaulting (approval)
             
             # Calculate loan-to-income ratio for override logic
             monthly_income = float(loan_data.get('monthly_income', 50000))
@@ -245,16 +247,41 @@ class LoanPredictor:
             
             credit_score = int(loan_data.get('cibil_score', loan_data.get('credit_score', 650)))
             
-            # Determine status based on probability (adjusted thresholds)
-            # OVERRIDE 1: Very favorable loan-to-income ratio (< 0.7x) with good credit score
-            if loan_to_income_ratio < 0.7 and credit_score >= 650 and emi_to_income_ratio < 0.50:
+            # Determine status based on probability AND risk factors
+            # Since model outputs extreme probabilities, we use rule-based PENDING_REVIEW triggers
+            has_defaults = str(loan_data.get('previous_loan_defaults', 'No')).lower() in ['yes', 'true', '1']
+            
+            # OVERRIDE 1: Very favorable LTI (<0.7x) with good credit, no defaults
+            if loan_to_income_ratio < 0.7 and credit_score >= 650 and emi_to_income_ratio < 0.50 and not has_defaults:
                 status = 'APPROVED'
-                approval_prob = max(approval_prob, 75)  # Boost probability display
-            # OVERRIDE 2: Reasonable loan-to-income ratio (< 1.0x) with excellent credit
-            elif loan_to_income_ratio < 1.0 and credit_score >= 700 and emi_to_income_ratio < 0.45:
+                approval_prob = max(approval_prob, 75)
+            
+            # OVERRIDE 2: Reasonable LTI (<1.0x) with excellent credit, no defaults
+            elif loan_to_income_ratio < 1.0 and credit_score >= 700 and emi_to_income_ratio < 0.45 and not has_defaults:
                 status = 'APPROVED'
                 approval_prob = max(approval_prob, 72)
-            # Standard ML-based thresholds (lowered from 75 to 65)
+            
+            # PENDING_REVIEW Case 1: Has defaults but otherwise good profile
+            elif has_defaults and credit_score >= 600 and loan_to_income_ratio < 1.0:
+                status = 'PENDING_REVIEW'
+                approval_prob = 55
+            
+            # PENDING_REVIEW Case 2: Low credit (500-600) but low LTI (<0.5)
+            elif credit_score < 600 and credit_score >= 500 and loan_to_income_ratio < 0.5 and not has_defaults:
+                status = 'PENDING_REVIEW'
+                approval_prob = 50
+            
+            # PENDING_REVIEW Case 3: High LTI (1.0-1.5) with fair credit
+            elif loan_to_income_ratio >= 1.0 and loan_to_income_ratio < 1.5 and credit_score >= 600 and not has_defaults:
+                status = 'PENDING_REVIEW'
+                approval_prob = 48
+            
+            # PENDING_REVIEW Case 4: Young applicant with limited experience
+            elif loan_data.get('age', 30) < 25 and loan_data.get('experience', 5) < 2 and credit_score < 650 and not has_defaults:
+                status = 'PENDING_REVIEW'
+                approval_prob = 52
+            
+            # Standard ML-based thresholds for remaining cases
             elif approval_prob >= 65:
                 status = 'APPROVED'
             elif approval_prob >= 40:

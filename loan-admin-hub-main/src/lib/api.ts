@@ -115,16 +115,18 @@ export const adminApi = {
 
     getDisbursements: () => apiFetch<any[]>('/admin/disbursements'),
 
-    // EMI Repayments - View customer payments
     getRepayments: () => apiFetch<{
         id: string;
         user_id: string;
         customer_name: string;
+        mobile_number: string;
         emi_number: number;
         amount: number;
-        payment_method: string;
+        payment_amount: number | null;
+        payment_method: string | null;
         status: string;
-        paid_at: string;
+        paid_at: string | null;
+        due_date: string | null;
     }[]>('/admin/repayments'),
 
     // Notifications
