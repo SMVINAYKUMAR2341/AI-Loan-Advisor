@@ -4631,17 +4631,23 @@ export default function Dashboard() {
                     {/* User Info & Logout */}
                     {sidebarOpen && (
                         <div className="p-4 border-t border-white/10">
-                            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 mb-3">
+                            <button
+                                onClick={() => {
+                                    setActiveSection('security');
+                                    setSecuritySubSection('account');
+                                }}
+                                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 mb-3 transition-colors cursor-pointer"
+                            >
                                 <div className="w-10 h-10 bg-teal-500/20 rounded-full flex items-center justify-center">
                                     <span className="text-teal-400 font-semibold text-sm">
                                         {profileData.user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                                     </span>
                                 </div>
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 text-left">
                                     <p className="text-white text-sm font-medium truncate">{profileData.user.fullName}</p>
-                                    <p className="text-gray-500 text-xs truncate">Customer ID: {profileData.user.id.slice(0, 8)}</p>
+                                    <p className="text-gray-500 text-xs truncate">Customer ID: {accountData?.customer_id || profileData.user.id}</p>
                                 </div>
-                            </div>
+                            </button>
                             <button
                                 onClick={handleLogout}
                                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium transition-colors"
