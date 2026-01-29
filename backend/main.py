@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import calendar
 from collections import defaultdict
@@ -6734,93 +6734,92 @@ async def add_ticket_message(
     return new_msg
 
 
- 
- #   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
- #   P A Y M E N T   &   E X T E R N A L   I N T E G R A T I O N S  
- #   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
- i m p o r t   e x t e r n a l _ s e r v i c e s  
-  
- @ a p p . p o s t ( " / a p i / v e r i f y - b a n k " )  
- a s y n c   d e f   v e r i f y _ b a n k _ a c c o u n t (  
-         r e q u e s t :   s c h e m a s . B a n k V e r i f i c a t i o n R e q u e s t ,  
-         c u r r e n t _ u s e r :   m o d e l s . U s e r   =   D e p e n d s ( a u t h . g e t _ c u r r e n t _ u s e r )  
- ) :  
-         " " "  
-         V e r i f y   b a n k   a c c o u n t   d e t a i l s   u s i n g   P e n n y   D r o p   ( S i m u l a t e d )  
-         " " "  
-         t r y :  
-                 r e s u l t   =   a w a i t   e x t e r n a l _ s e r v i c e s . v e r i f y _ b a n k _ a c c o u n t _ p e n n y _ d r o p (  
-                         a c c o u n t _ n u m b e r = r e q u e s t . a c c o u n t _ n u m b e r ,  
-                         i f s c _ c o d e = r e q u e s t . i f s c _ c o d e ,  
-                         a c c o u n t _ h o l d e r _ n a m e = r e q u e s t . a c c o u n t _ h o l d e r _ n a m e  
-                 )  
-                 r e t u r n   r e s u l t  
-         e x c e p t   E x c e p t i o n   a s   e :  
-                 r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 5 0 0 ,   d e t a i l = s t r ( e ) )  
-  
- @ a p p . p o s t ( " / a p i / i n i t i a t e - p a y m e n t " )  
- a s y n c   d e f   i n i t i a t e _ p a y m e n t (  
-         p a y m e n t _ r e q u e s t :   s c h e m a s . D i s b u r s e m e n t R e q u e s t ,  
-         c u r r e n t _ a d m i n   =   D e p e n d s ( a u t h . r e q u i r e _ a d m i n ( ) ) ,  
-         d b :   A s y n c S e s s i o n   =   D e p e n d s ( d a t a b a s e . g e t _ d b )  
- ) :  
-         " " "  
-         I n i t i a t e   l o a n   d i s b u r s e m e n t   p a y m e n t   ( A d m i n   o n l y )  
-         " " "  
-         t r y :  
-                 #   G e t   a p p l i c a t i o n   d e t a i l s  
-                 q u e r y   =   s e l e c t ( m o d e l s . L o a n A p p l i c a t i o n ) . w h e r e ( m o d e l s . L o a n A p p l i c a t i o n . i d   = =   p a y m e n t _ r e q u e s t . a p p l i c a t i o n _ i d )  
-                 r e s u l t   =   a w a i t   d b . e x e c u t e ( q u e r y )  
-                 a p p l i c a t i o n   =   r e s u l t . s c a l a r s ( ) . f i r s t ( )  
-                  
-                 i f   n o t   a p p l i c a t i o n :  
-                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 4 ,   d e t a i l = " A p p l i c a t i o n   n o t   f o u n d " )  
-                          
-                 #   G e t   U s e r   d e t a i l s   f o r   p a y m e n t   i n f o  
-                 u s e r _ q u e r y   =   s e l e c t ( m o d e l s . U s e r ) . w h e r e ( m o d e l s . U s e r . i d   = =   a p p l i c a t i o n . u s e r _ i d )  
-                 u s e r _ r e s u l t   =   a w a i t   d b . e x e c u t e ( u s e r _ q u e r y )  
-                 u s e r   =   u s e r _ r e s u l t . s c a l a r s ( ) . f i r s t ( )  
-                  
-                 i f   n o t   u s e r :  
-                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 4 ,   d e t a i l = " U s e r   n o t   f o u n d " )  
-  
-                 a m o u n t   =   a p p l i c a t i o n . l o a n _ a m o u n t  
-                 c u s t o m e r _ n a m e   =   f " { u s e r . f i r s t _ n a m e }   { u s e r . l a s t _ n a m e } "  
-                 c u s t o m e r _ e m a i l   =   u s e r . e m a i l   o r   " t e s t @ e x a m p l e . c o m "  
-                 c u s t o m e r _ p h o n e   =   u s e r . m o b i l e _ n u m b e r  
-                 o r d e r _ i d   =   f " L O A N _ { a p p l i c a t i o n . t r a c k i n g _ i d   o r   s t r ( a p p l i c a t i o n . i d ) [ : 8 ] } "  
-  
-                 i f   p a y m e n t _ r e q u e s t . p a y m e n t _ m e t h o d   = =   " s t r i p e " :  
-                         r e t u r n   a w a i t   e x t e r n a l _ s e r v i c e s . i n i t i a t e _ p a y m e n t _ s t r i p e (  
-                                 a m o u n t = a m o u n t ,  
-                                 c u s t o m e r _ e m a i l = c u s t o m e r _ e m a i l ,  
-                                 d e s c r i p t i o n = f " L o a n   D i s b u r s e m e n t   f o r   { o r d e r _ i d } "  
-                         )  
-                 e l s e :  
-                         r e t u r n   a w a i t   e x t e r n a l _ s e r v i c e s . i n i t i a t e _ p a y m e n t _ r a z o r p a y (  
-                                 a m o u n t = a m o u n t ,  
-                                 c u s t o m e r _ n a m e = c u s t o m e r _ n a m e ,  
-                                 c u s t o m e r _ e m a i l = c u s t o m e r _ e m a i l ,  
-                                 c u s t o m e r _ p h o n e = c u s t o m e r _ p h o n e ,  
-                                 o r d e r _ i d = o r d e r _ i d  
-                         )  
-                          
-         e x c e p t   E x c e p t i o n   a s   e :  
-                 i m p o r t   t r a c e b a c k  
-                 t r a c e b a c k . p r i n t _ e x c ( )  
-                 r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 5 0 0 ,   d e t a i l = s t r ( e ) )  
-  
- @ a p p . p o s t ( " / a p i / v a l i d a t e - i d " )  
- a s y n c   d e f   v a l i d a t e _ i d _ d o c u m e n t (  
-         d o c u m e n t _ t y p e :   s t r ,  
-         d o c u m e n t _ n u m b e r :   s t r ,  
-         c u r r e n t _ u s e r :   m o d e l s . U s e r   =   D e p e n d s ( a u t h . g e t _ c u r r e n t _ u s e r )  
- ) :  
-         " " "  
-         V a l i d a t e   I D   d o c u m e n t   f o r m a t   ( P A N / A a d h a a r )  
-         " " "  
-         r e t u r n   a w a i t   e x t e r n a l _ s e r v i c e s . v a l i d a t e _ i n d i a n _ i d _ d o c u m e n t s (  
-                 d o c u m e n t _ t y p e = d o c u m e n t _ t y p e ,    
-                 d o c u m e n t _ n u m b e r = d o c u m e n t _ n u m b e r  
-         )  
- 
+
+# =====================================================
+# PAYMENT & EXTERNAL INTEGRATIONS
+# =====================================================
+import external_services
+
+@app.post("/api/verify-bank")
+async def verify_bank_account(
+    request: schemas.BankVerificationRequest,
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Verify bank account details using Penny Drop (Simulated)
+    """
+    try:
+        result = await external_services.verify_bank_account_penny_drop(
+            account_number=request.account_number,
+            ifsc_code=request.ifsc_code,
+            account_holder_name=request.account_holder_name
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/initiate-payment")
+async def initiate_payment(
+    payment_request: schemas.DisbursementRequest,
+    current_admin = Depends(auth.require_admin()),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Initiate loan disbursement payment (Admin only)
+    """
+    try:
+        # Get application details
+        query = select(models.LoanApplication).where(models.LoanApplication.id == payment_request.application_id)
+        result = await db.execute(query)
+        application = result.scalars().first()
+        
+        if not application:
+            raise HTTPException(status_code=404, detail="Application not found")
+            
+        # Get User details for payment info
+        user_query = select(models.User).where(models.User.id == application.user_id)
+        user_result = await db.execute(user_query)
+        user = user_result.scalars().first()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        amount = application.loan_amount
+        customer_name = f"{user.first_name} {user.last_name}"
+        customer_email = user.email or "test@example.com"
+        customer_phone = user.mobile_number
+        order_id = f"LOAN_{application.tracking_id or str(application.id)[:8]}"
+
+        if payment_request.payment_method == "stripe":
+            return await external_services.initiate_payment_stripe(
+                amount=amount,
+                customer_email=customer_email,
+                description=f"Loan Disbursement for {order_id}"
+            )
+        else:
+            return await external_services.initiate_payment_razorpay(
+                amount=amount,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                customer_phone=customer_phone,
+                order_id=order_id
+            )
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/validate-id")
+async def validate_id_document(
+    document_type: str,
+    document_number: str,
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Validate ID document format (PAN/Aadhaar)
+    """
+    return await external_services.validate_indian_id_documents(
+        document_type=document_type, 
+        document_number=document_number
+    )
