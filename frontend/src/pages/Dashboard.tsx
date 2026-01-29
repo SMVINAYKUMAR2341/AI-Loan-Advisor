@@ -20,7 +20,7 @@ import {
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
     Activity, CheckSquare, Search, AlertTriangle, Download, Plus,
-    ShieldCheck, Landmark, PenTool, Lock, RefreshCw, Loader
+    ShieldCheck, Landmark, PenTool, Lock, RefreshCw, Loader, Loader2
 } from "lucide-react";
 
 // Charts - Professional visualization
@@ -340,6 +340,8 @@ export default function Dashboard() {
     });
     const [agreementConsent, setAgreementConsent] = useState(false);
     const [electronicConsent, setElectronicConsent] = useState(false);
+    const [signatureText, setSignatureText] = useState<string>("");
+    const [signingInProgress, setSigningInProgress] = useState(false);
 
     interface AccountData {
         customer_id: string;
@@ -829,6 +831,13 @@ export default function Dashboard() {
             setKycError('You must accept the terms to proceed');
             return;
         }
+        if (!signatureText.trim() || signatureText.length < 3) {
+            setKycError('Please enter your full name as digital signature');
+            return;
+        }
+        
+        setSigningInProgress(true);
+        
         try {
             const token = localStorage.getItem('access_token');
             const response = await fetch(`${API_BASE_URL}/kyc/${appId}/agreement/sign`, {
@@ -839,19 +848,30 @@ export default function Dashboard() {
                 },
                 body: JSON.stringify({
                     consent_checkbox: true,
-                    consent_text_acknowledged: "I have read and agree to all terms and conditions of this loan agreement."
+                    consent_text_acknowledged: `I, ${signatureText}, have read and agree to all terms and conditions of this loan agreement. Signed on ${new Date().toLocaleString()}.`,
+                    digital_signature: signatureText,
+                    signature_timestamp: new Date().toISOString()
                 })
             });
             if (response.ok) {
-                setKycSuccess('Agreement signed successfully!');
+                setKycSuccess('✓ Agreement signed and authenticated successfully!');
+                setSignatureText('');
+                setAgreementConsent(false);
                 fetchKycStatus(appId);
                 setKycStep(4);
+                
+                // Show success animation
+                setTimeout(() => {
+                    setKycSuccess('');
+                }, 5000);
             } else {
                 const error = await response.json();
                 setKycError(error.detail || 'Signing failed');
             }
         } catch (error) {
             setKycError('Network error signing agreement');
+        } finally {
+            setSigningInProgress(false);
         }
     };
 
@@ -2724,6 +2744,22 @@ export default function Dashboard() {
                 {/* Step 3: Agreement - RBI-Governor Grade Design */}
                 {kycStep === 3 && (
                     <div className="space-y-6">
+                        {/* Success Message */}
+                        {kycSuccess && (
+                            <div className="p-4 bg-green-900/30 border border-green-500/30 rounded-xl flex items-center gap-3 animate-fade-in">
+                                <CheckCircle className="w-6 h-6 text-green-400" />
+                                <p className="text-green-300 font-semibold">{kycSuccess}</p>
+                            </div>
+                        )}
+                        
+                        {/* Error Message */}
+                        {kycError && (
+                            <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl flex items-center gap-3 animate-fade-in">
+                                <AlertCircle className="w-6 h-6 text-red-400" />
+                                <p className="text-red-300 font-semibold">{kycError}</p>
+                            </div>
+                        )}
+                        
                         {/* Header Section – Trust & Identity */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-4">
                             <div>
@@ -2897,6 +2933,49 @@ export default function Dashboard() {
 
                                         <div className="flex flex-col lg:flex-row justify-between items-end gap-12 pt-8 border-t border-white/10">
                                             <div className="max-w-md w-full space-y-5">
+                                                {/* Digital Signature Input */}
+                                                <div className="space-y-3">
+                                                    <label className="block text-sm font-semibold text-gray-300 flex items-center gap-2">
+                                                        <PenTool className="w-4 h-4 text-teal-400" />
+                                                        Enter Your Full Name (Digital Signature)
+                                                    </label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            value={signatureText}
+                                                            onChange={(e) => setSignatureText(e.target.value)}
+                                                            placeholder="Type your full legal name here"
+                                                            disabled={agreement.signed_at !== null}
+                                                            className="w-full px-4 py-3 bg-gray-800/50 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all text-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            style={{ fontFamily: "'Brush Script MT', cursive" }}
+                                                        />
+                                                    </div>
+                                                    {signatureText && (
+                                                        <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-lg flex items-center gap-2">
+                                                            <CheckCircle className="w-4 h-4 text-teal-400" />
+                                                            <p className="text-sm text-teal-300">Signature: <span className="font-semibold">{signatureText}</span></p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Security Info */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="p-3 bg-blue-950/20 border border-blue-500/20 rounded-lg">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <ShieldCheck className="w-3 h-3 text-blue-400" />
+                                                            <p className="text-xs font-bold text-blue-400 uppercase">IP Verified</p>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500">Encrypted</p>
+                                                    </div>
+                                                    <div className="p-3 bg-purple-950/20 border border-purple-500/20 rounded-lg">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Clock className="w-3 h-3 text-purple-400" />
+                                                            <p className="text-xs font-bold text-purple-400 uppercase">Timestamp</p>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500">{new Date().toLocaleTimeString()}</p>
+                                                    </div>
+                                                </div>
+
                                                 <label className="flex items-start gap-4 cursor-pointer group p-4 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/10">
                                                     <div className="relative flex items-center mt-1">
                                                         <input
@@ -2914,10 +2993,15 @@ export default function Dashboard() {
                                                 <div className="flex gap-4">
                                                     <button
                                                         onClick={() => signAgreement(applicationId)}
-                                                        disabled={!agreementConsent || agreement.signed_at !== null}
-                                                        className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-30 disabled:from-gray-700 disabled:to-gray-800 rounded-xl text-white font-black text-xs tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_20px_-10px_rgba(20,184,166,0.3)] flex items-center justify-center gap-3 group"
+                                                        disabled={!agreementConsent || !signatureText.trim() || agreement.signed_at !== null || signingInProgress}
+                                                        className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-emerald-600 disabled:opacity-30 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed rounded-xl text-white font-black text-xs tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_20px_-10px_rgba(20,184,166,0.3)] flex items-center justify-center gap-3 group"
                                                     >
-                                                        {agreement.signed_at ? (
+                                                        {signingInProgress ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                PROCESSING...
+                                                            </>
+                                                        ) : agreement.signed_at ? (
                                                             <>
                                                                 <Lock className="w-4 h-4" />
                                                                 SIGNED & TRANSMITTED
