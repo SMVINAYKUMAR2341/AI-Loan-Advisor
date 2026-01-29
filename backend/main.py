@@ -17,6 +17,7 @@ from uuid import UUID
 import models
 import schemas
 import database
+from database import get_db
 import auth
 import report_generator
 
