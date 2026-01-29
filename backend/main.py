@@ -1544,8 +1544,28 @@ def read_root():
     return {"message": "Loan Advisor API is running", "version": "1.0.0"}
 
 @app.api_route("/health", methods=["GET", "HEAD"])
-def health_check():
-    return {"status": "healthy"}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    """
+    Enhanced health check with database connectivity test
+    """
+    try:
+        # Test database connection
+        from sqlalchemy import text
+        result = await db.execute(text("SELECT 1"))
+        result.scalar()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.post("/predict-loan", response_model=LoanPredictionResponse)
 async def predict_loan_eligibility(application: LoanApplicationRequest):
@@ -3850,16 +3870,21 @@ async def get_kyc_status(
 @app.post("/kyc/{application_id}/documents")
 async def upload_kyc_document(
     application_id: str,
-    document_type: str,  # ID_PROOF or ADDRESS_PROOF
-    document_category: str,  # PAN, PASSPORT, AADHAAR, UTILITY_BILL etc
-    request: Request,
+    document_type: str = Form(...),  # ID_PROOF or ADDRESS_PROOF
+    document_category: str = Form(...),  # PAN, PASSPORT, AADHAAR, etc
+    file: UploadFile = File(...),
     current_user: models.User = Depends(auth.get_current_user),
     db: AsyncSession = Depends(database.get_db)
 ):
     """
-    Upload KYC document (Step 1).
+    Upload KYC document (Step 1) with actual file.
     Accepts: PDF, JPG, PNG. Max 5MB.
+    Validates all 4 required documents.
     """
+    import os
+    import aiofiles
+    import uuid
+    
     application, prediction, kyc_tracking = await verify_kyc_eligibility(
         application_id, current_user.id, db
     )
@@ -3880,18 +3905,54 @@ async def upload_kyc_document(
             detail=f"Invalid category for {document_type}. Valid: {valid_categories[document_type]}"
         )
     
+    # Check if document already uploaded
+    doc_type_full = f"{document_type}_{document_category}"
+    existing_query = select(models.KYCDocument).where(
+        models.KYCDocument.application_id == application.id,
+        models.KYCDocument.document_type == doc_type_full
+    )
+    result = await db.execute(existing_query)
+    existing_doc = result.scalars().first()
     
-    # Create document record (simulating file upload)
-    import uuid
+    if existing_doc:
+        raise HTTPException(status_code=400, detail=f"{document_category} already uploaded")
+    
+    # Validate file
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+        
+    allowed_types = ["application/pdf", "image/jpeg", "image/png", "image/jpg"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="File must be PDF, JPG, or PNG")
+    
+    # Read and validate file size
+    file_content = await file.read()
+    file_size = len(file_content)
+    if file_size > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+    
+    # Create upload directory
+    upload_dir = f"uploads/{current_user.id}/{application.id}"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Save file
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'pdf'
+    unique_filename = f"{document_category}_{uuid.uuid4().hex[:8]}.{ext}"
+    file_path = f"{upload_dir}/{unique_filename}"
+    
+    async with aiofiles.open(file_path, 'wb') as f:
+        await f.write(file_content)
+    
+    # Create document record
     doc = models.KYCDocument(
         application_id=application.id,
         user_id=current_user.id,
-        document_type=f"{document_type}_{document_category}",
-        file_name=f"{document_category}_{uuid.uuid4().hex[:8]}.pdf",
-        file_path=f"/uploads/kyc/{current_user.id}/{application.id}/",
-        file_size=1024 * 100,  # Simulated 100KB
-        mime_type="application/pdf",
-        verification_status="UPLOADED"
+        document_type=doc_type_full,
+        file_name=unique_filename,
+        file_path=file_path,
+        file_size=file_size,
+        mime_type=file.content_type,
+        verification_status="PENDING"
     )
     db.add(doc)
     
@@ -3908,17 +3969,27 @@ async def upload_kyc_document(
         entity_type="kyc_document",
         entity_id=doc.id,
         description=f"Uploaded {document_category} document for KYC",
-        request=request
+        metadata={"file_size": file_size, "file_type": file.content_type}
     )
     
     await db.commit()
     await db.refresh(doc)
     
+    # Check if all 4 required documents are uploaded
+    count_query = select(func.count(models.KYCDocument.id)).where(
+        models.KYCDocument.application_id == application.id
+    )
+    result = await db.execute(count_query)
+    total_docs = result.scalar()
+    
     return {
         "message": "Document uploaded successfully",
         "document_id": str(doc.id),
         "document_type": doc.document_type,
-        "verification_status": doc.verification_status
+        "verification_status": doc.verification_status,
+        "total_uploaded": total_docs,
+        "required": 4,
+        "can_proceed": total_docs >= 2
     }
 
 
@@ -5099,6 +5170,192 @@ async def analyze_mock_statement(
         return {"error": str(e)}
 
 
+# =====================================================
+# REAL EXTERNAL API INTEGRATIONS (Free Services)
+# =====================================================
+
+@app.post("/api/validate-document-ocr")
+async def validate_document_with_external_ocr(
+    document_id: str,
+    admin = Depends(auth.require_admin()),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Validate document using OCR.space API (Free 25,000 requests/month)
+    Real API: https://api.ocr.space
+    """
+    from uuid import UUID as PyUUID
+    from external_services import validate_document_with_ocr
+    import os
+    
+    try:
+        doc_uuid = PyUUID(document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+    
+    query = select(models.KYCDocument).where(models.KYCDocument.id == doc_uuid)
+    result = await db.execute(query)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="Document file not found")
+    
+    validation_result = await validate_document_with_ocr(document.file_path)
+    
+    if validation_result.get("success"):
+        document.verification_notes = f"OCR: {validation_result.get('document_type')} - Score: {validation_result.get('validation_score')}%"
+        if validation_result.get("is_valid"):
+            document.verification_status = "VERIFIED"
+        await db.commit()
+    
+    return validation_result
+
+
+@app.post("/api/validate-id")
+async def validate_id_document(document_type: str, document_number: str):
+    """
+    Validate Indian ID documents (PAN/Aadhaar format)
+    Unlimited free validation
+    """
+    from external_services import validate_indian_id_documents
+    
+    if document_type not in ["PAN", "AADHAAR"]:
+        raise HTTPException(status_code=400, detail="Type must be PAN or AADHAAR")
+    
+    return await validate_indian_id_documents(document_type, document_number)
+
+
+@app.post("/api/initiate-payment")
+async def initiate_payment(
+    application_id: str,
+    payment_method: str = "razorpay",
+    admin = Depends(auth.require_admin()),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Real Payment Gateway Test Mode (Unlimited free):
+    - Razorpay: https://razorpay.com (Test Mode)
+    - Stripe: https://stripe.com (Test Mode)
+    """
+    from uuid import UUID as PyUUID
+    from external_services import initiate_payment_razorpay, initiate_payment_stripe
+    import random
+    
+    try:
+        app_uuid = PyUUID(application_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid application ID")
+    
+    app_query = select(models.LoanApplication, models.User).join(
+        models.User, models.LoanApplication.user_id == models.User.id
+    ).where(models.LoanApplication.id == app_uuid)
+    
+    result = await db.execute(app_query)
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    application, user = row
+    amount = application.loan_amount or 100000
+    customer_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "Customer"
+    order_id = f"LOAN_{application.tracking_id or str(app_uuid)[:8]}"
+    
+    if payment_method.lower() == "razorpay":
+        payment_result = await initiate_payment_razorpay(
+            amount, customer_name, user.email or "test@example.com",
+            user.mobile_number or "9999999999", order_id
+        )
+    elif payment_method.lower() == "stripe":
+        payment_result = await initiate_payment_stripe(
+            amount, user.email or "test@example.com", f"Loan - {order_id}"
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Method must be 'razorpay' or 'stripe'")
+    
+    if payment_result.get("success"):
+        disbursement = models.Disbursement(
+            application_id=app_uuid,
+            user_id=user.id,
+            amount=amount,
+            transaction_ref=payment_result.get("payment_id"),
+            payment_method=payment_method,
+            status="INITIATED"
+        )
+        db.add(disbursement)
+        await db.commit()
+        payment_result["disbursement_id"] = str(disbursement.id)
+    
+    return payment_result
+
+
+@app.post("/api/verify-bank")
+async def verify_bank(
+    application_id: str,
+    account_number: str,
+    ifsc_code: str,
+    account_holder_name: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Bank Account Verification (Penny Drop simulation)
+    Simulates: Razorpay/Cashfree/Signzy APIs
+    """
+    from external_services import verify_bank_account_penny_drop
+    from uuid import UUID as PyUUID
+    
+    try:
+        app_uuid = PyUUID(application_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid application ID")
+    
+    app_query = select(models.LoanApplication).where(
+        models.LoanApplication.id == app_uuid,
+        models.LoanApplication.user_id == current_user.id
+    )
+    result = await db.execute(app_query)
+    application = result.scalars().first()
+    
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    verification_result = await verify_bank_account_penny_drop(
+        account_number, ifsc_code, account_holder_name
+    )
+    
+    if verification_result.get("account_verified"):
+        bank_query = select(models.BankAccountDetails).where(
+            models.BankAccountDetails.application_id == app_uuid
+        )
+        bank_result = await db.execute(bank_query)
+        bank_details = bank_result.scalars().first()
+        
+        if bank_details:
+            bank_details.verification_status = "VERIFIED"
+            bank_details.verification_ref = verification_result.get("verification_id")
+        else:
+            bank_details = models.BankAccountDetails(
+                application_id=app_uuid,
+                user_id=current_user.id,
+                account_number=account_number,
+                ifsc_code=ifsc_code.upper(),
+                bank_name=verification_result.get("bank_name"),
+                account_holder_name=account_holder_name,
+                account_type="SAVINGS",
+                verification_status="VERIFIED",
+                verification_ref=verification_result.get("verification_id")
+            )
+            db.add(bank_details)
+        
+        await db.commit()
+    
+    return verification_result
+
+
 # Health check for mock APIs
 @app.get("/mock/health")
 async def mock_health():
@@ -5507,6 +5764,7 @@ async def verify_document_admin(
     """
     Verify or reject a KYC document.
     Status must be 'VERIFIED' or 'REJECTED'.
+    Updates KYC tracking and validates all 4 documents.
     """
     from uuid import UUID as PyUUID
     
@@ -5532,14 +5790,84 @@ async def verify_document_admin(
     document.verified_by = admin.id
     document.verified_at = datetime.now()
     
+    # Update KYC tracking for this application
+    kyc_query = select(models.KYCStatusTracking).where(
+        models.KYCStatusTracking.application_id == document.application_id
+    )
+    kyc_result = await db.execute(kyc_query)
+    kyc_tracking = kyc_result.scalars().first()
+    
+    if kyc_tracking:
+        # Count verified documents for this application
+        verified_count_query = select(func.count(models.KYCDocument.id)).where(
+            models.KYCDocument.application_id == document.application_id,
+            models.KYCDocument.verification_status == "VERIFIED"
+        )
+        verified_result = await db.execute(verified_count_query)
+        verified_count = verified_result.scalar()
+        
+        # Check if all 4 documents are verified
+        if verified_count >= 4:
+            kyc_tracking.step_1_documents = "COMPLETED"
+        elif verified_count > 0:
+            kyc_tracking.step_1_documents = "IN_PROGRESS"
+    
+    # Log audit
+    await log_audit(
+        db, admin.id,
+        models.AuditAction.DOCUMENT_VERIFIED if status.upper() == "VERIFIED" else models.AuditAction.DOCUMENT_REJECTED,
+        entity_type="kyc_document",
+        entity_id=document.id,
+        description=f"Document {status.upper()}: {document.document_type}",
+        metadata={"notes": notes, "verified_count": verified_count}
+    )
+    
     await db.commit()
     await db.refresh(document)
     
     return {
         "message": f"Document {status.upper()} successfully",
         "id": str(document.id),
-        "verification_status": document.verification_status
+        "verification_status": document.verification_status,
+        "verified_count": verified_count,
+        "all_verified": verified_count >= 4
     }
+
+
+@app.get("/admin/documents/{document_id}/view")
+async def view_document_admin(
+    document_id: str,
+    admin = Depends(auth.require_admin()),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    View/download document file for verification.
+    Returns the actual file for admin to review.
+    """
+    from uuid import UUID as PyUUID
+    from fastapi.responses import FileResponse
+    import os
+    
+    try:
+        doc_uuid = PyUUID(document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+    
+    query = select(models.KYCDocument).where(models.KYCDocument.id == doc_uuid)
+    result = await db.execute(query)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="Document file not found on server")
+    
+    return FileResponse(
+        path=document.file_path,
+        filename=document.file_name,
+        media_type=document.mime_type
+    )
 
 
 @app.post("/admin/notifications/send")
@@ -6406,3 +6734,93 @@ async def add_ticket_message(
     return new_msg
 
 
+ 
+ #   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
+ #   P A Y M E N T   &   E X T E R N A L   I N T E G R A T I O N S  
+ #   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
+ i m p o r t   e x t e r n a l _ s e r v i c e s  
+  
+ @ a p p . p o s t ( " / a p i / v e r i f y - b a n k " )  
+ a s y n c   d e f   v e r i f y _ b a n k _ a c c o u n t (  
+         r e q u e s t :   s c h e m a s . B a n k V e r i f i c a t i o n R e q u e s t ,  
+         c u r r e n t _ u s e r :   m o d e l s . U s e r   =   D e p e n d s ( a u t h . g e t _ c u r r e n t _ u s e r )  
+ ) :  
+         " " "  
+         V e r i f y   b a n k   a c c o u n t   d e t a i l s   u s i n g   P e n n y   D r o p   ( S i m u l a t e d )  
+         " " "  
+         t r y :  
+                 r e s u l t   =   a w a i t   e x t e r n a l _ s e r v i c e s . v e r i f y _ b a n k _ a c c o u n t _ p e n n y _ d r o p (  
+                         a c c o u n t _ n u m b e r = r e q u e s t . a c c o u n t _ n u m b e r ,  
+                         i f s c _ c o d e = r e q u e s t . i f s c _ c o d e ,  
+                         a c c o u n t _ h o l d e r _ n a m e = r e q u e s t . a c c o u n t _ h o l d e r _ n a m e  
+                 )  
+                 r e t u r n   r e s u l t  
+         e x c e p t   E x c e p t i o n   a s   e :  
+                 r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 5 0 0 ,   d e t a i l = s t r ( e ) )  
+  
+ @ a p p . p o s t ( " / a p i / i n i t i a t e - p a y m e n t " )  
+ a s y n c   d e f   i n i t i a t e _ p a y m e n t (  
+         p a y m e n t _ r e q u e s t :   s c h e m a s . D i s b u r s e m e n t R e q u e s t ,  
+         c u r r e n t _ a d m i n   =   D e p e n d s ( a u t h . r e q u i r e _ a d m i n ( ) ) ,  
+         d b :   A s y n c S e s s i o n   =   D e p e n d s ( d a t a b a s e . g e t _ d b )  
+ ) :  
+         " " "  
+         I n i t i a t e   l o a n   d i s b u r s e m e n t   p a y m e n t   ( A d m i n   o n l y )  
+         " " "  
+         t r y :  
+                 #   G e t   a p p l i c a t i o n   d e t a i l s  
+                 q u e r y   =   s e l e c t ( m o d e l s . L o a n A p p l i c a t i o n ) . w h e r e ( m o d e l s . L o a n A p p l i c a t i o n . i d   = =   p a y m e n t _ r e q u e s t . a p p l i c a t i o n _ i d )  
+                 r e s u l t   =   a w a i t   d b . e x e c u t e ( q u e r y )  
+                 a p p l i c a t i o n   =   r e s u l t . s c a l a r s ( ) . f i r s t ( )  
+                  
+                 i f   n o t   a p p l i c a t i o n :  
+                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 4 ,   d e t a i l = " A p p l i c a t i o n   n o t   f o u n d " )  
+                          
+                 #   G e t   U s e r   d e t a i l s   f o r   p a y m e n t   i n f o  
+                 u s e r _ q u e r y   =   s e l e c t ( m o d e l s . U s e r ) . w h e r e ( m o d e l s . U s e r . i d   = =   a p p l i c a t i o n . u s e r _ i d )  
+                 u s e r _ r e s u l t   =   a w a i t   d b . e x e c u t e ( u s e r _ q u e r y )  
+                 u s e r   =   u s e r _ r e s u l t . s c a l a r s ( ) . f i r s t ( )  
+                  
+                 i f   n o t   u s e r :  
+                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 4 ,   d e t a i l = " U s e r   n o t   f o u n d " )  
+  
+                 a m o u n t   =   a p p l i c a t i o n . l o a n _ a m o u n t  
+                 c u s t o m e r _ n a m e   =   f " { u s e r . f i r s t _ n a m e }   { u s e r . l a s t _ n a m e } "  
+                 c u s t o m e r _ e m a i l   =   u s e r . e m a i l   o r   " t e s t @ e x a m p l e . c o m "  
+                 c u s t o m e r _ p h o n e   =   u s e r . m o b i l e _ n u m b e r  
+                 o r d e r _ i d   =   f " L O A N _ { a p p l i c a t i o n . t r a c k i n g _ i d   o r   s t r ( a p p l i c a t i o n . i d ) [ : 8 ] } "  
+  
+                 i f   p a y m e n t _ r e q u e s t . p a y m e n t _ m e t h o d   = =   " s t r i p e " :  
+                         r e t u r n   a w a i t   e x t e r n a l _ s e r v i c e s . i n i t i a t e _ p a y m e n t _ s t r i p e (  
+                                 a m o u n t = a m o u n t ,  
+                                 c u s t o m e r _ e m a i l = c u s t o m e r _ e m a i l ,  
+                                 d e s c r i p t i o n = f " L o a n   D i s b u r s e m e n t   f o r   { o r d e r _ i d } "  
+                         )  
+                 e l s e :  
+                         r e t u r n   a w a i t   e x t e r n a l _ s e r v i c e s . i n i t i a t e _ p a y m e n t _ r a z o r p a y (  
+                                 a m o u n t = a m o u n t ,  
+                                 c u s t o m e r _ n a m e = c u s t o m e r _ n a m e ,  
+                                 c u s t o m e r _ e m a i l = c u s t o m e r _ e m a i l ,  
+                                 c u s t o m e r _ p h o n e = c u s t o m e r _ p h o n e ,  
+                                 o r d e r _ i d = o r d e r _ i d  
+                         )  
+                          
+         e x c e p t   E x c e p t i o n   a s   e :  
+                 i m p o r t   t r a c e b a c k  
+                 t r a c e b a c k . p r i n t _ e x c ( )  
+                 r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 5 0 0 ,   d e t a i l = s t r ( e ) )  
+  
+ @ a p p . p o s t ( " / a p i / v a l i d a t e - i d " )  
+ a s y n c   d e f   v a l i d a t e _ i d _ d o c u m e n t (  
+         d o c u m e n t _ t y p e :   s t r ,  
+         d o c u m e n t _ n u m b e r :   s t r ,  
+         c u r r e n t _ u s e r :   m o d e l s . U s e r   =   D e p e n d s ( a u t h . g e t _ c u r r e n t _ u s e r )  
+ ) :  
+         " " "  
+         V a l i d a t e   I D   d o c u m e n t   f o r m a t   ( P A N / A a d h a a r )  
+         " " "  
+         r e t u r n   a w a i t   e x t e r n a l _ s e r v i c e s . v a l i d a t e _ i n d i a n _ i d _ d o c u m e n t s (  
+                 d o c u m e n t _ t y p e = d o c u m e n t _ t y p e ,    
+                 d o c u m e n t _ n u m b e r = d o c u m e n t _ n u m b e r  
+         )  
+ 

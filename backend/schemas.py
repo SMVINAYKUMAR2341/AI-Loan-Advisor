@@ -677,3 +677,20 @@ class RepaymentCreate(BaseModel):
     amount: float
     payment_method: str = "UPI"
     payment_reference: Optional[str] = None
+ 
+ #   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
+ #   P A Y M E N T   &   D I S B U R S E M E N T   S C H E M A S  
+ #   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =  
+  
+ c l a s s   B a n k V e r i f i c a t i o n R e q u e s t ( B a s e M o d e l ) :  
+         " " " R e q u e s t   t o   v e r i f y   b a n k   a c c o u n t   d e t a i l s " " "  
+         a p p l i c a t i o n _ i d :   s t r  
+         a c c o u n t _ n u m b e r :   s t r  
+         i f s c _ c o d e :   s t r  
+         a c c o u n t _ h o l d e r _ n a m e :   s t r  
+  
+ c l a s s   D i s b u r s e m e n t R e q u e s t ( B a s e M o d e l ) :  
+         " " " R e q u e s t   t o   i n i t i a t e   l o a n   d i s b u r s e m e n t " " "  
+         a p p l i c a t i o n _ i d :   s t r  
+         p a y m e n t _ m e t h o d :   s t r   =   " r a z o r p a y "     #   r a z o r p a y   o r   s t r i p e  
+ 

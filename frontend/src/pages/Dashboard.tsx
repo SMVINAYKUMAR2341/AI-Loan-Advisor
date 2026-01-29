@@ -724,18 +724,52 @@ export default function Dashboard() {
 
     const uploadDocument = async (appId: string, docType: string, docCategory: string) => {
         setKycError('');
+        setKycSuccess('');
+        
+        // Get the file from input
+        const input = document.getElementById(`file-upload-${docCategory}`) as HTMLInputElement;
+        if (!input || !input.files || input.files.length === 0) {
+            setKycError('Please select a file to upload');
+            return;
+        }
+        
+        const file = input.files[0];
+        
+        // Validate file size (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setKycError('File size must be less than 5MB');
+            return;
+        }
+        
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            setKycError('File must be PDF, JPG, or PNG');
+            return;
+        }
+        
         try {
             const token = localStorage.getItem('access_token');
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('document_type', docType);
+            formData.append('document_category', docCategory);
+            
             const response = await fetch(
-                `${API_BASE_URL}/kyc/${appId}/documents?document_type=${docType}&document_category=${docCategory}`,
+                `${API_BASE_URL}/kyc/${appId}/documents`,
                 {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
                 }
             );
+            
             if (response.ok) {
-                setKycSuccess(`${docCategory} document uploaded successfully!`);
+                const result = await response.json();
+                setKycSuccess(`${docCategory} document uploaded successfully! (${result.total_uploaded}/4 documents)`);
                 fetchKycStatus(appId);
+                // Clear the file input
+                input.value = '';
             } else {
                 const error = await response.json();
                 setKycError(error.detail || 'Upload failed');
@@ -2519,14 +2553,14 @@ export default function Dashboard() {
                             <FileText className="w-5 h-5 text-teal-400" />
                             Step 1: Upload Identity & Address Proof
                         </h4>
-                        <p className="text-gray-400 text-sm">Upload all 4 required documents: Aadhaar, PAN, Passport, and Driving License/Bank Statement.</p>
+                        <p className="text-gray-400 text-sm">Upload 4 required documents. You can proceed to bank details after uploading any 2 documents.</p>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                                { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR", icon: FileText, desc: "Primary Address Proof" },
-                                { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Primary Identity Proof" },
-                                { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Secondary Address Proof" },
-                                { label: "Driving License / Bank Statement", type: "ID_PROOF", code: "DRIVING_LICENSE", icon: CreditCard, desc: "Secondary Identity Proof" }
+                                { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR", icon: FileText, desc: "Required - Address Proof" },
+                                { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Required - Identity Proof" },
+                                { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Required - Address Proof" },
+                                { label: "Driving License", type: "ID_PROOF", code: "DRIVING_LICENSE", icon: CreditCard, desc: "Required - Identity Proof" }
                             ].map((doc, idx) => {
                                 const Icon = doc.icon;
                                 const isUploaded = kycStatus?.documents.some(d => d.document_type.includes(doc.code));
@@ -2579,7 +2613,7 @@ export default function Dashboard() {
                         {/* Uploaded Documents */}
                         {kycStatus && kycStatus.documents.length > 0 && (
                             <div className="mt-4 p-4 bg-gray-800 rounded-xl">
-                                <h5 className="text-white font-medium mb-2">Uploaded: {kycStatus.step_1_docs_uploaded}/2</h5>
+                                <h5 className="text-white font-medium mb-2">Uploaded: {kycStatus.step_1_docs_uploaded}/4 (Minimum 2 required to proceed)</h5>
                                 <div className="space-y-2">
                                     {kycStatus.documents.map((doc: KYCDocumentItem) => (
                                         <div key={doc.id} className="flex items-center justify-between p-2 bg-green-900 rounded-lg">
@@ -2591,13 +2625,18 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {kycStatus && kycStatus.step_1_docs_uploaded >= 4 && (
+                        {kycStatus && kycStatus.step_1_docs_uploaded >= 2 && (
                             <button
                                 onClick={() => setKycStep(2)}
-                                className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-green-500 rounded-xl text-white font-semibold"
+                                className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-green-500 rounded-xl text-white font-semibold hover:from-teal-600 hover:to-green-600 transition-all"
                             >
-                                Continue to Bank Details →
+                                Continue to Bank Details → ({kycStatus.step_1_docs_uploaded}/4 documents uploaded)
                             </button>
+                        )}
+                        {kycStatus && kycStatus.step_1_docs_uploaded < 2 && kycStatus.step_1_docs_uploaded > 0 && (
+                            <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/30 rounded-xl text-blue-300 text-sm">
+                                📋 Upload {2 - kycStatus.step_1_docs_uploaded} more document(s) to proceed to bank details
+                            </div>
                         )}
                     </div>
                 )}
