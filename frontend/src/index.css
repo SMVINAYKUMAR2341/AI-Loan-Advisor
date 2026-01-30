@@ -9,7 +9,7 @@
 @layer base {
   :root {
     /* Dark navy gradient theme - using dark mode as default */
-    --background: 222 47% 8%;
+    --background: 220 50% 11%;
     --foreground: 210 40% 98%;
 
     --card: 222 47% 11%;
@@ -103,11 +103,14 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply antialiased;
+    background-color: #0A2540;
+    color: #F3F4F6;
   }
 
   html {
     scroll-behavior: smooth;
+    background-color: #0A2540;
   }
 }
 
@@ -120,21 +123,43 @@
 
   .gradient-text {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg,
-        hsl(var(--primary)) 0%,
-        hsl(var(--glow-secondary)) 100%);
+    background-image: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #f472b6 100%);
+    background-size: 200% auto;
+    animation: gradient-shift 4s ease infinite;
   }
 
   .glass {
-    @apply backdrop-blur-md;
-    background: hsl(var(--background) / 0.8);
-    border: 1px solid hsl(var(--border) / 0.5);
+    @apply backdrop-blur-2xl;
+    background: rgba(10, 37, 64, 0.7);
+    border: 1px solid rgba(236, 72, 153, 0.25);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), 
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
 
   .glass-card {
-    @apply backdrop-blur-sm rounded-lg;
-    background: hsl(var(--surface) / 0.6);
-    border: 1px solid hsl(var(--border) / 0.3);
+    @apply backdrop-blur-xl rounded-2xl;
+    background: rgba(10, 37, 64, 0.8);
+    border: 1px solid rgba(236, 72, 153, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3),
+                0 0 40px 0 rgba(236, 72, 153, 0.1),
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    position: relative;
+  }
+
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+      transparent 0%,
+      rgba(236, 72, 153, 0.5) 20%, 
+      rgba(244, 114, 182, 0.6) 50%, 
+      rgba(236, 72, 153, 0.5) 80%,
+      transparent 100%);
+    border-radius: 12px 12px 0 0;
   }
 
   .glow {
@@ -152,6 +177,18 @@
 
   .animate-fade-in {
     animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 20s linear infinite;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
   }
 
   @keyframes fadeInUp {
@@ -173,6 +210,88 @@
 
     to {
       opacity: 1;
+    }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.15);
+    }
+  }
+
+  @keyframes gradient-shift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  @keyframes wave-flow {
+    0% {
+      transform: translateX(-100%) rotate(-5deg);
+    }
+    50% {
+      transform: translateX(0%) rotate(5deg);
+    }
+    100% {
+      transform: translateX(100%) rotate(-5deg);
+    }
+  }
+
+  @keyframes wave-sway {
+    0%, 100% {
+      transform: rotate(-3deg) translateY(0);
+    }
+    50% {
+      transform: rotate(3deg) translateY(-30px);
+    }
+  }
+
+  @keyframes morph {
+    0%, 100% {
+      border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    }
+    50% {
+      border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+    }
+  }
+
+  .animate-wave {
+    animation: wave-sway 8s ease-in-out infinite;
+  }
+
+  .animate-morph {
+    animation: morph 8s ease-in-out infinite;
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 8s ease infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px);
+      opacity: 0.6;
+    }
+    25% {
+      transform: translateY(-20px) translateX(10px);
+      opacity: 0.8;
+    }
+    50% {
+      transform: translateY(-40px) translateX(-10px);
+      opacity: 1;
+    }
+    75% {
+      transform: translateY(-20px) translateX(10px);
+      opacity: 0.8;
     }
   }
 

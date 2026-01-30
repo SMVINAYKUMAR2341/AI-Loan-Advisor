@@ -134,9 +134,6 @@ class LoanApplication(Base):
     property_area = Column(String(20))
     coapplicant_income = Column(Float, default=0)
     
-    # Human-readable tracking ID (format: RBI2026LA01)
-    tracking_id = Column(String(20), unique=True, index=True, nullable=True)
-    
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     
@@ -409,6 +406,36 @@ class KYCStatusTracking(Base):
     user = relationship("User")
 
 
+class DeletionRequest(Base):
+    """
+    Application Deletion Requests - User requests to delete their loan application.
+    Admin must review and approve deletion requests.
+    """
+    __tablename__ = "deletion_requests"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("loan_applications.id"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Request Details
+    reason = Column(Text, nullable=True)
+    status = Column(String(20), default="PENDING")  # PENDING, APPROVED, REJECTED
+    
+    # Admin Review
+    reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    review_notes = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    application = relationship("LoanApplication", backref="deletion_requests")
+    user = relationship("User", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
 class AuditLog(Base):
     """
     Audit Trail - RBI-compliant immutable audit log.
@@ -540,6 +567,7 @@ class AuditAction:
     DOCUMENT_UPLOADED = "DOCUMENT_UPLOADED"
     DOCUMENT_VERIFIED = "DOCUMENT_VERIFIED"
     DOCUMENT_REJECTED = "DOCUMENT_REJECTED"
+    DOCUMENT_DELETED = "DOCUMENT_DELETED"
     KYC_COMPLETED = "KYC_COMPLETED"
     
     # =========================================================================
@@ -583,7 +611,7 @@ class AuditAction:
         ]
         kyc_actions = [
             "KYC_INITIATED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED",
-            "DOCUMENT_REJECTED", "KYC_COMPLETED"
+            "DOCUMENT_REJECTED", "DOCUMENT_DELETED", "KYC_COMPLETED"
         ]
         payment_actions = [
             "EMI_SCHEDULE_GENERATED", "EMI_PAYMENT_ATTEMPTED", "EMI_PAYMENT_SUCCESS",

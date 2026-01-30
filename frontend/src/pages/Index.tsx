@@ -40,6 +40,14 @@ import {
   Linkedin,
   Instagram,
   FileCheck,
+  Star,
+  Award,
+  Target,
+  Clock,
+  DollarSign,
+  Percent,
+  Mail,
+  Phone,
 } from "lucide-react";
 
 // Utility function
@@ -92,11 +100,13 @@ const Index = () => {
   // Header state
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [flowType, setFlowType] = useState<'customer' | 'admin'>('customer');
 
   // Calculator state
   const [income, setIncome] = useState(50000);
   const [existingEMI, setExistingEMI] = useState(5000);
   const [creditUtilization, setCreditUtilization] = useState(30);
+  const [paymentHistory, setPaymentHistory] = useState(95);
 
   // Header scroll effect
   useEffect(() => {
@@ -150,27 +160,65 @@ const Index = () => {
     {
       icon: FileText,
       title: "Submit Basic Details",
-      description: "Simple financial info, no documents needed upfront",
+      description: "Simple financial info, no documents needed upfront. Get instant tracking ID.",
     },
     {
       icon: Brain,
       title: "AI Analysis",
-      description: "Income, credit behavior, and liabilities reviewed instantly",
+      description: "Income, credit behavior, and liabilities reviewed instantly by smart algorithms",
     },
     {
       icon: Zap,
       title: "Instant Decision",
-      description: "Clear explanation of your eligibility status",
+      description: "Clear explanation of eligibility - approved or rejected with reasons",
     },
     {
       icon: UserCheck,
-      title: "KYC After Approval",
-      description: "Document verification only if you're approved",
+      title: "Smart KYC Process",
+      description: "Upload just 2 documents. Reuse Aadhaar/PAN for future loans automatically",
+    },
+    {
+      icon: ShieldCheck,
+      title: "Admin Verification",
+      description: "Expert review of documents. Admins verify identity and financial documents",
     },
     {
       icon: Banknote,
-      title: "Loan Disbursement",
-      description: "Funds released after quick verification",
+      title: "Instant Disbursement",
+      description: "Funds released immediately after admin approval. Track with your ID",
+    },
+  ];
+
+  const adminSteps = [
+    {
+      icon: Eye,
+      title: "Monitor Applications",
+      description: "View all loan applications in real-time dashboard with filters",
+    },
+    {
+      icon: FileText,
+      title: "Track by ID",
+      description: "Search any application instantly using 8-digit tracking ID",
+    },
+    {
+      icon: FileCheck,
+      title: "Verify Documents",
+      description: "Review uploaded documents. View cross-application history for repeat customers",
+    },
+    {
+      icon: CheckCircle,
+      title: "Approve or Reject",
+      description: "One-click document verification. Mark as verified or request reupload",
+    },
+    {
+      icon: Banknote,
+      title: "Process Disbursement",
+      description: "Release funds directly to verified bank accounts with full audit trail",
+    },
+    {
+      icon: BarChart3,
+      title: "Analytics & Reports",
+      description: "Track approval rates, processing times, and document verification metrics",
     },
   ];
 
@@ -183,9 +231,14 @@ const Index = () => {
 
   const kycFeatures = [
     {
+      icon: Sparkles,
+      title: "Smart Document Reuse",
+      description: "Upload identity documents once - reuse for all future loan applications automatically",
+    },
+    {
       icon: Fingerprint,
-      title: "Secure Identity Verification",
-      description: "Bank-grade identity checks protect your information",
+      title: "2-Document Quick KYC",
+      description: "Complete KYC with just 2 documents - reduced from 4 for faster processing",
     },
     {
       icon: FileCheck,
@@ -193,9 +246,19 @@ const Index = () => {
       description: "Quick, accurate document verification with smart AI",
     },
     {
+      icon: RefreshCw,
+      title: "Delete & Reupload Anytime",
+      description: "Made a mistake? Delete and reupload documents instantly before verification",
+    },
+    {
       icon: Lock,
       title: "End-to-End Encryption",
       description: "Your data is encrypted at rest and in transit",
+    },
+    {
+      icon: ShieldCheck,
+      title: "Fresh Bank Statements",
+      description: "Latest 3-6 months bank statements required per application for accurate assessment",
     },
     {
       icon: UserCheck,
@@ -210,6 +273,11 @@ const Index = () => {
   ];
 
   const repaymentFeatures = [
+    {
+      icon: FileText,
+      title: "Instant Tracking ID",
+      description: "Get a unique 8-digit tracking ID instantly - track your loan application anywhere, anytime.",
+    },
     {
       icon: CreditCard,
       title: "Debit Card Repayment",
@@ -229,6 +297,11 @@ const Index = () => {
       icon: BarChart3,
       title: "Transparent EMI Breakdown",
       description: "See exactly how much goes to principal vs interest.",
+    },
+    {
+      icon: Zap,
+      title: "Admin Tracking Search",
+      description: "Admins can instantly find any application by tracking ID for faster support.",
     },
   ];
 
@@ -289,70 +362,172 @@ const Index = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="min-h-screen gradient-bg">
-      {/* Header */}
+    <div className="min-h-screen bg-[#0A2540] relative">
+      {/* Global Background - Flowing Waves Like Reference Image */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        {/* Base gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0A2540] via-[#0d2d4d] to-[#0A2540]" />
+        
+        {/* Flowing Wave 1 - Top Right */}
+        <div 
+          className="absolute -top-[20%] -right-[10%] w-[80%] h-[60%] animate-wave"
+          style={{
+            background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.6) 0%, rgba(219, 39, 119, 0.4) 50%, rgba(147, 51, 234, 0.3) 100%)',
+            borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%',
+            filter: 'blur(60px)',
+            transform: 'rotate(-15deg)',
+          }}
+        />
+        
+        {/* Flowing Wave 2 - Bottom Left */}
+        <div 
+          className="absolute -bottom-[30%] -left-[20%] w-[90%] h-[70%] animate-wave"
+          style={{
+            background: 'linear-gradient(45deg, rgba(236, 72, 153, 0.7) 0%, rgba(244, 114, 182, 0.5) 40%, rgba(168, 85, 247, 0.4) 100%)',
+            borderRadius: '30% 60% 70% 40% / 50% 60% 30% 60%',
+            filter: 'blur(80px)',
+            transform: 'rotate(10deg)',
+            animationDelay: '2s',
+          }}
+        />
+        
+        {/* Flowing Wave 3 - Center Right */}
+        <div 
+          className="absolute top-[30%] -right-[15%] w-[60%] h-[50%] animate-morph"
+          style={{
+            background: 'linear-gradient(180deg, rgba(236, 72, 153, 0.5) 0%, rgba(219, 39, 119, 0.6) 50%, rgba(190, 24, 93, 0.4) 100%)',
+            borderRadius: '40% 60% 60% 40% / 70% 30% 70% 30%',
+            filter: 'blur(70px)',
+            animationDelay: '1s',
+          }}
+        />
+        
+        {/* Flowing Wave 4 - Top Left accent */}
+        <div 
+          className="absolute -top-[10%] -left-[15%] w-[50%] h-[40%] animate-wave"
+          style={{
+            background: 'linear-gradient(225deg, rgba(244, 114, 182, 0.5) 0%, rgba(236, 72, 153, 0.4) 100%)',
+            borderRadius: '70% 30% 50% 50% / 30% 60% 40% 70%',
+            filter: 'blur(50px)',
+            animationDelay: '3s',
+          }}
+        />
+        
+        {/* Subtle blue wave accent */}
+        <div 
+          className="absolute bottom-[20%] right-[10%] w-[40%] h-[35%] animate-morph"
+          style={{
+            background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.3) 100%)',
+            borderRadius: '50% 50% 30% 70% / 40% 60% 40% 60%',
+            filter: 'blur(60px)',
+            animationDelay: '4s',
+          }}
+        />
+        
+        {/* Floating particles */}
+        <div className="absolute top-[20%] left-[20%] w-3 h-3 rounded-full bg-pink-400/40 animate-float" />
+        <div className="absolute top-[60%] right-[30%] w-2 h-2 rounded-full bg-pink-300/50 animate-float" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-[30%] left-[40%] w-4 h-4 rounded-full bg-purple-400/30 animate-float" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[40%] right-[20%] w-2 h-2 rounded-full bg-pink-500/40 animate-float" style={{ animationDelay: '3s' }} />
+        <div className="absolute bottom-[50%] left-[60%] w-3 h-3 rounded-full bg-pink-300/30 animate-float" style={{ animationDelay: '4s' }} />
+      </div>
+
+      {/* Header - Premium Glassmorphism Navbar */}
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "glass py-3" : "bg-transparent py-5"
-          }`}
+        className={`fixed top-4 left-4 right-4 z-50 transition-all duration-500 rounded-2xl ${
+          isScrolled 
+            ? "backdrop-blur-2xl bg-[#0A2540]/80 border border-pink-500/20 shadow-lg shadow-pink-500/5" 
+            : "backdrop-blur-xl bg-[#0A2540]/40 border border-white/10"
+        }`}
       >
-        <div className="container mx-auto px-4 flex items-center justify-between">
-          <a href="#" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <span className="font-display font-bold text-primary-foreground text-lg">LA</span>
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          {/* Logo */}
+          <a href="#" className="flex items-center gap-3 group">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl blur-md opacity-60 group-hover:opacity-100 transition-opacity" />
+              <div className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <span className="font-display font-bold text-white text-lg">LA</span>
+              </div>
             </div>
-            <span className="font-display font-semibold text-xl text-foreground hidden sm:inline">
-              LoanAdvisor
-            </span>
+            <div className="hidden sm:block">
+              <span className="font-display font-bold text-xl text-white">Loan</span>
+              <span className="font-display font-bold text-xl bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">Advisor</span>
+            </div>
           </a>
 
-          <nav className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground" asChild>
-              <a href="/login">Login</a>
-            </Button>
-            <Button className="glow-sm" asChild>
-              <a href="/signup">Sign Up</a>
-            </Button>
-          </div>
-
-          <button
-            className="md:hidden p-2 text-foreground"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-
-        {isMobileMenuOpen && (
-          <div className="md:hidden glass mt-2 mx-4 rounded-lg p-4 animate-fade-in">
-            <nav className="flex flex-col gap-4">
+          {/* Center Navigation */}
+          <nav className="hidden lg:flex items-center">
+            <div className="flex items-center gap-1 bg-white/5 rounded-full p-1.5 border border-white/10">
               {navLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium py-2"
+                  className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-300"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </nav>
+
+          {/* Right Side - Auth Buttons */}
+          <div className="hidden md:flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              className="text-gray-300 hover:text-white hover:bg-white/10 rounded-full px-5" 
+              asChild
+            >
+              <a href="/login" className="flex items-center gap-2">
+                <LogIn size={16} />
+                Login
+              </a>
+            </Button>
+            <Button 
+              className="relative overflow-hidden rounded-full px-6 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 border-0 shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 transition-all duration-300" 
+              asChild
+            >
+              <a href="/signup" className="flex items-center gap-2">
+                <Sparkles size={16} />
+                Get Started
+              </a>
+            </Button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="lg:hidden p-2.5 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden mx-4 mb-4 rounded-xl bg-[#0A2540]/95 backdrop-blur-xl border border-pink-500/20 p-5 animate-fade-in">
+            <nav className="flex flex-col gap-2">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all text-sm font-medium"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.label}
                 </a>
               ))}
-              <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                <Button variant="ghost" className="justify-start text-muted-foreground" asChild>
-                  <a href="/login">Login</a>
+              <div className="flex flex-col gap-2 pt-4 mt-2 border-t border-white/10">
+                <Button variant="ghost" className="justify-start text-gray-300 hover:text-white hover:bg-white/10 rounded-lg" asChild>
+                  <a href="/login" className="flex items-center gap-2">
+                    <LogIn size={16} />
+                    Login
+                  </a>
                 </Button>
-                <Button className="glow-sm" asChild>
-                  <a href="/signup">Sign Up</a>
+                <Button className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg justify-center" asChild>
+                  <a href="/signup" className="flex items-center gap-2">
+                    <Sparkles size={16} />
+                    Get Started
+                  </a>
                 </Button>
               </div>
             </nav>
@@ -360,68 +535,122 @@ const Index = () => {
         )}
       </header>
 
-      <main>
-        {/* Hero Section */}
-        <section className="min-h-screen flex items-center justify-center relative overflow-hidden pt-20">
-          <div className="absolute inset-0 gradient-bg" />
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-glow" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-glow-secondary/10 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: "1s" }} />
-
+      <main className="relative z-10">
+        {/* Hero Section - Compact & Beautiful */}
+        <section className="min-h-[90vh] flex items-center justify-center relative overflow-hidden pt-20">
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-4xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-8 animate-fade-in-up">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-sm text-muted-foreground">AI-Powered Financial Decisions</span>
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left Content */}
+              <div className="text-center lg:text-left">
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 animate-fade-in-up bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-400/30 backdrop-blur-sm">
+                  <span className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
+                  <span className="text-sm text-gray-100 font-medium">AI-Powered Financial Decisions</span>
+                </div>
+
+                <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-5 animate-fade-in-up stagger-1">
+                  <span className="text-white">AI-Powered</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-pink-400 via-pink-300 to-purple-400 bg-clip-text text-transparent">Loan Eligibility</span>
+                  <br />
+                  <span className="text-white">Advisor</span>
+                </h1>
+
+                <p className="text-lg text-gray-300 max-w-lg mx-auto lg:mx-0 mb-8 animate-fade-in-up stagger-2">
+                  Get instant eligibility decisions powered by AI. No documents upfront. Know where you stand in 2 minutes.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4 animate-fade-in-up stagger-3">
+                  <Button size="lg" className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-base px-8 py-6 rounded-xl shadow-lg shadow-pink-500/25 group">
+                    Check Eligibility
+                    <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={20} />
+                  </Button>
+                  <Button variant="outline" size="lg" className="text-base px-8 py-6 rounded-xl border-white/20 hover:bg-white/10" asChild>
+                    <a href="#how-it-works">
+                      See How It Works
+                      <ChevronDown className="ml-2" size={20} />
+                    </a>
+                  </Button>
+                </div>
+
+                {/* Stats Row */}
+                <div className="flex items-center justify-center lg:justify-start gap-8 mt-10 animate-fade-in-up stagger-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">2 min</div>
+                    <div className="text-xs text-gray-400">Decision</div>
+                  </div>
+                  <div className="w-px h-10 bg-white/20" />
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">0</div>
+                    <div className="text-xs text-gray-400">Docs Upfront</div>
+                  </div>
+                  <div className="w-px h-10 bg-white/20" />
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">100%</div>
+                    <div className="text-xs text-gray-400">Transparent</div>
+                  </div>
+                </div>
               </div>
 
-              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 animate-fade-in-up stagger-1">
-                <span className="text-foreground">AI-Powered</span>
-                <br />
-                <span className="gradient-text">Loan Eligibility Advisor</span>
-              </h1>
+              {/* Right Side - Feature Cards */}
+              <div className="hidden lg:block relative">
+                <div className="relative">
+                  {/* Main Card */}
+                  <div className="glass-card p-6 rounded-2xl max-w-sm ml-auto">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                        <Brain className="text-white" size={24} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">AI Analysis</h3>
+                        <p className="text-xs text-gray-400">100+ factors analyzed</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                        <span className="text-sm text-gray-300">Credit Score</span>
+                        <span className="text-sm font-semibold text-green-400">Excellent</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                        <span className="text-sm text-gray-300">Income Verified</span>
+                        <CheckCircle className="text-green-400" size={18} />
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                        <span className="text-sm text-gray-300">Loan Eligible</span>
+                        <span className="text-sm font-semibold text-pink-400">₹5,00,000</span>
+                      </div>
+                    </div>
+                  </div>
 
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in-up stagger-2">
-                Get instant, explainable eligibility decisions powered by AI. No documents needed upfront.
-                Know where you stand in minutes.
-              </p>
+                  {/* Floating Cards */}
+                  <div className="absolute -top-4 -left-4 glass-card p-4 rounded-xl animate-float">
+                    <div className="flex items-center gap-2">
+                      <Zap className="text-yellow-400" size={20} />
+                      <span className="text-sm font-medium text-white">Instant Decision</span>
+                    </div>
+                  </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up stagger-3">
-                <Button size="lg" className="glow text-base px-8 py-6 group">
-                  Check Eligibility
-                  <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={20} />
-                </Button>
-                <Button variant="outline" size="lg" className="text-base px-8 py-6" asChild>
-                  <a href="#how-it-works">
-                    See How It Works
-                    <ChevronDown className="ml-2" size={20} />
-                  </a>
-                </Button>
-              </div>
+                  <div className="absolute -bottom-4 -left-8 glass-card p-4 rounded-xl animate-float" style={{ animationDelay: '1s' }}>
+                    <div className="flex items-center gap-2">
+                      <Shield className="text-green-400" size={20} />
+                      <span className="text-sm font-medium text-white">Bank-grade Security</span>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-3 gap-8 max-w-lg mx-auto mt-16 animate-fade-in-up stagger-4">
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-foreground">2 min</div>
-                  <div className="text-sm text-muted-foreground">Decision Time</div>
-                </div>
-                <div className="text-center border-x border-border">
-                  <div className="text-2xl sm:text-3xl font-bold text-foreground">0</div>
-                  <div className="text-sm text-muted-foreground">Documents Upfront</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-foreground">100%</div>
-                  <div className="text-sm text-muted-foreground">Transparent</div>
+                  <div className="absolute top-1/2 -right-4 glass-card p-4 rounded-xl animate-float" style={{ animationDelay: '2s' }}>
+                    <div className="flex items-center gap-2">
+                      <Star className="text-pink-400 fill-pink-400" size={20} />
+                      <span className="text-sm font-medium text-white">4.8 Rating</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-float">
-            <ChevronDown className="text-muted-foreground" size={32} />
-          </div>
         </section>
 
-        {/* Trust Strip */}
-        <section className="py-12 border-y border-border bg-card/50">
+        {/* Trust Strip - Compact */}
+        <section className="py-6 border-y border-pink-500/20 bg-[#0A2540]/80 backdrop-blur-sm">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
               {trustItems.map((item, index) => (
@@ -429,650 +658,754 @@ const Index = () => {
                   key={index}
                   className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left"
                 >
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <item.icon className="text-primary" size={24} />
+                  <div className="w-12 h-12 rounded-lg bg-pink-500/10 flex items-center justify-center flex-shrink-0">
+                    <item.icon className="text-pink-400" size={24} />
                   </div>
-                  <span className="text-sm font-medium text-foreground">{item.label}</span>
+                  <span className="text-sm font-medium text-gray-200">{item.label}</span>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* How It Works */}
-        <section id="how-it-works" className="py-24 relative">
+        {/* Statistics - Compact Inline */}
+        <section className="py-10 relative">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                How the <span className="gradient-text">AI Loan Advisor</span> Works
-              </h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                A simple, transparent process from application to approval
-              </p>
-            </div>
-
-            <div className="hidden lg:flex items-start justify-between relative">
-              <div className="absolute top-12 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-
-              {steps.map((step, index) => (
-                <div key={index} className="flex flex-col items-center text-center relative z-10 max-w-[180px]">
-                  <div className="w-24 h-24 rounded-2xl glass-card flex items-center justify-center mb-6 glow-sm">
-                    <step.icon className="text-primary" size={36} />
-                  </div>
-
-                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    {index + 1}
-                  </div>
-
-                  <h3 className="font-display font-semibold text-lg mb-2">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
-
-                  {index < steps.length - 1 && (
-                    <ArrowRight className="absolute -right-8 top-12 text-primary/50 hidden xl:block" size={24} />
-                  )}
+            <div className="glass-card rounded-2xl p-8 max-w-5xl mx-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div className="text-center">
+                  <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">50K+</div>
+                  <div className="text-sm text-gray-400 mt-1">Loans Processed</div>
                 </div>
-              ))}
-            </div>
-
-            <div className="lg:hidden space-y-6">
-              {steps.map((step, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-4 glass-card p-6 rounded-xl"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 relative">
-                    <step.icon className="text-primary" size={28} />
-                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-semibold text-lg mb-1">{step.title}</h3>
-                    <p className="text-sm text-muted-foreground">{step.description}</p>
-                  </div>
+                <div className="text-center">
+                  <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">₹500Cr</div>
+                  <div className="text-sm text-gray-400 mt-1">Disbursed</div>
                 </div>
-              ))}
+                <div className="text-center">
+                  <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">4.8★</div>
+                  <div className="text-sm text-gray-400 mt-1">User Rating</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">2 min</div>
+                  <div className="text-sm text-gray-400 mt-1">Avg. Decision</div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Credit Calculator */}
-        <section id="calculator" className="py-24 relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
-
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-6">
-                <Calculator className="text-primary" size={18} />
-                <span className="text-sm text-muted-foreground">Educational Tool</span>
+        {/* Why We're Different - Comparison */}
+        <section className="py-12 relative bg-transparent">
+          <div className="container mx-auto px-4">
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="font-display text-3xl sm:text-4xl font-bold mb-3">
+                  Why Choose <span className="gradient-text">Us Over Banks</span>
+                </h2>
+                <p className="text-gray-400">Experience the future of lending</p>
               </div>
-              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                Credit Score <span className="gradient-text">Calculator</span>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Us */}
+                <div className="glass-card p-6 rounded-2xl border-pink-500/30">
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center mx-auto mb-2">
+                      <Zap className="text-white" size={24} />
+                    </div>
+                    <h3 className="font-bold text-lg text-white">LoanAdvisor</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-center gap-2 text-sm"><CheckCircle className="text-green-400 flex-shrink-0" size={16} /><span className="text-gray-300">2 min decision</span></li>
+                    <li className="flex items-center gap-2 text-sm"><CheckCircle className="text-green-400 flex-shrink-0" size={16} /><span className="text-gray-300">Only 2 documents</span></li>
+                    <li className="flex items-center gap-2 text-sm"><CheckCircle className="text-green-400 flex-shrink-0" size={16} /><span className="text-gray-300">From 8.99% interest</span></li>
+                    <li className="flex items-center gap-2 text-sm"><CheckCircle className="text-green-400 flex-shrink-0" size={16} /><span className="text-gray-300">100% online</span></li>
+                    <li className="flex items-center gap-2 text-sm"><CheckCircle className="text-green-400 flex-shrink-0" size={16} /><span className="text-gray-300">24hr disbursement</span></li>
+                    <li className="flex items-center gap-2 text-sm"><CheckCircle className="text-green-400 flex-shrink-0" size={16} /><span className="text-gray-300">AI-powered</span></li>
+                  </ul>
+                </div>
+
+                {/* VS */}
+                <div className="flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+                    <span className="font-bold text-xl text-gray-400">VS</span>
+                  </div>
+                </div>
+
+                {/* Banks */}
+                <div className="glass-card p-6 rounded-2xl opacity-60">
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center mx-auto mb-2">
+                      <Banknote className="text-gray-400" size={24} />
+                    </div>
+                    <h3 className="font-bold text-lg text-gray-400">Traditional Banks</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-center gap-2 text-sm"><X className="text-red-400 flex-shrink-0" size={16} /><span className="text-gray-500">5-7 days wait</span></li>
+                    <li className="flex items-center gap-2 text-sm"><X className="text-red-400 flex-shrink-0" size={16} /><span className="text-gray-500">10-15 documents</span></li>
+                    <li className="flex items-center gap-2 text-sm"><X className="text-red-400 flex-shrink-0" size={16} /><span className="text-gray-500">11-14% interest</span></li>
+                    <li className="flex items-center gap-2 text-sm"><X className="text-red-400 flex-shrink-0" size={16} /><span className="text-gray-500">Branch visits</span></li>
+                    <li className="flex items-center gap-2 text-sm"><X className="text-red-400 flex-shrink-0" size={16} /><span className="text-gray-500">7-14 days disburse</span></li>
+                    <li className="flex items-center gap-2 text-sm"><X className="text-red-400 flex-shrink-0" size={16} /><span className="text-gray-500">Manual process</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* How It Works - Compact Horizontal Flow */}
+        <section id="how-it-works" className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold mb-2">
+                How It <span className="gradient-text">Works</span>
               </h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                Get an estimate of your credit health based on key financial factors
-              </p>
+              <div className="inline-flex items-center glass-card rounded-full p-0.5 mt-3">
+                <button
+                  onClick={() => setFlowType('customer')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    flowType === 'customer'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Customer
+                </button>
+                <button
+                  onClick={() => setFlowType('admin')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    flowType === 'admin'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Admin
+                </button>
+              </div>
+            </div>
+
+            {/* Horizontal Steps */}
+            <div className="glass-card p-4 rounded-2xl">
+              <div className="flex flex-wrap justify-center gap-2 lg:gap-4">
+                {(flowType === 'customer' ? steps : adminSteps).map((step, index) => (
+                  <div key={index} className="flex items-center gap-2 lg:gap-3">
+                    <div className="flex items-center gap-2 bg-secondary/50 px-3 py-2 rounded-xl">
+                      <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <step.icon className="text-primary" size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold">{step.title}</div>
+                        <div className="text-[10px] text-muted-foreground hidden sm:block">{step.description}</div>
+                      </div>
+                    </div>
+                    {index < (flowType === 'customer' ? steps : adminSteps).length - 1 && (
+                      <ArrowRight className="text-primary/40 hidden sm:block" size={16} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Credit Calculator - Compact Version */}
+        <section id="calculator" className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-card mb-3">
+                <Calculator className="text-primary" size={14} />
+                <span className="text-xs text-muted-foreground">Credit Score Calculator</span>
+              </div>
+              <h2 className="font-display text-2xl sm:text-3xl font-bold">
+                Check Your <span className="gradient-text">Credit Health</span>
+              </h2>
+            </div>
+
+            <div className="max-w-4xl mx-auto">
+              <div className="glass-card p-6 rounded-2xl">
+                <div className="grid lg:grid-cols-3 gap-6 items-center">
+                  {/* Sliders */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-xs font-medium">Monthly Income</label>
+                          <span className="text-xs text-primary font-semibold">₹{income.toLocaleString()}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="10000"
+                          max="500000"
+                          step="5000"
+                          value={income}
+                          onChange={(e) => setIncome(Number(e.target.value))}
+                          className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-xs font-medium">Existing EMIs</label>
+                          <span className="text-xs text-primary font-semibold">₹{existingEMI.toLocaleString()}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100000"
+                          step="1000"
+                          value={existingEMI}
+                          onChange={(e) => setExistingEMI(Number(e.target.value))}
+                          className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-xs font-medium">Credit Utilization</label>
+                          <span className="text-xs text-primary font-semibold">{creditUtilization}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={creditUtilization}
+                          onChange={(e) => setCreditUtilization(Number(e.target.value))}
+                          className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-xs font-medium">Payment History</label>
+                          <span className="text-xs text-primary font-semibold">{paymentHistory}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={paymentHistory}
+                          onChange={(e) => setPaymentHistory(Number(e.target.value))}
+                          className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Score Display */}
+                  <div className="flex flex-col items-center">
+                    <div className="relative w-28 h-28">
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--secondary))" strokeWidth="6" />
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="hsl(var(--primary))" strokeWidth="6"
+                          strokeDasharray={`${((score - 300) / 550) * 264} 264`} strokeLinecap="round" className="transition-all duration-500" />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className={`text-2xl font-bold ${getScoreColor(score)}`}>{score}</span>
+                        <span className="text-[10px] text-muted-foreground">{getScoreLabel(score)}</span>
+                      </div>
+                    </div>
+                    <div className="w-full mt-3">
+                      <div className="h-1.5 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 relative">
+                        <div className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-foreground rounded-full border border-background transition-all duration-500"
+                          style={{ left: `${((score - 300) / 550) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Info size={12} />
+                    <span>Estimate based on your inputs</span>
+                  </div>
+                  <Button size="sm" className="glow group text-xs h-8">
+                    Check Real Eligibility
+                    <ArrowRight className="ml-1 group-hover:translate-x-0.5 transition-transform" size={14} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* KYC & Security - Compact */}
+        <section className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="glass-card p-6 rounded-2xl">
+              <div className="grid lg:grid-cols-5 gap-6 items-center">
+                {/* Icon */}
+                <div className="lg:col-span-1 flex justify-center">
+                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center relative">
+                    <Shield className="text-primary" size={40} strokeWidth={1.5} />
+                    <div className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
+                      <Lock className="text-primary" size={12} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Title & Description */}
+                <div className="lg:col-span-1 text-center lg:text-left">
+                  <h2 className="font-display text-xl font-bold mb-1">
+                    KYC & <span className="gradient-text">Security</span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">Bank-grade protection for your data</p>
+                </div>
+
+                {/* Features Grid */}
+                <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {kycFeatures.map((feature, index) => (
+                    <div key={index} className="bg-secondary/30 rounded-xl p-3 text-center">
+                      <feature.icon className="text-primary mx-auto mb-1.5" size={18} />
+                      <div className="text-xs font-medium">{feature.title}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Loan Amounts - Compact Cards */}
+        <section className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold">
+                Loans For <span className="gradient-text">Every Need</span>
+              </h2>
             </div>
 
             <div className="max-w-5xl mx-auto">
-              <div className="grid lg:grid-cols-2 gap-8">
-                <div className="glass-card p-8 rounded-2xl">
-                  <h3 className="font-display font-semibold text-xl mb-6">Enter Your Details</h3>
-
-                  <div className="space-y-8">
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium">Monthly Income</label>
-                        <span className="text-primary font-semibold">₹{income.toLocaleString()}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10000"
-                        max="500000"
-                        step="5000"
-                        value={income}
-                        onChange={(e) => setIncome(Number(e.target.value))}
-                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>₹10K</span>
-                        <span>₹5L+</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium">Existing EMIs (Monthly)</label>
-                        <span className="text-primary font-semibold">₹{existingEMI.toLocaleString()}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100000"
-                        step="1000"
-                        value={existingEMI}
-                        onChange={(e) => setExistingEMI(Number(e.target.value))}
-                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>₹0</span>
-                        <span>₹1L</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium">Credit Card Utilization</label>
-                        <span className="text-primary font-semibold">{creditUtilization}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="5"
-                        value={creditUtilization}
-                        onChange={(e) => setCreditUtilization(Number(e.target.value))}
-                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>0%</span>
-                        <span>100%</span>
-                      </div>
-                    </div>
+              <div className="grid md:grid-cols-3 gap-4 mb-4">
+                <div className="glass-card p-5 rounded-xl hover:glow-sm transition-all group text-center">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500/20 to-teal-500/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Target className="text-green-400" size={20} />
+                  </div>
+                  <h3 className="font-bold text-lg mb-1">₹50K - ₹2L</h3>
+                  <p className="text-xs text-muted-foreground mb-2">Personal Loans</p>
+                  <div className="text-xs space-y-1 text-muted-foreground">
+                    <div>From 8.99% • 6-24 months</div>
                   </div>
                 </div>
 
-                <div className="glass-card p-8 rounded-2xl flex flex-col">
-                  <h3 className="font-display font-semibold text-xl mb-6">Estimated Score</h3>
-
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="relative w-48 h-48">
-                      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="hsl(var(--secondary))"
-                          strokeWidth="8"
-                        />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth="8"
-                          strokeDasharray={`${((score - 300) / 550) * 283} 283`}
-                          strokeLinecap="round"
-                          className="transition-all duration-500"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className={`text-4xl font-bold ${getScoreColor(score)}`}>{score}</span>
-                        <span className="text-sm text-muted-foreground">{getScoreLabel(score)}</span>
-                      </div>
-                    </div>
+                <div className="glass-card p-5 rounded-xl hover:glow-sm transition-all group text-center relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold rounded-bl">
+                    POPULAR
                   </div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Banknote className="text-blue-400" size={20} />
+                  </div>
+                  <h3 className="font-bold text-lg mb-1">₹2L - ₹5L</h3>
+                  <p className="text-xs text-muted-foreground mb-2">Medium Loans</p>
+                  <div className="text-xs space-y-1 text-muted-foreground">
+                    <div>From 9.49% • 12-36 months</div>
+                  </div>
+                </div>
 
-                  <div className="mt-6">
-                    <div className="h-3 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 relative">
-                      <div
-                        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-foreground rounded-full border-2 border-background transition-all duration-500"
-                        style={{ left: `${((score - 300) / 550) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                      <span>300</span>
-                      <span>550</span>
-                      <span>700</span>
-                      <span>850</span>
-                    </div>
+                <div className="glass-card p-5 rounded-xl hover:glow-sm transition-all group text-center">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500/20 to-red-500/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Award className="text-pink-400" size={20} />
+                  </div>
+                  <h3 className="font-bold text-lg mb-1">₹5L - ₹10L</h3>
+                  <p className="text-xs text-muted-foreground mb-2">Premium Loans</p>
+                  <div className="text-xs space-y-1 text-muted-foreground">
+                    <div>From 9.99% • 12-48 months</div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-8 glass-card p-6 rounded-2xl">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="text-primary" size={20} />
-                  <h4 className="font-display font-semibold">Tips to Improve Your Score</h4>
+              <div className="glass-card p-4 rounded-xl">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                      <Sparkles className="text-primary" size={14} />
+                      Use It For
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Wedding', 'Medical', 'Home Renovation', 'Education', 'Travel', 'Business'].map((item, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-secondary/50 rounded text-xs">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                      <Shield className="text-primary" size={14} />
+                      No Hidden Charges
+                    </h4>
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <span>2% Processing</span>
+                      <span className="text-green-400">₹0 Prepayment</span>
+                      <span className="text-green-400">Part Payment OK</span>
+                    </div>
+                  </div>
                 </div>
-                <ul className="grid sm:grid-cols-2 gap-3">
-                  {improvements.map((tip, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Repayment - Compact */}
+        <section className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold">
+                Repayment <span className="gradient-text">Made Simple</span>
+              </h2>
+            </div>
+
+            <div className="max-w-4xl mx-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {repaymentFeatures.map((feature, index) => (
+                  <div key={index} className="glass-card p-4 rounded-xl text-center group hover:glow-sm transition-all">
+                    <feature.icon className="text-primary mx-auto mb-2" size={20} />
+                    <h3 className="font-semibold text-sm mb-0.5">{feature.title}</h3>
+                    <p className="text-[10px] text-muted-foreground">{feature.description}</p>
+                  </div>
+                ))}
               </div>
 
-              <div className="mt-8 text-center">
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-6">
-                  <Info size={16} />
-                  <span>This is an estimate based on the information you provide. Actual scores may vary.</span>
+              <div className="glass-card rounded-xl overflow-hidden">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm">Sample EMI</h3>
+                    <p className="text-xs text-muted-foreground">₹1L @ 12% for 12 months</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-primary">₹8,884</div>
+                    <div className="text-[10px] text-muted-foreground">Monthly EMI</div>
+                  </div>
                 </div>
-                <Button size="lg" className="glow group">
-                  Check Your Real Eligibility
-                  <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={20} />
+                <div className="p-3 grid grid-cols-4 gap-2 text-center text-xs">
+                  <div className="bg-secondary/30 rounded p-2">
+                    <div className="text-muted-foreground">Total Interest</div>
+                    <div className="font-semibold">₹6,608</div>
+                  </div>
+                  <div className="bg-secondary/30 rounded p-2">
+                    <div className="text-muted-foreground">Total Amount</div>
+                    <div className="font-semibold">₹1,06,608</div>
+                  </div>
+                  <div className="bg-secondary/30 rounded p-2">
+                    <div className="text-muted-foreground">First EMI</div>
+                    <div className="font-semibold text-green-400">₹7,884 P</div>
+                  </div>
+                  <div className="bg-secondary/30 rounded p-2">
+                    <div className="text-muted-foreground">Last EMI</div>
+                    <div className="font-semibold text-green-400">₹8,796 P</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* AI Advisor - Compact Chat Preview */}
+        <section className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="max-w-5xl mx-auto">
+              <div className="glass-card p-6 rounded-2xl">
+                <div className="grid lg:grid-cols-2 gap-6 items-center">
+                  {/* Left Side - Info */}
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 mb-3">
+                      <Bot className="text-primary" size={14} />
+                      <span className="text-xs text-primary font-medium">AI-Powered</span>
+                    </div>
+                    <h2 className="font-display text-2xl font-bold mb-2">
+                      Personal <span className="gradient-text">Credit Guide</span>
+                    </h2>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Get explanations in plain language and tips to improve your eligibility.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2 text-xs">
+                        <MessageSquare className="text-primary" size={14} />
+                        <span>Plain explanations</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Lightbulb className="text-primary" size={14} />
+                        <span>Improvement tips</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <HelpCircle className="text-primary" size={14} />
+                        <span>24/7 available</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Shield className="text-primary" size={14} />
+                        <span>Human oversight</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side - Chat Preview */}
+                  <div className="bg-secondary/30 rounded-xl overflow-hidden">
+                    <div className="p-3 border-b border-border flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Bot className="text-primary" size={14} />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">AI Advisor</div>
+                        <div className="text-[10px] text-green-400">Online</div>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-2 h-40 overflow-hidden">
+                      <div className="flex gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <Bot className="text-primary" size={10} />
+                        </div>
+                        <div className="bg-secondary/50 p-2 rounded-lg rounded-tl-none text-xs max-w-[85%]">
+                          You're eligible for up to ₹2,00,000! 🎉
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <div className="bg-primary text-primary-foreground p-2 rounded-lg rounded-tr-none text-xs">
+                          Can I get more?
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <Bot className="text-primary" size={10} />
+                        </div>
+                        <div className="bg-secondary/50 p-2 rounded-lg rounded-tl-none text-xs max-w-[85%]">
+                          Lower credit utilization to 30% for ₹3.5L eligibility 💡
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Why Choose Us - Compact Grid */}
+        <section id="why-choose-us" className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold">
+                Why <span className="gradient-text">Choose Us</span>
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 max-w-5xl mx-auto">
+              {benefits.map((benefit, index) => (
+                <div key={index} className="glass-card p-4 rounded-xl text-center group hover:glow-sm transition-all">
+                  <benefit.icon className="text-primary mx-auto mb-2" size={20} />
+                  <h3 className="font-semibold text-xs">{benefit.title}</h3>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Compliance - Compact Banner */}
+        <section className="py-8 relative">
+          <div className="container mx-auto px-4">
+            <div className="glass-card p-4 rounded-xl max-w-4xl mx-auto">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-center">
+                <div className="flex items-center gap-2">
+                  <Scale className="text-primary" size={16} />
+                  <span className="text-sm font-semibold">AI Transparency</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Shield className="text-primary/60" size={14} />
+                  <span>Data Protected</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <FileText className="text-primary/60" size={14} />
+                  <span>Fair Lending Audited</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Users className="text-primary/60" size={14} />
+                  <span>Human Oversight</span>
+                </div>
+                <a href="#" className="text-xs text-primary hover:underline">Learn More →</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials - Compact */}
+        <section className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold">
+                Customer <span className="gradient-text">Stories</span>
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto mb-6">
+              <div className="glass-card p-4 rounded-xl">
+                <div className="flex items-center gap-0.5 mb-2">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="text-yellow-400 fill-yellow-400" size={12} />)}
+                </div>
+                <p className="text-xs text-muted-foreground mb-3 italic line-clamp-2">
+                  "Got approved in 2 minutes! Best loan experience ever."
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center text-[10px] font-bold">RP</div>
+                  <div>
+                    <div className="font-semibold text-xs">Rahul P.</div>
+                    <div className="text-[10px] text-muted-foreground">Mumbai</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card p-4 rounded-xl">
+                <div className="flex items-center gap-0.5 mb-2">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="text-yellow-400 fill-yellow-400" size={12} />)}
+                </div>
+                <p className="text-xs text-muted-foreground mb-3 italic line-clamp-2">
+                  "No paperwork upfront? Smart KYC made it so easy!"
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-teal-500 flex items-center justify-center text-[10px] font-bold">SM</div>
+                  <div>
+                    <div className="font-semibold text-xs">Sneha M.</div>
+                    <div className="text-[10px] text-muted-foreground">Bangalore</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card p-4 rounded-xl">
+                <div className="flex items-center gap-0.5 mb-2">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="text-yellow-400 fill-yellow-400" size={12} />)}
+                </div>
+                <p className="text-xs text-muted-foreground mb-3 italic line-clamp-2">
+                  "Second loan was even easier! Documents reused. Amazing!"
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-[10px] font-bold">AK</div>
+                  <div>
+                    <div className="font-semibold text-xs">Amit K.</div>
+                    <div className="text-[10px] text-muted-foreground">Delhi</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="inline-flex items-center gap-6 glass-card px-6 py-3 rounded-xl text-center">
+                <div>
+                  <div className="text-xl font-bold gradient-text">12K+</div>
+                  <div className="text-[10px] text-muted-foreground">5-Star Reviews</div>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <div className="text-xl font-bold gradient-text">98%</div>
+                  <div className="text-[10px] text-muted-foreground">Satisfied</div>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <div className="text-xl font-bold gradient-text">4.8★</div>
+                  <div className="text-[10px] text-muted-foreground">Avg Rating</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ - Compact Accordion Style */}
+        <section className="py-10 relative">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto">
+              <div className="text-center mb-6">
+                <h2 className="font-display text-2xl sm:text-3xl font-bold">
+                  Common <span className="gradient-text">Questions</span>
+                </h2>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  { q: "How long does approval take?", a: "Instant eligibility in under 2 minutes. Funds within 24 hours after KYC." },
+                  { q: "Do I need documents to check eligibility?", a: "No! Check first with zero documents. Only 2 docs needed after approval." },
+                  { q: "Will this affect my credit score?", a: "No. We use soft inquiry. Zero impact until you proceed with the loan." },
+                  { q: "What interest rates do you offer?", a: "Personalized rates starting from 8.99% p.a. based on your profile." },
+                  { q: "Can I reuse documents for a second loan?", a: "Yes! Aadhaar & PAN are reusable. Only fresh bank statement needed." },
+                  { q: "Is my data secure?", a: "Bank-grade 256-bit encryption. Fully compliant with data protection laws." }
+                ].map((faq, index) => (
+                  <div key={index} className="glass-card rounded-xl overflow-hidden">
+                    <div className="p-4 hover:bg-secondary/30 transition-colors">
+                      <h3 className="font-semibold text-sm mb-1">{faq.q}</h3>
+                      <p className="text-xs text-muted-foreground">{faq.a}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 text-center">
+                <Button variant="outline" size="sm" className="group text-xs h-8">
+                  <HelpCircle className="mr-1" size={14} />
+                  More Questions? Contact Us
+                  <ArrowRight className="ml-1 group-hover:translate-x-0.5 transition-transform" size={14} />
                 </Button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* KYC & Security */}
-        <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-secondary/50 to-transparent" />
-
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="flex justify-center lg:justify-start">
-                <div className="relative">
-                  <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl glass-card flex items-center justify-center glow">
-                    <Shield className="text-primary w-32 h-32 sm:w-40 sm:h-40" strokeWidth={1} />
-                  </div>
-
-                  <div className="absolute -top-4 -right-4 w-16 h-16 rounded-xl glass-card flex items-center justify-center animate-float">
-                    <Lock className="text-primary" size={28} />
-                  </div>
-                  <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-xl glass-card flex items-center justify-center animate-float" style={{ animationDelay: "2s" }}>
-                    <Fingerprint className="text-primary" size={28} />
-                  </div>
-                  <div className="absolute top-1/2 -right-8 w-12 h-12 rounded-lg glass-card flex items-center justify-center animate-float" style={{ animationDelay: "4s" }}>
-                    <Eye className="text-primary" size={20} />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                  KYC & <span className="gradient-text">Security</span>
-                </h2>
-                <p className="text-muted-foreground text-lg mb-10 max-w-lg">
-                  Your security is our priority. We use advanced technology and rigorous processes to keep your data safe.
-                </p>
-
-                <div className="space-y-6">
-                  {kycFeatures.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-4 group">
-                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
-                        <feature.icon className="text-primary" size={22} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold mb-1">{feature.title}</h3>
-                        <p className="text-sm text-muted-foreground">{feature.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        {/* Final CTA - Premium Design */}
+        <section className="py-20 relative overflow-hidden">
+          {/* Animated Background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0A2540] via-[#0d2d4d] to-[#0A2540]" />
+          <div className="absolute inset-0">
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-pink-500/20 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-500/20 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[150px]" />
           </div>
-        </section>
-
-        {/* Repayment Section */}
-        <section className="py-24 relative">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                Repayment <span className="gradient-text">Made Simple</span>
-              </h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                Flexible, transparent, and hassle-free repayment options
-              </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              {repaymentFeatures.map((feature, index) => (
-                <div
-                  key={index}
-                  className="glass-card p-6 rounded-2xl hover:bg-secondary/50 transition-colors group"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:glow-sm transition-shadow">
-                    <feature.icon className="text-primary" size={28} />
-                  </div>
-                  <h3 className="font-display font-semibold text-lg mb-2">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="max-w-3xl mx-auto">
-              <div className="glass-card rounded-2xl overflow-hidden">
-                <div className="p-6 border-b border-border">
-                  <h3 className="font-display font-semibold text-lg">Sample EMI Breakdown</h3>
-                  <p className="text-sm text-muted-foreground">For a ₹1,00,000 loan at 12% p.a. for 12 months</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-secondary/50">
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Month</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">EMI</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Principal</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Interest</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {[
-                        { month: 1, emi: 8884, principal: 7884, interest: 1000, balance: 92116 },
-                        { month: 2, emi: 8884, principal: 7963, interest: 921, balance: 84153 },
-                        { month: 3, emi: 8884, principal: 8042, interest: 842, balance: 76111 },
-                        { month: "...", emi: "...", principal: "...", interest: "...", balance: "..." },
-                        { month: 12, emi: 8884, principal: 8796, interest: 88, balance: 0 },
-                      ].map((row, index) => (
-                        <tr key={index} className="hover:bg-secondary/30 transition-colors">
-                          <td className="px-6 py-4 text-sm">{row.month}</td>
-                          <td className="px-6 py-4 text-sm font-medium text-primary">
-                            {typeof row.emi === "number" ? `₹${row.emi.toLocaleString()}` : row.emi}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            {typeof row.principal === "number" ? `₹${row.principal.toLocaleString()}` : row.principal}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-muted-foreground">
-                            {typeof row.interest === "number" ? `₹${row.interest.toLocaleString()}` : row.interest}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            {typeof row.balance === "number" ? `₹${row.balance.toLocaleString()}` : row.balance}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* AI Advisor */}
-        <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-secondary/30 to-transparent" />
-
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-6">
-                  <Bot className="text-primary" size={18} />
-                  <span className="text-sm text-muted-foreground">AI-Powered Guidance</span>
-                </div>
-
-                <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                  Your Personal <span className="gradient-text">Credit Guide</span>
-                </h2>
-
-                <p className="text-muted-foreground text-lg mb-8 max-w-lg">
-                  Our AI doesn't just make decisions—it explains them in plain language and helps you understand how to improve.
-                </p>
-
-                <div className="space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <MessageSquare className="text-primary" size={22} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">Plain Language Explanations</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Understand why you were approved or what needs improvement—no jargon.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Lightbulb className="text-primary" size={22} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">Actionable Improvement Tips</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Get personalized suggestions to boost your eligibility and credit health.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <HelpCircle className="text-primary" size={22} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">Always Ready to Help</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Questions about EMI, interest rates, or credit scores? Our AI has answers.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-10 p-4 glass-card rounded-lg inline-block">
-                  <p className="text-sm text-muted-foreground italic">
-                    "AI-guided decisions. Human-governed oversight."
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-center lg:justify-end">
-                <div className="w-full max-w-sm glass-card rounded-2xl overflow-hidden">
-                  <div className="p-4 border-b border-border flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Bot className="text-primary" size={20} />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm">AI Credit Advisor</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-green-500" />
-                        Online
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 space-y-4 h-80 overflow-y-auto">
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Bot className="text-primary" size={14} />
-                      </div>
-                      <div className="glass-card p-3 rounded-lg rounded-tl-none max-w-[80%]">
-                        <p className="text-sm">
-                          Hi! I've analyzed your application. You're eligible for a loan up to ₹2,00,000.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3 justify-end">
-                      <div className="bg-primary text-primary-foreground p-3 rounded-lg rounded-tr-none max-w-[80%]">
-                        <p className="text-sm">Why only ₹2L? Can I get more?</p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Bot className="text-primary" size={14} />
-                      </div>
-                      <div className="glass-card p-3 rounded-lg rounded-tl-none max-w-[80%]">
-                        <p className="text-sm">
-                          Your current credit utilization is at 45%. If you bring it below 30%, you could qualify for up to ₹3,50,000.
-                          <br /><br />
-                          <span className="text-primary">Tip:</span> Pay down ₹15,000 on your credit card to improve your ratio.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3 justify-end">
-                      <div className="bg-primary text-primary-foreground p-3 rounded-lg rounded-tr-none max-w-[80%]">
-                        <p className="text-sm">That's helpful! What's my interest rate?</p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Bot className="text-primary" size={14} />
-                      </div>
-                      <div className="glass-card p-3 rounded-lg rounded-tl-none max-w-[80%]">
-                        <p className="text-sm">
-                          Based on your profile, you qualify for 12.5% p.a. For a ₹2L loan over 24 months, your EMI would be ₹9,445.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 border-t border-border">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-secondary/50 rounded-lg px-4 py-2 text-sm text-muted-foreground">
-                        Ask about your eligibility...
-                      </div>
-                      <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                        <MessageSquare className="text-primary-foreground" size={18} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Why Choose Us */}
-        <section id="why-choose-us" className="py-24 relative">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                Why Choose <span className="gradient-text">Our Platform</span>
-              </h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                Built for transparency, speed, and trust
-              </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {benefits.map((benefit, index) => (
-                <div
-                  key={index}
-                  className="glass-card p-8 rounded-2xl hover:glow-sm transition-shadow group"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
-                    <benefit.icon className="text-primary" size={28} />
-                  </div>
-                  <h3 className="font-display font-semibold text-xl mb-3">{benefit.title}</h3>
-                  <p className="text-muted-foreground">{benefit.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Compliance */}
-        <section className="py-16 relative">
-          <div className="absolute inset-0 bg-secondary/30" />
 
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-4xl mx-auto">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <Scale className="text-primary" size={28} />
-                <h2 className="font-display text-2xl sm:text-3xl font-bold">
-                  Compliance & AI Disclosure
+              {/* Glass Card Container */}
+              <div className="glass-card p-10 md:p-14 rounded-3xl text-center relative overflow-hidden">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-pink-500/20 to-transparent rounded-full blur-2xl" />
+                <div className="absolute bottom-0 right-0 w-40 h-40 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-full blur-2xl" />
+                
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+                  <Sparkles className="text-primary" size={16} />
+                  <span className="text-sm font-medium text-primary">Start Your Journey Today</span>
+                </div>
+
+                <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+                  Ready to Get Your
+                  <br />
+                  <span className="gradient-text">Dream Loan?</span>
                 </h2>
-              </div>
+                
+                <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+                  Join 50,000+ happy customers who got instant loan approvals with zero hassle
+                </p>
 
-              <div className="glass-card p-8 rounded-2xl">
-                <div className="prose prose-invert max-w-none">
-                  <p className="text-muted-foreground leading-relaxed mb-6">
-                    We believe in full transparency about how we use AI in our lending decisions. Our AI-powered
-                    eligibility assessment system is designed to provide fair, consistent, and explainable decisions
-                    while maintaining human oversight for complex cases.
-                  </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+                  <Button size="lg" className="glow group px-8 py-6 text-lg rounded-xl">
+                    <Zap className="mr-2" size={20} />
+                    Check Eligibility Free
+                    <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={20} />
+                  </Button>
+                  <Button variant="outline" size="lg" className="px-8 py-6 text-lg rounded-xl border-white/20 hover:bg-white/5" asChild>
+                    <a href="/login">
+                      <LogIn className="mr-2" size={20} />
+                      Track Application
+                    </a>
+                  </Button>
+                </div>
 
-                  <div className="grid sm:grid-cols-3 gap-6 mb-6">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Shield className="text-primary" size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-sm mb-1">Data Protection</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Your data is handled in compliance with applicable data protection regulations.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <FileText className="text-primary" size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-sm mb-1">Fair Lending</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Our AI is regularly audited to ensure fair and unbiased decision-making.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Scale className="text-primary" size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-sm mb-1">Human Oversight</h4>
-                        <p className="text-xs text-muted-foreground">
-                          All edge cases and appeals are reviewed by qualified human experts.
-                        </p>
-                      </div>
-                    </div>
+                {/* Trust Indicators */}
+                <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span>256-bit SSL Encryption</span>
                   </div>
-
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <a href="#" className="text-primary hover:underline">Privacy Policy</a>
-                    <span className="text-border">|</span>
-                    <a href="#" className="text-primary hover:underline">Terms of Service</a>
-                    <span className="text-border">|</span>
-                    <a href="#" className="text-primary hover:underline">AI Disclosure Statement</a>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span>Zero Credit Impact</span>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Final CTA */}
-        <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-glow-secondary/10 to-primary/10" />
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-glow-secondary/20 rounded-full blur-3xl" />
-
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
-                Ready to Know <span className="gradient-text">Where You Stand?</span>
-              </h2>
-              <p className="text-muted-foreground text-lg mb-10 max-w-xl mx-auto">
-                Check your eligibility in minutes. No documents needed upfront, no impact on your credit score.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button size="lg" className="glow text-base px-8 py-6 group">
-                  Check Your Eligibility
-                  <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={20} />
-                </Button>
-                <Button variant="outline" size="lg" className="text-base px-8 py-6" asChild>
-                  <a href="/login">
-                    <LogIn className="mr-2" size={20} />
-                    Track Your Application
-                  </a>
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-center gap-6 mt-12 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  256-bit Encryption
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  No Credit Impact
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  2-Minute Process
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span>2-Minute Approval</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1080,85 +1413,126 @@ const Index = () => {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="py-16 border-t border-border bg-card/50">
+      {/* Premium Footer */}
+      <footer className="relative bg-[#060d17] border-t border-white/5">
+        {/* Top Wave Decoration */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+        
         <div className="container mx-auto px-4">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-            <div className="lg:col-span-1">
-              <a href="#" className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                  <span className="font-display font-bold text-primary-foreground text-lg">LA</span>
+          {/* Main Footer Content */}
+          <div className="py-16">
+            <div className="grid lg:grid-cols-5 gap-12">
+              {/* Brand Column */}
+              <div className="lg:col-span-2">
+                <a href="#" className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
+                    <span className="font-display font-bold text-white text-xl">LA</span>
+                  </div>
+                  <div>
+                    <span className="font-display font-bold text-xl block">LoanAdvisor</span>
+                    <span className="text-xs text-muted-foreground">AI-Powered Lending</span>
+                  </div>
+                </a>
+                <p className="text-muted-foreground mb-6 max-w-sm">
+                  Making loans accessible, transparent, and instant with the power of AI. Trusted by thousands across India.
+                </p>
+                
+                {/* Social Links */}
+                <div className="flex gap-3">
+                  {socialLinks.map((social, index) => (
+                    <a key={index} href={social.href} aria-label={social.label}
+                      className="w-10 h-10 rounded-xl glass-card flex items-center justify-center hover:bg-primary/20 hover:border-primary/30 transition-all group">
+                      <social.icon size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                    </a>
+                  ))}
                 </div>
-                <span className="font-display font-semibold text-xl text-foreground">
-                  LoanAdvisor
-                </span>
-              </a>
-              <p className="text-sm text-muted-foreground mb-6">
-                AI-powered loan eligibility decisions with full transparency and human oversight.
-              </p>
-              <div className="flex gap-3">
-                {socialLinks.map((social, index) => (
-                  <a
-                    key={index}
-                    href={social.href}
-                    aria-label={social.label}
-                    className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"
-                  >
-                    <social.icon size={18} className="text-muted-foreground" />
-                  </a>
-                ))}
               </div>
-            </div>
 
-            <div>
-              <h4 className="font-display font-semibold mb-4">Quick Links</h4>
-              <ul className="space-y-3">
-                {quickLinks.map((link, index) => (
-                  <li key={index}>
-                    <a
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {link.label}
-                    </a>
+              {/* Links Columns */}
+              <div>
+                <h4 className="font-display font-semibold mb-5 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-gradient-to-b from-pink-500 to-purple-500 rounded-full" />
+                  Quick Links
+                </h4>
+                <ul className="space-y-3">
+                  {quickLinks.map((link, index) => (
+                    <li key={index}>
+                      <a href={link.href} className="text-sm text-muted-foreground hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1 group">
+                        <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-display font-semibold mb-5 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-gradient-to-b from-pink-500 to-purple-500 rounded-full" />
+                  Legal
+                </h4>
+                <ul className="space-y-3">
+                  {legalLinks.map((link, index) => (
+                    <li key={index}>
+                      <a href={link.href} className="text-sm text-muted-foreground hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1 group">
+                        <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-display font-semibold mb-5 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-gradient-to-b from-pink-500 to-purple-500 rounded-full" />
+                  Contact Us
+                </h4>
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Mail size={14} className="text-primary" />
+                    </div>
+                    <span className="text-sm text-muted-foreground">support@loanadvisor.ai</span>
                   </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-display font-semibold mb-4">Legal</h4>
-              <ul className="space-y-3">
-                {legalLinks.map((link, index) => (
-                  <li key={index}>
-                    <a
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {link.label}
-                    </a>
+                  <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Phone size={14} className="text-primary" />
+                    </div>
+                    <span className="text-sm text-muted-foreground">1800-XXX-XXXX</span>
                   </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-display font-semibold mb-4">Contact</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li>support@loanadvisor.ai</li>
-                <li>1800-XXX-XXXX</li>
-                <li>Mon - Sat: 9AM - 8PM</li>
-              </ul>
+                  <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Clock size={14} className="text-primary" />
+                    </div>
+                    <span className="text-sm text-muted-foreground">Mon - Sat: 9AM - 8PM</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              © {currentYear} LoanAdvisor. All rights reserved.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Powered by AI with human oversight for fair lending decisions.
-            </p>
+          {/* Bottom Bar */}
+          <div className="py-6 border-t border-white/5">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-muted-foreground">
+                © {currentYear} LoanAdvisor. All rights reserved.
+              </p>
+              <div className="flex items-center gap-6 text-xs text-muted-foreground">
+                <span className="flex items-center gap-2">
+                  <Shield size={14} className="text-primary" />
+                  Bank-Grade Security
+                </span>
+                <span className="flex items-center gap-2">
+                  <Bot size={14} className="text-primary" />
+                  AI with Human Oversight
+                </span>
+                <span className="flex items-center gap-2">
+                  <Award size={14} className="text-primary" />
+                  RBI Compliant
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </footer>

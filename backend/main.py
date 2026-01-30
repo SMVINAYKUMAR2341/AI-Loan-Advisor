@@ -3,8 +3,9 @@ import sys
 import calendar
 from collections import defaultdict
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) # Fix import paths
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, UploadFile, File, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
@@ -126,13 +127,17 @@ async def generic_exception_handler(request: Request, exc: Exception):
     print(f"CRITICAL ERROR: {exc}")
     traceback.print_exc()
     
+    # In development, show the real error. In production, use generic message
+    import os
+    is_dev = os.getenv("ENVIRONMENT", "development") == "development"
+    
     origin = request.headers.get("origin", "*")
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "An unexpected error occurred. Our team has been notified.",
+            "detail": str(exc) if is_dev else "An unexpected error occurred. Our team has been notified.",
             "error_type": type(exc).__name__,
-            "message": str(exc) # Included for debugging purposes as requested
+            "message": str(exc)
         },
         headers={
             "Access-Control-Allow-Origin": origin if origin else "*",
@@ -482,29 +487,36 @@ async def get_my_loan_applications(
     db: AsyncSession = Depends(database.get_db)
 ):
     """Get all loan applications for the current user"""
-    query = (
-        select(models.LoanApplication, models.LoanPrediction)
-        .outerjoin(models.LoanPrediction, models.LoanApplication.id == models.LoanPrediction.application_id)
-        .where(models.LoanApplication.user_id == user.id)
-        .order_by(models.LoanApplication.created_at.desc())
-    )
-    result = await db.execute(query)
-    rows = result.all()
+    # Use raw SQL without tracking_id column reference
+    from sqlalchemy import text
+    query = text("""
+        SELECT 
+            la.id, la.loan_amount, la.loan_purpose, la.created_at, la.loan_duration,
+            lp.decision, lp.approval_probability, lp.interest_rate, lp.emi,
+            COALESCE(kyc.overall_status, 'NOT_STARTED') as kyc_status
+        FROM loan_applications la
+        LEFT OUTER JOIN loan_predictions lp ON la.id = lp.application_id
+        LEFT OUTER JOIN kyc_status_tracking kyc ON la.id = kyc.application_id
+        WHERE la.user_id = :user_id
+        ORDER BY la.created_at DESC
+    """)
+    result = await db.execute(query, {"user_id": user.id})
+    rows = result.fetchall()
     
     return [{
-        "id": str(app.id),
-        "loan_amount": app.loan_amount,
-        "loan_purpose": app.loan_purpose,
-        "created_at": app.created_at.isoformat(),
-        "tracking_id": app.tracking_id,
-        # Prediction details (might be None if not processed yet)
-        "decision": pred.decision if pred else "PENDING",
-        "status": pred.decision if pred else "PENDING", # Map decision to status for frontend compatibility
-        "approval_probability": pred.approval_probability if pred else 0,
-        "interest_rate": pred.interest_rate if pred else 0,
-        "emi": pred.emi if pred else 0,
-        "tenure": app.loan_duration
-    } for app, pred in rows]
+        "id": str(row.id),
+        "loan_amount": float(row.loan_amount) if row.loan_amount else 0,
+        "loan_purpose": row.loan_purpose,
+        "created_at": row.created_at.isoformat(),
+        "tracking_id": str(row.id)[:8].upper(),  # Generate from UUID
+        "decision": row.decision if row.decision else "PENDING",
+        "status": row.decision if row.decision else "PENDING",
+        "approval_probability": float(row.approval_probability) if row.approval_probability else 0,
+        "interest_rate": float(row.interest_rate) if row.interest_rate else 0,
+        "emi": float(row.emi) if row.emi else 0,
+        "tenure": int(row.loan_duration) if row.loan_duration else 0,
+        "kyc_status": row.kyc_status
+    } for row in rows]
 
 
 @app.get("/repayments/me")
@@ -563,6 +575,92 @@ async def get_my_disbursements(
         "bank_name": d.bank_name,
         "account_number_masked": d.account_number_masked
     } for d, app in rows]
+
+
+@app.post("/loan-applications/{application_id}/request-delete")
+async def request_application_deletion(
+    application_id: str,
+    reason: str = Body(..., embed=True),
+    user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Submit a deletion request for a loan application.
+    Users can request deletion, but admin must approve.
+    """
+    try:
+        app_uuid = uuid.UUID(application_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid application ID")
+    
+    # Verify the application belongs to this user
+    query = select(models.LoanApplication).where(
+        models.LoanApplication.id == app_uuid,
+        models.LoanApplication.user_id == user.id
+    )
+    result = await db.execute(query)
+    application = result.scalar_one_or_none()
+    
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Check if application is already disbursed
+    pred_query = select(models.LoanPrediction).where(
+        models.LoanPrediction.application_id == app_uuid
+    )
+    pred_result = await db.execute(pred_query)
+    prediction = pred_result.scalar_one_or_none()
+    
+    if prediction and prediction.decision == "DISBURSED":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete disbursed applications. Please contact support."
+        )
+    
+    # Check if there's already a pending deletion request
+    existing_query = select(models.DeletionRequest).where(
+        models.DeletionRequest.application_id == app_uuid,
+        models.DeletionRequest.status == "PENDING"
+    )
+    existing_result = await db.execute(existing_query)
+    existing_request = existing_result.scalar_one_or_none()
+    
+    if existing_request:
+        raise HTTPException(
+            status_code=400,
+            detail="A deletion request for this application is already pending"
+        )
+    
+    # Create the deletion request
+    deletion_request = models.DeletionRequest(
+        application_id=app_uuid,
+        user_id=user.id,
+        reason=reason,
+        status="PENDING"
+    )
+    
+    db.add(deletion_request)
+    
+    # Log the action
+    audit_log = models.AuditLog(
+        user_id=user.id,
+        action="request_application_deletion",
+        event_category="LOAN",
+        severity="INFO",
+        entity_type="loan_application",
+        entity_id=app_uuid,
+        description=f"User requested deletion of application {str(app_uuid)[:8].upper()}",
+        extra_data={"reason": reason}
+    )
+    db.add(audit_log)
+    
+    await db.commit()
+    
+    return {
+        "message": "Deletion request submitted successfully",
+        "request_id": str(deletion_request.id),
+        "status": "PENDING"
+    }
 
 
 # =====================================================
@@ -899,7 +997,7 @@ async def get_application_full_details(
     return {
         "application": {
             "id": str(application.id),
-            "tracking_id": application.tracking_id,
+            "tracking_id": str(application.id)[:8].upper(),
             "loan_amount": application.loan_amount,
             "loan_purpose": application.loan_purpose,
             "loan_duration": application.loan_duration,
@@ -958,6 +1056,153 @@ async def get_application_full_details(
 # =====================================================
 # ADMIN DISBURSEMENT ENDPOINTS
 # =====================================================
+
+@app.get("/admin/applications/tracking/{tracking_id}")
+async def get_application_by_tracking_id(
+    tracking_id: str,
+    current_admin = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get application details by tracking ID (first 8 characters of UUID).
+    Returns full application details including documents and KYC status.
+    """
+    # Search for applications where UUID starts with tracking_id
+    query = select(models.LoanApplication)
+    result = await db.execute(query)
+    applications = result.scalars().all()
+    
+    # Filter by tracking_id (first 8 chars of UUID)
+    matching_app = None
+    for app in applications:
+        if str(app.id)[:8].upper() == tracking_id.upper():
+            matching_app = app
+            break
+    
+    if not matching_app:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No application found with tracking ID: {tracking_id}"
+        )
+    
+    # Get user details
+    user_query = select(models.User).where(models.User.id == matching_app.user_id)
+    user_result = await db.execute(user_query)
+    user = user_result.scalars().first()
+    
+    # Get prediction
+    pred_query = select(models.LoanPrediction).where(
+        models.LoanPrediction.application_id == matching_app.id
+    )
+    pred_result = await db.execute(pred_query)
+    prediction = pred_result.scalars().first()
+    
+    # Get KYC documents for this application
+    docs_query = select(models.KYCDocument).where(
+        models.KYCDocument.application_id == matching_app.id
+    )
+    docs_result = await db.execute(docs_query)
+    documents = docs_result.scalars().all()
+    
+    # Get ALL user documents across all applications (for admin context)
+    all_user_docs_query = select(models.KYCDocument).where(
+        models.KYCDocument.user_id == matching_app.user_id,
+        models.KYCDocument.verification_status == "VERIFIED"
+    ).order_by(models.KYCDocument.uploaded_at.desc())
+    all_docs_result = await db.execute(all_user_docs_query)
+    all_user_documents = all_docs_result.scalars().all()
+    
+    # Get KYC status
+    kyc_query = select(models.KYCStatusTracking).where(
+        models.KYCStatusTracking.application_id == matching_app.id
+    )
+    kyc_result = await db.execute(kyc_query)
+    kyc_status = kyc_result.scalars().first()
+    
+    # Get bank details
+    bank_query = select(models.BankAccountDetails).where(
+        models.BankAccountDetails.application_id == matching_app.id
+    )
+    bank_result = await db.execute(bank_query)
+    bank_details = bank_result.scalars().first()
+    
+    # Check if already disbursed
+    disb_query = select(models.Disbursement).where(
+        models.Disbursement.application_id == matching_app.id
+    )
+    disb_result = await db.execute(disb_query)
+    disbursement = disb_result.scalars().first()
+    
+    return {
+        "application": {
+            "id": str(matching_app.id),
+            "tracking_id": tracking_id.upper(),
+            "user_id": str(matching_app.user_id),
+            "customer_name": f"{user.first_name} {user.last_name}" if user else "N/A",
+            "customer_id": user.customer_id if user else None,
+            "email": user.email if user else None,
+            "phone": user.phone if user else None,
+            "loan_amount": matching_app.loan_amount,
+            "loan_purpose": matching_app.loan_purpose,
+            "tenure_months": matching_app.tenure_months,
+            "employment_type": matching_app.employment_type,
+            "monthly_income": matching_app.monthly_income,
+            "created_at": matching_app.created_at.isoformat(),
+        },
+        "prediction": {
+            "decision": prediction.decision if prediction else "PENDING",
+            "approval_probability": prediction.approval_probability if prediction else None,
+            "risk_score": prediction.risk_score if prediction else None,
+            "credit_score": prediction.credit_score if prediction else None,
+            "suggested_interest_rate": prediction.suggested_interest_rate if prediction else None,
+        } if prediction else None,
+        "kyc_status": {
+            "overall_status": kyc_status.overall_status if kyc_status else "NOT_STARTED",
+            "step_1_documents": kyc_status.step_1_documents if kyc_status else "NOT_STARTED",
+            "step_2_bank_details": kyc_status.step_2_bank_details if kyc_status else "NOT_STARTED",
+            "step_3_agreement": kyc_status.step_3_agreement if kyc_status else "NOT_STARTED",
+            "can_proceed_to_disbursement": kyc_status.can_proceed_to_disbursement if kyc_status else False,
+            "documents_count": len(documents),
+        },
+        "documents": [
+            {
+                "id": str(doc.id),
+                "type": doc.document_type,
+                "file_name": doc.file_name,
+                "file_path": doc.file_path,
+                "verification_status": doc.verification_status,
+                "uploaded_at": doc.uploaded_at.isoformat(),
+                "application_id": str(doc.application_id),
+            }
+            for doc in documents
+        ],
+        "all_user_documents": [
+            {
+                "id": str(doc.id),
+                "type": doc.document_type,
+                "file_name": doc.file_name,
+                "file_path": doc.file_path,
+                "verification_status": doc.verification_status,
+                "uploaded_at": doc.uploaded_at.isoformat(),
+                "application_id": str(doc.application_id),
+                "is_current_application": doc.application_id == matching_app.id,
+            }
+            for doc in all_user_documents
+        ],
+        "bank_details": {
+            "account_holder_name": bank_details.account_holder_name if bank_details else None,
+            "bank_name": bank_details.bank_name if bank_details else None,
+            "account_number_masked": f"****{bank_details.account_number[-4:]}" if bank_details and bank_details.account_number else None,
+            "ifsc_code": bank_details.ifsc_code if bank_details else None,
+        } if bank_details else None,
+        "disbursement": {
+            "status": disbursement.status if disbursement else "NOT_DISBURSED",
+            "amount": disbursement.amount if disbursement else None,
+            "transaction_ref": disbursement.transaction_ref if disbursement else None,
+            "processed_at": disbursement.processed_at.isoformat() if disbursement and disbursement.processed_at else None,
+        } if disbursement else None,
+    }
+
 
 @app.post("/admin/disbursements/{application_id}")
 async def process_disbursement(
@@ -1838,36 +2083,38 @@ async def get_my_loan_applications(
     return response
 
 
-async def generate_tracking_id(db: AsyncSession) -> str:
-    """
-    Generate sequential tracking ID: RBI{Year}LA{Seq}
-    Example: RBI2026LA01, RBI2026LA02
-    """
-    current_year = datetime.now().year
-    prefix = f"RBI{current_year}LA"
-    
-    # Find last tracking ID for current year
-    query = (
-        select(models.LoanApplication.tracking_id)
-        .where(models.LoanApplication.tracking_id.like(f"{prefix}%"))
-        .order_by(models.LoanApplication.tracking_id.desc())
-        .limit(1)
-    )
-    result = await db.execute(query)
-    last_id = result.scalars().first()
-    
-    if last_id:
-        # Extract sequence number
-        try:
-            seq_str = last_id.replace(prefix, "")
-            seq = int(seq_str)
-            new_seq = seq + 1
-        except ValueError:
-            new_seq = 1
-    else:
-        new_seq = 1
-        
-    return f"{prefix}{new_seq:02d}"
+# DEPRECATED: tracking_id column removed from database
+# Tracking IDs are now generated dynamically from UUID: str(application.id)[:8].upper()
+# async def generate_tracking_id(db: AsyncSession) -> str:
+#     """
+#     Generate sequential tracking ID: RBI{Year}LA{Seq}
+#     Example: RBI2026LA01, RBI2026LA02
+#     """
+#     current_year = datetime.now().year
+#     prefix = f"RBI{current_year}LA"
+#     
+#     # Find last tracking ID for current year
+#     query = (
+#         select(models.LoanApplication.tracking_id)
+#         .where(models.LoanApplication.tracking_id.like(f"{prefix}%"))
+#         .order_by(models.LoanApplication.tracking_id.desc())
+#         .limit(1)
+#     )
+#     result = await db.execute(query)
+#     last_id = result.scalars().first()
+#     
+#     if last_id:
+#         # Extract sequence number
+#         try:
+#             seq_str = last_id.replace(prefix, "")
+#             seq = int(seq_str)
+#             new_seq = seq + 1
+#         except ValueError:
+#             new_seq = 1
+#     else:
+#         new_seq = 1
+#         
+#     return f"{prefix}{new_seq:02d}"
 
 
 @app.post("/loan-application", response_model=schemas.LoanApplicationResponse)
@@ -1920,13 +2167,9 @@ async def submit_loan_application(
             'previous_loan_defaults': application.previous_loan_defaults,  # Yes/No
         }
         
-        # Generate Tracking ID
-        tracking_id = await generate_tracking_id(db)
-        
         # 1. Store ML input features (loan_applications table)
         db_application = models.LoanApplication(
             user_id=current_user.id,
-            tracking_id=tracking_id,
             features_json=features,
             gender=application.gender,
             age=application.age,
@@ -3868,6 +4111,184 @@ async def get_kyc_status(
     }
 
 
+@app.get("/kyc/user-verified-documents")
+async def get_user_verified_documents(
+    exclude_application_id: Optional[str] = None,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Get all verified KYC documents from user's previous applications.
+    Used for second loan applications to reuse verified identity documents.
+    Excludes bank statements as they must be fresh for each application.
+    """
+    query = select(models.KYCDocument).where(
+        models.KYCDocument.user_id == current_user.id,
+        models.KYCDocument.verification_status == "VERIFIED"
+    )
+    
+    # Exclude current application if specified
+    if exclude_application_id:
+        try:
+            exclude_uuid = UUID(exclude_application_id)
+            query = query.where(models.KYCDocument.application_id != exclude_uuid)
+        except ValueError:
+            pass
+    
+    result = await db.execute(query)
+    all_documents = result.scalars().all()
+    
+    # Group by document type and get the most recent
+    doc_by_type = {}
+    for doc in all_documents:
+        # Skip bank statements - they must be fresh
+        if "BANK_STATEMENT" in doc.document_type:
+            continue
+            
+        if doc.document_type not in doc_by_type or doc.uploaded_at > doc_by_type[doc.document_type].uploaded_at:
+            doc_by_type[doc.document_type] = doc
+    
+    # Get application IDs for context
+    reusable_docs = []
+    for doc_type, doc in doc_by_type.items():
+        # Get application info
+        app_query = select(models.LoanApplication).where(
+            models.LoanApplication.id == doc.application_id
+        )
+        app_result = await db.execute(app_query)
+        app = app_result.scalars().first()
+        
+        reusable_docs.append({
+            "id": str(doc.id),
+            "document_type": doc.document_type,
+            "file_name": doc.file_name,
+            "verification_status": doc.verification_status,
+            "verified_at": doc.verified_at.isoformat() if doc.verified_at else None,
+            "uploaded_at": doc.uploaded_at.isoformat(),
+            "source_application_id": str(doc.application_id),
+            "can_reuse": True
+        })
+    
+    return {
+        "reusable_documents": reusable_docs,
+        "count": len(reusable_docs),
+        "message": "Identity documents from previous applications can be reused. Bank statements must be uploaded fresh."
+    }
+
+
+@app.post("/kyc/{application_id}/link-previous-document")
+async def link_previous_document(
+    application_id: str,
+    source_document_id: str = Body(..., embed=True),
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Link a verified document from a previous application to the current application.
+    Creates a new KYCDocument record pointing to the same file.
+    Only works for identity documents (not bank statements).
+    """
+    # Verify application eligibility
+    application, prediction, kyc_tracking = await verify_kyc_eligibility(
+        application_id, current_user.id, db
+    )
+    
+    # Get source document
+    try:
+        source_doc_uuid = UUID(source_document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+    
+    source_query = select(models.KYCDocument).where(
+        models.KYCDocument.id == source_doc_uuid,
+        models.KYCDocument.user_id == current_user.id,
+        models.KYCDocument.verification_status == "VERIFIED"
+    )
+    source_result = await db.execute(source_query)
+    source_doc = source_result.scalars().first()
+    
+    if not source_doc:
+        raise HTTPException(status_code=404, detail="Source document not found or not verified")
+    
+    # Prevent linking bank statements
+    if "BANK_STATEMENT" in source_doc.document_type:
+        raise HTTPException(
+            status_code=400, 
+            detail="Bank statements cannot be reused. Please upload a fresh bank statement."
+        )
+    
+    # Check if this document type already exists for current application
+    existing_query = select(models.KYCDocument).where(
+        models.KYCDocument.application_id == application.id,
+        models.KYCDocument.document_type == source_doc.document_type
+    )
+    existing_result = await db.execute(existing_query)
+    existing_doc = existing_result.scalars().first()
+    
+    if existing_doc:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"{source_doc.document_type} already exists for this application"
+        )
+    
+    # Create new document record linked to same file
+    new_doc = models.KYCDocument(
+        application_id=application.id,
+        user_id=current_user.id,
+        document_type=source_doc.document_type,
+        file_name=source_doc.file_name,
+        file_path=source_doc.file_path,
+        file_size=source_doc.file_size,
+        mime_type=source_doc.mime_type,
+        verification_status="VERIFIED",  # Auto-verified since source is verified
+        verification_notes=f"Linked from previous application: {source_doc.application_id}",
+        verified_by=source_doc.verified_by,
+        verified_at=datetime.utcnow()
+    )
+    db.add(new_doc)
+    
+    # Update KYC tracking
+    kyc_tracking.step_1_documents = "IN_PROGRESS"
+    if kyc_tracking.overall_status == "NOT_STARTED":
+        kyc_tracking.overall_status = "IN_PROGRESS"
+        kyc_tracking.started_at = datetime.utcnow()
+    
+    # Log audit
+    await log_audit(
+        db, current_user.id,
+        models.AuditAction.DOCUMENT_UPLOADED,
+        entity_type="kyc_document",
+        entity_id=new_doc.id,
+        description=f"Linked {source_doc.document_type} from previous application",
+        metadata={
+            "source_document_id": str(source_doc.id),
+            "source_application_id": str(source_doc.application_id),
+            "reused": True
+        }
+    )
+    
+    await db.commit()
+    await db.refresh(new_doc)
+    
+    # Get updated count
+    count_query = select(func.count(models.KYCDocument.id)).where(
+        models.KYCDocument.application_id == application.id
+    )
+    count_result = await db.execute(count_query)
+    total_docs = count_result.scalar()
+    
+    return {
+        "message": "Document linked successfully",
+        "document_id": str(new_doc.id),
+        "document_type": new_doc.document_type,
+        "verification_status": new_doc.verification_status,
+        "total_uploaded": total_docs,
+        "required": 4,
+        "can_proceed": total_docs >= 2,
+        "reused_from_application": str(source_doc.application_id)
+    }
+
+
 @app.post("/kyc/{application_id}/documents")
 async def upload_kyc_document(
     application_id: str,
@@ -3988,6 +4409,77 @@ async def upload_kyc_document(
         "document_id": str(doc.id),
         "document_type": doc.document_type,
         "verification_status": doc.verification_status,
+        "total_uploaded": total_docs,
+        "required": 4,
+        "can_proceed": total_docs >= 2
+    }
+
+
+@app.delete("/kyc/{application_id}/documents/{document_id}")
+async def delete_kyc_document(
+    application_id: str,
+    document_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: AsyncSession = Depends(database.get_db)
+):
+    """
+    Delete a KYC document by ID.
+    """
+    import os
+    
+    # Verify application ownership
+    application, prediction, kyc_tracking = await verify_kyc_eligibility(
+        application_id, current_user.id, db
+    )
+    
+    # Find document
+    doc_query = select(models.KYCDocument).where(
+        models.KYCDocument.id == document_id,
+        models.KYCDocument.application_id == application.id,
+        models.KYCDocument.user_id == current_user.id
+    )
+    result = await db.execute(doc_query)
+    document = result.scalars().first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Delete physical file
+    try:
+        if os.path.exists(document.file_path):
+            os.remove(document.file_path)
+    except Exception as e:
+        print(f"Warning: Could not delete file {document.file_path}: {e}")
+    
+    # Log audit before deletion
+    await log_audit(
+        db, current_user.id,
+        models.AuditAction.DOCUMENT_DELETED,
+        entity_type="kyc_document",
+        entity_id=document.id,
+        description=f"Deleted {document.document_type} document from KYC",
+        metadata={"file_name": document.file_name}
+    )
+    
+    # Delete from database
+    await db.delete(document)
+    await db.commit()
+    
+    # Get updated document count
+    count_query = select(func.count(models.KYCDocument.id)).where(
+        models.KYCDocument.application_id == application.id
+    )
+    result = await db.execute(count_query)
+    total_docs = result.scalar()
+    
+    # Update KYC tracking status
+    if total_docs == 0:
+        kyc_tracking.step_1_documents = "NOT_STARTED"
+    
+    await db.commit()
+    
+    return {
+        "message": "Document deleted successfully",
         "total_uploaded": total_docs,
         "required": 4,
         "can_proceed": total_docs >= 2
@@ -4595,17 +5087,17 @@ async def complete_kyc(
         application_id, current_user.id, db
     )
     
-    # Verify Step 1: Documents
+    # Verify Step 1: Documents (minimum 2 required)
     doc_query = select(models.KYCDocument).where(
         models.KYCDocument.application_id == application.id
     )
     doc_result = await db.execute(doc_query)
     documents = doc_result.scalars().all()
     
-    if len(documents) < 4:
+    if len(documents) < 2:
         raise HTTPException(
             status_code=400, 
-            detail=f"Step 1 incomplete: Upload at least 4 documents. Uploaded: {len(documents)}"
+            detail=f"Step 1 incomplete: Upload at least 2 documents. Uploaded: {len(documents)}"
         )
     
     # Verify Step 2: Bank Details
@@ -4830,7 +5322,7 @@ async def get_report_qr_code(
         base_url = str(request.base_url).rstrip('/')
         
         # Embed Tracking ID in the URL for reference/scanning
-        tracking_ref = f"?ref={application.tracking_id}" if getattr(application, "tracking_id", None) else ""
+        tracking_ref = f"?ref={str(application.id)[:8].upper()}"
         shareable_url = f"{base_url}/shared-report/{token}{tracking_ref}"
         
         # Generate QR code - Use version=None for auto-fitting
@@ -5263,7 +5755,7 @@ async def initiate_payment(
     application, user = row
     amount = application.loan_amount or 100000
     customer_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "Customer"
-    order_id = f"LOAN_{application.tracking_id or str(app_uuid)[:8]}"
+    order_id = f"LOAN_{str(app_uuid)[:8].upper()}"
     
     if payment_method.lower() == "razorpay":
         payment_result = await initiate_payment_razorpay(
@@ -5749,7 +6241,7 @@ async def get_all_documents(
         "customer_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or "N/A",
         "customer_id": user.customer_id or str(user.id)[:8],
         "application_id": str(doc.application_id),
-        "tracking_id": app.tracking_id,
+        "tracking_id": str(app.id)[:8].upper(),
         "loan_amount": app.loan_amount
     } for doc, user, app in rows]
 
@@ -6006,47 +6498,48 @@ async def get_admin_repayments(
     } for r, u in rows]
 
 
-@app.get("/admin/applications/search", response_model=List[schemas.ApplicationListItem])
-async def search_applications(
-    tracking_id: str,
-    current_user = Depends(auth.require_admin()),
-    db: AsyncSession = Depends(database.get_db)
-):
-    """Search applications by Tracking ID (e.g., RBI2026LA01)"""
-    query = (
-        select(models.LoanApplication)
-        .where(models.LoanApplication.tracking_id == tracking_id)
-    )
-    result = await db.execute(query)
-    applications = result.scalars().all()
-    
-    response = []
-    for app in applications:
-        # Get user info
-        user_query = select(models.User).where(models.User.id == app.user_id)
-        user_result = await db.execute(user_query)
-        user = user_result.scalars().first()
-        
-        # Get prediction
-        pred_query = select(models.LoanPrediction).where(
-            models.LoanPrediction.application_id == app.id
-        )
-        pred_result = await db.execute(pred_query)
-        prediction = pred_result.scalars().first()
-        
-        response.append(schemas.ApplicationListItem(
-            id=app.id,
-            user_id=app.user_id,
-            customer_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
-            customer_id=user.customer_id if user else None,
-            loan_amount=app.loan_amount,
-            loan_purpose=app.loan_purpose,
-            decision=prediction.decision if prediction else "PENDING",
-            approval_probability=prediction.approval_probability if prediction else 0,
-            created_at=app.created_at,
-            reviewed=False
-        ))
-    return response
+# DEPRECATED: Tracking ID search disabled - tracking_id column removed from database
+# @app.get("/admin/applications/search", response_model=List[schemas.ApplicationListItem])
+# async def search_applications(
+#     tracking_id: str,
+#     current_user = Depends(auth.require_admin()),
+#     db: AsyncSession = Depends(database.get_db)
+# ):
+#     """Search applications by Tracking ID (e.g., RBI2026LA01)"""
+#     query = (
+#         select(models.LoanApplication)
+#         .where(models.LoanApplication.tracking_id == tracking_id)
+#     )
+#     result = await db.execute(query)
+#     applications = result.scalars().all()
+#     
+#     response = []
+#     for app in applications:
+#         # Get user info
+#         user_query = select(models.User).where(models.User.id == app.user_id)
+#         user_result = await db.execute(user_query)
+#         user = user_result.scalars().first()
+#         
+#         # Get prediction
+#         pred_query = select(models.LoanPrediction).where(
+#             models.LoanPrediction.application_id == app.id
+#         )
+#         pred_result = await db.execute(pred_query)
+#         prediction = pred_result.scalars().first()
+#         
+#         response.append(schemas.ApplicationListItem(
+#             id=app.id,
+#             user_id=app.user_id,
+#             customer_name=f\"{user.first_name or ''} {user.last_name or ''}\".strip() if user else None,
+#             customer_id=user.customer_id if user else None,
+#             loan_amount=app.loan_amount,
+#             loan_purpose=app.loan_purpose,
+#             decision=prediction.decision if prediction else \"PENDING\",
+#             approval_probability=prediction.approval_probability if prediction else 0,
+#             created_at=app.created_at,
+#             reviewed=False
+#         ))
+#     return response
 
 
 @app.get("/admin/applications")
@@ -6162,6 +6655,12 @@ async def verify_admin_document(
     
     await db.commit()
     
+    return {
+        "message": f"Document {verify_request.status.lower()} successfully",
+        "id": str(document.id),
+        "status": document.verification_status
+    }
+
 @app.get("/admin/applications/{application_id}/download-report")
 async def admin_download_report(
     application_id: str,

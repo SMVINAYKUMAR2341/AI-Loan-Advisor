@@ -131,6 +131,85 @@ The frontend will be available at `http://localhost:5173`.
 - 24-hour expiration for security
 - Works across all devices
 
+### 7. KYC Completion Workflow
+![KYC Completed](screenshots/kyc-completed.png)
+- **Application Tracking**: Unique 8-character tracking ID (e.g., 1C9C4E4) displayed prominently
+- **Progress Indicators**: Visual step completion (Documents, Bank Details, Agreement, Complete)
+- **Success Confirmation**: Large checkmark with "KYC Completed Successfully!" message
+- **Verification Status**: Shows "Verified & Approved" badge in green
+- **Disbursement Timeline**: Clear 24-48 hours timeline for loan processing
+- **Application Details Card**:
+  - Application Reference Number
+  - Verification Status with checkmark
+  - Expected disbursement timeline
+- **What Happens Next** Section:
+  - ✓ Team verification of submitted documents
+  - ✓ Loan amount credit to bank account
+  - ✓ SMS & Email confirmation upon disbursement
+- **Document Management**:
+  - Minimum 2 documents required (down from 4 for faster processing)
+  - Delete & reupload functionality for corrections
+  - Real-time document verification status
+- **Professional UI**: Gradient backgrounds, consistent teal/blue theme, no redundant messages
+
+### Key Features:
+- **Tracking ID System**: 8-character unique identifier generated from application UUID
+  - Copy-to-clipboard functionality for easy reference
+  - Displayed prominently with large font (3xl) and gradient background
+  - Used for all customer communications and admin searches
+- **Admin Tracking Search**: Backend endpoint `/admin/applications/tracking/{tracking_id}` returns:
+  - Complete customer information (name, email, phone, customer_id)
+  - Loan details (amount, purpose, tenure, income)
+  - AI prediction data (decision, approval_probability, risk_score, credit_score)
+  - KYC status with document count and verification details
+  - Full document list with file paths and verification status
+  - Bank details (masked account number, IFSC code)
+  - Disbursement status if processed
+  - Flag indicating if application can proceed to disbursement
+- **Document Viewing**: Admin endpoint `/admin/documents/{document_id}/view` provides FileResponse for document review
+- **Disbursement Processing**: Admin endpoint `/admin/disbursements/{application_id}` processes approved loans
+
+### 8. Second Loan Application - Smart Document Reuse
+**New Feature**: Intelligent KYC handling for repeat customers applying for additional loans
+
+#### Customer Benefits:
+- **Identity Documents Reuse**: Previously verified Aadhaar and PAN cards can be reused instantly
+- **No Re-upload Required**: Save time by linking verified documents from previous applications
+- **Fresh Bank Statements**: System requires updated bank statements (3-6 months) for each new loan
+- **One-Click Linking**: Simply click "Use This Document" to reuse verified identity proofs
+
+#### Business Logic:
+- **Identity Verification**: One-time KYC per customer (not per application)
+- **Financial Verification**: Fresh per application to assess:
+  - Current income and expense patterns
+  - Existing loan EMI payment history
+  - Updated debt-to-income ratio
+  - Repayment capacity for multiple loans
+
+#### Technical Implementation:
+**Backend Endpoints:**
+- `GET /kyc/user-verified-documents` - Fetches reusable documents from previous applications
+- `POST /kyc/{application_id}/link-previous-document` - Links verified document to new application
+- `GET /admin/applications/tracking/{tracking_id}` - Shows all user documents across applications
+
+**Smart Document Categories:**
+- ✅ **Reusable**: Aadhaar, PAN, Passport (identity documents)
+- ❌ **Fresh Required**: Bank Statements (must be recent for each application)
+
+**Admin View Enhancement:**
+- Admins can see `all_user_documents` array in tracking endpoint
+- View document history across all customer applications
+- Track which documents are original vs linked
+- Verify bank statement freshness for second loans
+
+#### UI Highlights:
+- 🔵 Blue info card showing "Second Loan Application?" with document reuse option
+- 🟡 Yellow highlighting for bank statement requirement with animated alert
+- 🟢 Green badges for verified reusable documents
+- Modal showing previous verified documents with one-click linking
+
+This feature reduces customer friction for repeat loans while maintaining compliance with fresh financial assessment requirements.
+
 ---
 
 ## Bank Admin Dashboard

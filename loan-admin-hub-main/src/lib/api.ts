@@ -145,10 +145,20 @@ export const adminApi = {
     },
 
     verifyDocument: (docId: string, status: 'VERIFIED' | 'REJECTED', notes?: string) =>
-        apiFetch<{ message: string; id: string }>(
-            `/admin/documents/${docId}/verify?status=${status}${notes ? `&notes=${encodeURIComponent(notes)}` : ''}`,
-            { method: 'POST' }
-        ),
+        fetch(`${API_BASE_URL}/admin/documents/${docId}/verify`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                status: status,
+                notes: notes || ''
+            })
+        }).then(async res => {
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Verification failed' }));
+                throw new Error(err.detail || 'Verification failed');
+            }
+            return res.json();
+        }),
 
     getAgreement: (appId: string) =>
         apiFetch<{

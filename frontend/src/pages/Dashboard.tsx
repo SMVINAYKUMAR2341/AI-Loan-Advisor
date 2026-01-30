@@ -20,7 +20,7 @@ import {
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
     CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
     Activity, CheckSquare, Search, AlertTriangle, Download, Plus,
-    ShieldCheck, Landmark, PenTool, Lock, RefreshCw, Loader, Loader2
+    ShieldCheck, Landmark, PenTool, Lock, RefreshCw, Loader, Loader2, Trash2, Upload
 } from "lucide-react";
 
 // Charts - Professional visualization
@@ -150,9 +150,13 @@ export default function Dashboard() {
         approval_probability: number;
         created_at: string;
         tracking_id?: string;
+        kyc_status?: string; // KYC status: NOT_STARTED, IN_PROGRESS, COMPLETED, BLOCKED
     }
     const [loanApplications, setLoanApplications] = useState<LoanApplicationItem[]>([]);
     const [loanApplicationsLoading, setLoanApplicationsLoading] = useState(false);
+    const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+    const [viewingApplication, setViewingApplication] = useState<LoanApplicationItem | null>(null);
+    const [showApplicationModal, setShowApplicationModal] = useState(false);
 
     // DISBURSEMENTS STATE - Bank transfers received
     interface DisbursementItem {
@@ -251,6 +255,45 @@ export default function Dashboard() {
         setLoanApplicationsLoading(false);
     };
 
+    const handleViewApplication = async (applicationId: string) => {
+        const application = loanApplications.find(app => app.id === applicationId);
+        if (application) {
+            setViewingApplication(application);
+            setShowApplicationModal(true);
+        }
+    };
+
+    const handleRequestDelete = async (applicationId: string) => {
+        if (!confirm('Are you sure you want to request deletion of this application?\n\nAn admin will review your request.')) {
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`${API_BASE_URL}/loan-applications/${applicationId}/request-delete`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    reason: 'User requested deletion'
+                })
+            });
+            
+            if (response.ok) {
+                alert('Delete request submitted successfully!\n\nAn admin will review your request shortly.');
+                fetchLoanApplications(); // Refresh the list
+            } else {
+                const error = await response.json();
+                alert(`Failed to submit delete request: ${error.detail || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error("Failed to request delete:", error);
+            alert('Network error - please try again');
+        }
+    };
+
     const fetchDisbursements = async () => {
         try {
             const token = localStorage.getItem('access_token');
@@ -328,6 +371,8 @@ export default function Dashboard() {
     const [kycStep, setKycStep] = useState(1);
     const [kycError, setKycError] = useState('');
     const [kycSuccess, setKycSuccess] = useState('');
+    const [previousDocuments, setPreviousDocuments] = useState<any[]>([]);
+    const [showPreviousDocs, setShowPreviousDocs] = useState(false);
     const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
     const [agreement, setAgreement] = useState<LoanAgreement | null>(null);
     const [bankForm, setBankForm] = useState({
@@ -710,16 +755,23 @@ export default function Dashboard() {
             if (response.ok) {
                 const data = await response.json();
                 setKycStatus(data);
+                setKycError(''); // Clear any previous errors
                 // Set current step based on status
                 if (data.step_3_agreement === 'COMPLETED') setKycStep(4);
                 else if (data.step_2_bank_details === 'COMPLETED') setKycStep(3);
                 else if (data.step_1_docs_uploaded >= 2) setKycStep(2);
                 else setKycStep(1);
-            } else if (response.status === 403) {
+            } else if (response.status === 403 || response.status === 404) {
+                const error = await response.json().catch(() => ({ detail: 'Loan application not found or not eligible for KYC' }));
                 setKycStatus(null); // Not eligible
+                setKycError(error.detail || 'This loan application is not eligible for KYC. Please ensure you have an approved loan application.');
+                setAdvisorResult(null); // Reset to start fresh
             }
         } catch (error) {
             console.error("KYC fetch error:", error);
+            setKycError('Unable to fetch KYC status. Please try creating a new loan application.');
+            setKycStatus(null);
+            setAdvisorResult(null);
         }
         setKycLoading(false);
     };
@@ -728,14 +780,18 @@ export default function Dashboard() {
         setKycError('');
         setKycSuccess('');
         
+        console.log('Upload started:', { appId, docType, docCategory });
+        
         // Get the file from input
         const input = document.getElementById(`file-upload-${docCategory}`) as HTMLInputElement;
         if (!input || !input.files || input.files.length === 0) {
             setKycError('Please select a file to upload');
+            console.error('No file selected');
             return;
         }
         
         const file = input.files[0];
+        console.log('File selected:', file.name, file.type, file.size);
         
         // Validate file size (5MB)
         if (file.size > 5 * 1024 * 1024) {
@@ -752,10 +808,17 @@ export default function Dashboard() {
         
         try {
             const token = localStorage.getItem('access_token');
+            if (!token) {
+                setKycError('You must be logged in to upload documents');
+                return;
+            }
+            
             const formData = new FormData();
             formData.append('file', file);
             formData.append('document_type', docType);
             formData.append('document_category', docCategory);
+            
+            console.log('Sending upload request to:', `${API_BASE_URL}/kyc/${appId}/documents`);
             
             const response = await fetch(
                 `${API_BASE_URL}/kyc/${appId}/documents`,
@@ -766,18 +829,103 @@ export default function Dashboard() {
                 }
             );
             
+            console.log('Upload response status:', response.status);
+            
             if (response.ok) {
                 const result = await response.json();
+                console.log('Upload success:', result);
                 setKycSuccess(`${docCategory} document uploaded successfully! (${result.total_uploaded}/4 documents)`);
                 fetchKycStatus(appId);
                 // Clear the file input
                 input.value = '';
             } else {
                 const error = await response.json();
+                console.error('Upload error:', error);
                 setKycError(error.detail || 'Upload failed');
             }
         } catch (error) {
+            console.error('Upload exception:', error);
             setKycError('Network error uploading document');
+        }
+    };
+
+    const deleteDocument = async (appId: string, documentId: string) => {
+        if (!confirm('Are you sure you want to delete this document?')) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(
+                `${API_BASE_URL}/kyc/${appId}/documents/${documentId}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+
+            if (response.ok) {
+                setKycSuccess('Document deleted successfully');
+                fetchKycStatus(appId);
+            } else {
+                const error = await response.json();
+                setKycError(error.detail || 'Failed to delete document');
+            }
+        } catch (error) {
+            setKycError('Network error deleting document');
+        }
+    };
+
+    const fetchPreviousDocuments = async (excludeApplicationId?: string) => {
+        try {
+            const token = localStorage.getItem('access_token');
+            const url = excludeApplicationId 
+                ? `${API_BASE_URL}/kyc/user-verified-documents?exclude_application_id=${excludeApplicationId}`
+                : `${API_BASE_URL}/kyc/user-verified-documents`;
+            
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setPreviousDocuments(data.reusable_documents || []);
+                return data.reusable_documents || [];
+            }
+        } catch (error) {
+            console.error('Error fetching previous documents:', error);
+        }
+        return [];
+    };
+
+    const linkPreviousDocument = async (appId: string, sourceDocumentId: string) => {
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(
+                `${API_BASE_URL}/kyc/${appId}/link-previous-document`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ source_document_id: sourceDocumentId })
+                }
+            );
+
+            if (response.ok) {
+                const result = await response.json();
+                setKycSuccess(`${result.document_type} linked successfully! (${result.total_uploaded}/4 documents)`);
+                fetchKycStatus(appId);
+                setShowPreviousDocs(false);
+            } else {
+                const error = await response.json();
+                setKycError(error.detail || 'Failed to link document');
+            }
+        } catch (error) {
+            setKycError('Network error linking document');
         }
     };
 
@@ -957,6 +1105,15 @@ export default function Dashboard() {
             fetchNotifications();
         }
     }, [isAuthenticated]);
+
+    // Auto-fetch KYC status when entering KYC section (via 'apply' section with selectedApplicationId)
+    useEffect(() => {
+        const appId = selectedApplicationId || advisorResult?.application_id;
+        if (activeSection === 'apply' && appId && !kycStatus && !kycLoading) {
+            console.log('Auto-fetching KYC status for:', appId);
+            fetchKycStatus(appId);
+        }
+    }, [activeSection, selectedApplicationId, advisorResult?.application_id]);
 
     const handleLogout = () => {
         localStorage.removeItem("user_id");
@@ -1236,22 +1393,24 @@ export default function Dashboard() {
                             <table className="w-full">
                                 <thead>
                                     <tr className="border-b border-white/10">
-                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Application ID</th>
-                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Purpose</th>
-                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Amount</th>
-                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Approval %</th>
-                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Decision</th>
-                                        <th className="text-left py-3 px-4 text-gray-400 font-medium">Applied On</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">Application ID</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">Purpose</th>
+                                        <th className="text-right py-3 px-4 text-gray-400 font-medium">Amount</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">Approval %</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">Decision</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">KYC Status</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">Applied On</th>
+                                        <th className="text-center py-3 px-4 text-gray-400 font-medium">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loanApplications.map((app) => (
                                         <tr key={app.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                                            <td className="py-4 px-4 text-white font-mono text-sm">{app.tracking_id || app.id.slice(0, 8)}</td>
-                                            <td className="py-4 px-4 text-white">{app.loan_purpose}</td>
-                                            <td className="py-4 px-4 text-white">{formatCurrency(app.loan_amount)}</td>
-                                            <td className="py-4 px-4 text-teal-400">{app.approval_probability.toFixed(1)}%</td>
-                                            <td className="py-4 px-4">
+                                            <td className="py-4 px-4 text-white font-mono text-sm text-center">{app.tracking_id || app.id.slice(0, 8)}</td>
+                                            <td className="py-4 px-4 text-white text-center">{app.loan_purpose}</td>
+                                            <td className="py-4 px-4 text-white text-right">{formatCurrency(app.loan_amount)}</td>
+                                            <td className="py-4 px-4 text-teal-400 text-center">{app.approval_probability.toFixed(1)}%</td>
+                                            <td className="py-4 px-4 text-center">
                                                 <span className={`px-3 py-1 rounded-full text-sm ${app.decision === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
                                                     app.decision === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
                                                         'bg-yellow-500/20 text-yellow-400'
@@ -1259,7 +1418,53 @@ export default function Dashboard() {
                                                     {app.decision}
                                                 </span>
                                             </td>
-                                            <td className="py-4 px-4 text-gray-400 text-sm">{new Date(app.created_at).toLocaleDateString()}</td>
+                                            <td className="py-4 px-4 text-center">
+                                                {app.decision === 'APPROVED' ? (
+                                                    <span className={`px-3 py-1 rounded-full text-xs inline-block ${
+                                                        app.kyc_status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                                                        app.kyc_status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-400' :
+                                                        app.kyc_status === 'BLOCKED' ? 'bg-red-500/20 text-red-400' :
+                                                        'bg-yellow-500/20 text-yellow-400'
+                                                    }`}>
+                                                        {app.kyc_status === 'COMPLETED' ? 'Completed' :
+                                                         app.kyc_status === 'IN_PROGRESS' ? 'In Progress' :
+                                                         app.kyc_status === 'BLOCKED' ? 'Blocked' : 'Pending'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-500 text-xs">N/A</span>
+                                                )}
+                                            </td>
+                                            <td className="py-4 px-4 text-gray-400 text-sm text-center">{new Date(app.created_at).toLocaleDateString()}</td>
+                                            <td className="py-4 px-4 text-center">
+                                                <div className="flex items-center justify-center gap-2 flex-wrap">
+                                                    {app.decision === 'APPROVED' && app.kyc_status !== 'COMPLETED' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                console.log('Complete KYC clicked for:', app.id);
+                                                                setSelectedApplicationId(app.id);
+                                                                setActiveSection('apply');
+                                                            }}
+                                                            className="px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg text-sm font-medium transition whitespace-nowrap"
+                                                        >
+                                                            Complete KYC
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleViewApplication(app.id)}
+                                                        className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition whitespace-nowrap"
+                                                    >
+                                                        View
+                                                    </button>
+                                                    {app.decision !== 'DISBURSED' && (
+                                                        <button
+                                                            onClick={() => handleRequestDelete(app.id)}
+                                                            className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm font-medium transition whitespace-nowrap"
+                                                        >
+                                                            Delete Request
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1537,7 +1742,12 @@ export default function Dashboard() {
     // APPLY FOR LOAN SECTION - Bank-Grade AI Loan Advisor
 
     const renderApplySection = () => {
-        // KYC PAGE TRANSIITON: If KYC is started, show ONLY the KYC section (Next Page)
+        // KYC PAGE TRANSITION: If navigating to KYC from loan applications list
+        if (selectedApplicationId && activeSection === 'apply') {
+            return renderKYCSection(selectedApplicationId);
+        }
+        
+        // KYC PAGE TRANSITION: If KYC is started from advisor, show ONLY the KYC section (Next Page)
         if (advisorResult?.decision === 'APPROVED' && advisorResult?.application_id && kycStatus) {
             return renderKYCSection(advisorResult.application_id);
         }
@@ -2504,6 +2714,64 @@ export default function Dashboard() {
     const renderKYCSection = (applicationId: string) => {
         if (!applicationId) return null;
 
+        // Auto-fetch KYC status if not already loaded
+        if (!kycStatus && !kycLoading && !kycError) {
+            fetchKycStatus(applicationId);
+        }
+
+        // Show loading state
+        if (kycLoading && !kycStatus) {
+            return (
+                <div className="mt-8 p-6 bg-gray-900 rounded-2xl border border-green-500/30">
+                    <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+                            <p className="text-gray-400">Loading KYC status...</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Show error state if KYC fetch failed
+        if (kycError && !kycStatus) {
+            return (
+                <div className="mt-8 p-6 bg-gray-900 rounded-2xl border border-red-500/30">
+                    <div className="p-6 bg-red-900/20 rounded-xl border border-red-500/30">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                                <AlertCircle className="w-5 h-5 text-red-400" />
+                            </div>
+                            <h4 className="text-lg font-semibold text-red-400">Unable to Load KYC</h4>
+                        </div>
+                        <p className="text-red-300 mb-4">{kycError}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setKycError('');
+                                    fetchKycStatus(applicationId);
+                                }}
+                                className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg font-medium transition"
+                            >
+                                Try Again
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setKycStatus(null);
+                                    setKycError('');
+                                    setAdvisorResult(null);
+                                    setActiveSection('apply');
+                                }}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition"
+                            >
+                                Back to Application
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="mt-8 p-6 bg-gray-900 rounded-2xl border border-green-500/30">
                 {/* Back Button */}
@@ -2573,45 +2841,128 @@ export default function Dashboard() {
                             <FileText className="w-5 h-5 text-teal-400" />
                             Step 1: Upload Identity & Address Proof
                         </h4>
-                        <p className="text-gray-400 text-sm">Upload 4 required documents. You can proceed to bank details after uploading any 2 documents.</p>
+                        <p className="text-gray-400 text-sm">Upload required documents. Bank statement must be fresh (within last 3-6 months).</p>
+
+                        {/* Previous Documents Reuse Section */}
+                        <div className="mb-6 p-4 bg-gradient-to-r from-blue-900/20 to-teal-900/20 rounded-xl border border-blue-500/30">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mt-1">
+                                    <Shield className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div className="flex-1">
+                                    <h5 className="text-white font-semibold mb-1">Second Loan Application?</h5>
+                                    <p className="text-gray-300 text-sm mb-3">
+                                        If you've completed KYC before, you can reuse verified identity documents (Aadhaar, PAN). 
+                                        <span className="text-yellow-400 font-medium"> Bank statements must be uploaded fresh for each application.</span>
+                                    </p>
+                                    <button
+                                        onClick={async () => {
+                                            const docs = await fetchPreviousDocuments(applicationId);
+                                            if (docs.length > 0) {
+                                                setShowPreviousDocs(!showPreviousDocs);
+                                            } else {
+                                                setKycError('No previous verified documents found. Please upload documents below.');
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        {showPreviousDocs ? 'Hide' : 'Show'} Previous Documents
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Previous Documents Modal */}
+                        {showPreviousDocs && previousDocuments.length > 0 && (
+                            <div className="mb-6 p-5 bg-gray-800 rounded-xl border border-blue-500/30">
+                                <h5 className="text-white font-semibold mb-3 flex items-center gap-2">
+                                    <CheckCircle className="w-5 h-5 text-green-400" />
+                                    Verified Documents from Previous Applications
+                                </h5>
+                                <div className="space-y-2">
+                                    {previousDocuments.map((doc) => (
+                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-all">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                                    <CheckCircle className="w-5 h-5 text-green-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-white font-medium">{doc.document_type.replace(/_/g, ' ')}</p>
+                                                    <p className="text-gray-400 text-xs">Verified on {new Date(doc.verified_at).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => linkPreviousDocument(applicationId, doc.id)}
+                                                className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm font-medium transition-all"
+                                            >
+                                                Use This Document
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-gray-400 text-xs mt-3">
+                                    ℹ️ Click "Use This Document" to link verified documents to this application
+                                </p>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                                { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR", icon: FileText, desc: "Required - Address Proof" },
-                                { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Required - Identity Proof" },
-                                { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Required - Address Proof" },
-                                { label: "Driving License", type: "ID_PROOF", code: "DRIVING_LICENSE", icon: CreditCard, desc: "Required - Identity Proof" }
+                                { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR", icon: FileText, desc: "Identity - Can reuse from previous application", reusable: true },
+                                { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Identity - Can reuse from previous application", reusable: true },
+                                { label: "Bank Statement", type: "ADDRESS_PROOF", code: "BANK_STATEMENT", icon: CreditCard, desc: "⚠️ REQUIRED FRESH - Last 3-6 months", reusable: false },
+                                { label: "Passport (Optional)", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Additional identity proof", reusable: true }
                             ].map((doc, idx) => {
                                 const Icon = doc.icon;
                                 const isUploaded = kycStatus?.documents.some(d => d.document_type.includes(doc.code));
 
                                 return (
                                     <div key={doc.code} className="relative">
+                                        {/* Highlight bank statement as required fresh */}
+                                        {doc.code === "BANK_STATEMENT" && !isUploaded && (
+                                            <div className="absolute -top-2 -right-2 z-10">
+                                                <span className="flex h-5 w-5">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-5 w-5 bg-yellow-500 items-center justify-center text-xs font-bold text-black">!</span>
+                                                </span>
+                                            </div>
+                                        )}
                                         <button
                                             onClick={() => {
                                                 const input = document.getElementById(`file-upload-${doc.code}`);
                                                 if (input) input.click();
                                             }}
                                             disabled={isUploaded}
-                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all group text-left ${isUploaded
-                                                ? 'bg-green-900/20 border-green-500/50 cursor-default'
-                                                : 'bg-gray-800 hover:bg-gray-700 border-white/10 hover:border-teal-500/50'
-                                                }`}
+                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all group text-left ${
+                                                doc.code === "BANK_STATEMENT" && !isUploaded
+                                                    ? 'bg-yellow-900/20 border-yellow-500/50 hover:bg-yellow-900/30'
+                                                    : isUploaded
+                                                    ? 'bg-green-900/20 border-green-500/50 cursor-default'
+                                                    : 'bg-gray-800 hover:bg-gray-700 border-white/10 hover:border-teal-500/50'
+                                            }`}
                                         >
-                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition ${isUploaded ? 'bg-green-500/20' : 'bg-teal-900 group-hover:bg-teal-800'
-                                                }`}>
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition ${
+                                                isUploaded 
+                                                    ? 'bg-green-500/20' 
+                                                    : doc.code === "BANK_STATEMENT"
+                                                    ? 'bg-yellow-500/20'
+                                                    : 'bg-teal-900 group-hover:bg-teal-800'
+                                            }`}>
                                                 {isUploaded ? (
                                                     <CheckCircle className="w-6 h-6 text-green-400" />
                                                 ) : (
-                                                    <Icon className="w-6 h-6 text-teal-400 group-hover:scale-110 transition" />
+                                                    <Icon className={`w-6 h-6 ${doc.code === "BANK_STATEMENT" ? 'text-yellow-400' : 'text-teal-400'} group-hover:scale-110 transition`} />
                                                 )}
                                             </div>
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-white font-semibold">{doc.label}</p>
                                                     {isUploaded && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">UPLOADED</span>}
+                                                    {!isUploaded && doc.reusable && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">REUSABLE</span>}
+                                                    {!isUploaded && doc.code === "BANK_STATEMENT" && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-bold">FRESH REQUIRED</span>}
                                                 </div>
-                                                <p className="text-gray-400 text-xs">{doc.desc}</p>
+                                                <p className={`text-xs ${doc.code === "BANK_STATEMENT" ? 'text-yellow-300 font-medium' : 'text-gray-400'}`}>{doc.desc}</p>
                                             </div>
                                         </button>
                                         <input
@@ -2630,17 +2981,84 @@ export default function Dashboard() {
                             })}
                         </div>
 
+                        {/* Bank Statement Warning */}
+                        <div className="p-4 bg-yellow-900/20 rounded-xl border border-yellow-500/30">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                                <div>
+                                    <h5 className="text-yellow-400 font-semibold mb-1">Bank Statement Must Be Fresh</h5>
+                                    <p className="text-gray-300 text-sm">
+                                        Bank statements must be from the <span className="font-semibold">last 3-6 months</span> for each new loan application. 
+                                        This helps us verify your current income, existing EMI payments, and financial health.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Uploaded Documents */}
                         {kycStatus && kycStatus.documents.length > 0 && (
                             <div className="mt-4 p-4 bg-gray-800 rounded-xl">
                                 <h5 className="text-white font-medium mb-2">Uploaded: {kycStatus.step_1_docs_uploaded}/4 (Minimum 2 required to proceed)</h5>
                                 <div className="space-y-2">
-                                    {kycStatus.documents.map((doc: KYCDocumentItem) => (
-                                        <div key={doc.id} className="flex items-center justify-between p-2 bg-green-900 rounded-lg">
-                                            <span className="text-green-400 text-sm">{doc.document_type}</span>
-                                            <span className="text-xs text-gray-400">{doc.verification_status}</span>
-                                        </div>
-                                    ))}
+                                    {kycStatus.documents.map((doc: KYCDocumentItem) => {
+                                        const docCode = doc.document_type.split('_').pop() || '';
+                                        const docTypeInfo = [
+                                            { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR" },
+                                            { label: "PAN Card", type: "ID_PROOF", code: "PAN" },
+                                            { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT" },
+                                            { label: "Driving License", type: "ID_PROOF", code: "DRIVING_LICENSE" }
+                                        ].find(d => doc.document_type.includes(d.code));
+                                        
+                                        return (
+                                            <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg group hover:bg-gray-700 transition-all">
+                                                <div className="flex items-center gap-3 flex-1">
+                                                    <CheckCircle className="w-4 h-4 text-green-400" />
+                                                    <div>
+                                                        <span className="text-green-400 text-sm font-medium block">{doc.document_type}</span>
+                                                        <span className="text-xs text-gray-400">{doc.verification_status}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Reupload Button */}
+                                                    <button
+                                                        onClick={() => {
+                                                            const input = document.getElementById(`file-reupload-${docCode}`);
+                                                            if (input) input.click();
+                                                        }}
+                                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition-all flex items-center gap-1.5"
+                                                        title="Reupload document"
+                                                    >
+                                                        <Upload className="w-3.5 h-3.5" />
+                                                        Reupload
+                                                    </button>
+                                                    <input
+                                                        id={`file-reupload-${docCode}`}
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept=".pdf,.jpg,.jpeg,.png"
+                                                        onChange={(e) => {
+                                                            if (e.target.files && e.target.files[0] && docTypeInfo) {
+                                                                uploadDocument(applicationId, docTypeInfo.type, docTypeInfo.code);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {/* Delete Button */}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`Are you sure you want to delete ${doc.document_type}?`)) {
+                                                                deleteDocument(applicationId, doc.id);
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs rounded-lg transition-all flex items-center gap-1.5"
+                                                        title="Delete document"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -3096,25 +3514,106 @@ export default function Dashboard() {
 
                 {/* Step 4: Complete */}
                 {kycStep === 4 && (
-                    <div className="text-center space-y-6">
-                        <div className="w-20 h-20 mx-auto bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center">
-                            <CheckCircle className="w-10 h-10 text-white" />
-                        </div>
-                        <h4 className="text-2xl font-bold text-white">Almost There!</h4>
-                        <p className="text-gray-400">All steps completed. Click below to finalize your KYC.</p>
-
+                    <div className="space-y-6">
                         {kycStatus?.can_proceed_to_disbursement ? (
-                            <div className="p-6 bg-green-900 border border-green-500/30 rounded-xl">
-                                <p className="text-green-400 text-xl font-semibold">🎉 KYC Completed Successfully!</p>
-                                <p className="text-gray-300 mt-2">Disbursement will be processed within 24-48 hours.</p>
+                            <div className="text-center space-y-6">
+                                {/* Success Icon */}
+                                <div className="w-24 h-24 mx-auto bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center shadow-2xl">
+                                    <CheckCircle className="w-12 h-12 text-white" />
+                                </div>
+                                
+                                {/* Success Message */}
+                                <div>
+                                    <h4 className="text-3xl font-bold text-white mb-2">🎉 KYC Completed Successfully!</h4>
+                                    <p className="text-gray-400 text-lg">Your verification is complete and approved</p>
+                                </div>
+
+                                {/* Success Details Card */}
+                                <div className="bg-gradient-to-br from-green-900/40 to-teal-900/40 border border-green-500/30 rounded-xl p-6 backdrop-blur-sm">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between pb-3 border-b border-green-500/20">
+                                            <span className="text-gray-400">Application Ref</span>
+                                            <span className="text-white font-mono">{applicationId.slice(0, 8).toUpperCase()}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between pb-3 border-b border-green-500/20">
+                                            <span className="text-gray-400">Verification Status</span>
+                                            <span className="text-green-400 font-semibold flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4" />
+                                                Verified & Approved
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-gray-400">Disbursement Timeline</span>
+                                            <span className="text-white font-semibold">24-48 hours</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Next Steps */}
+                                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-5">
+                                    <h5 className="text-blue-300 font-semibold mb-3 flex items-center gap-2">
+                                        <AlertCircle className="w-5 h-5" />
+                                        What Happens Next?
+                                    </h5>
+                                    <ul className="text-gray-300 text-sm space-y-2 text-left">
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                                            <span>Our team will verify your submitted documents</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                                            <span>Loan amount will be credited to your bank account</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                                            <span>You'll receive SMS & email confirmation upon disbursement</span>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                {/* Action Button */}
+                                <button
+                                    onClick={() => setActiveSection('home')}
+                                    className="w-full py-4 bg-gradient-to-r from-teal-500 to-green-500 hover:from-teal-600 hover:to-green-600 rounded-xl text-white font-semibold text-lg transition-all shadow-lg"
+                                >
+                                    Back to Dashboard
+                                </button>
                             </div>
                         ) : (
-                            <button
-                                onClick={() => completeKyc(applicationId)}
-                                className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 rounded-xl text-white font-bold text-lg"
-                            >
-                                Complete KYC & Request Disbursement
-                            </button>
+                            <div className="text-center space-y-6">
+                                {/* Pending Icon */}
+                                <div className="w-20 h-20 mx-auto bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                    <CheckCircle className="w-10 h-10 text-white" />
+                                </div>
+                                <h4 className="text-2xl font-bold text-white">Almost There!</h4>
+                                <p className="text-gray-400">All steps completed. Click below to finalize your KYC.</p>
+
+                                {/* Checklist */}
+                                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 text-left">
+                                    <h5 className="text-white font-semibold mb-4">Completed Steps:</h5>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 text-green-400">
+                                            <CheckCircle className="w-5 h-5" />
+                                            <span>Documents Uploaded ({kycStatus?.step_1_docs_uploaded}/4)</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-green-400">
+                                            <CheckCircle className="w-5 h-5" />
+                                            <span>Bank Details Submitted</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-green-400">
+                                            <CheckCircle className="w-5 h-5" />
+                                            <span>Agreement Signed</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => completeKyc(applicationId)}
+                                    className="w-full px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 rounded-xl text-white font-bold text-lg transition-all shadow-lg"
+                                >
+                                    Complete KYC & Request Disbursement
+                                </button>
+                            </div>
                         )}
                     </div>
                 )}
@@ -4713,6 +5212,143 @@ export default function Dashboard() {
                     </footer>
                 </div>
             </div>
+
+            {/* Application Details Modal */}
+            {showApplicationModal && viewingApplication && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-gray-900 rounded-2xl border border-white/10 max-w-2xl w-full max-h-[90vh] overflow-auto">
+                        <div className="sticky top-0 bg-gray-900 border-b border-white/10 p-6 flex items-center justify-between">
+                            <h2 className="text-2xl font-bold text-white">Application Details</h2>
+                            <button
+                                onClick={() => {
+                                    setShowApplicationModal(false);
+                                    setViewingApplication(null);
+                                }}
+                                className="p-2 hover:bg-white/10 rounded-lg transition"
+                            >
+                                <X className="w-5 h-5 text-gray-400" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 space-y-6">
+                            {/* Tracking ID - Prominent Display */}
+                            <div className="p-5 bg-gradient-to-r from-teal-900/40 to-blue-900/40 rounded-xl border-2 border-teal-500/30">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <div className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Tracking ID</div>
+                                        <div className="text-3xl font-bold font-mono text-teal-400 tracking-wider">
+                                            {viewingApplication.tracking_id || viewingApplication.id.substring(0, 8).toUpperCase()}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">Use this ID for all communications</div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            const trackingId = viewingApplication.tracking_id || viewingApplication.id.substring(0, 8).toUpperCase();
+                                            navigator.clipboard.writeText(trackingId);
+                                            alert('Tracking ID copied to clipboard!');
+                                        }}
+                                        className="px-4 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg transition flex items-center gap-2"
+                                        title="Copy Tracking ID"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        Copy
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Status Banner */}
+                            <div className={`p-4 rounded-xl border-2 ${
+                                viewingApplication.decision === 'APPROVED' ? 'bg-green-500/10 border-green-500/30' :
+                                viewingApplication.decision === 'REJECTED' ? 'bg-red-500/10 border-red-500/30' :
+                                'bg-yellow-500/10 border-yellow-500/30'
+                            }`}>
+                                <div className="text-sm text-gray-400 mb-2">Status</div>
+                                <div className={`text-2xl font-bold ${
+                                    viewingApplication.decision === 'APPROVED' ? 'text-green-400' :
+                                    viewingApplication.decision === 'REJECTED' ? 'text-red-400' :
+                                    'text-yellow-400'
+                                }`}>
+                                    {viewingApplication.decision}
+                                </div>
+                                {viewingApplication.approval_probability && (
+                                    <div className="text-sm text-gray-400 mt-1">
+                                        Approval Probability: {viewingApplication.approval_probability.toFixed(1)}%
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Loan Details Grid */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                    <div className="text-sm text-gray-400 mb-1">Loan Amount</div>
+                                    <div className="text-xl font-bold text-white">₹{viewingApplication.loan_amount.toLocaleString()}</div>
+                                </div>
+
+                                <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                    <div className="text-sm text-gray-400 mb-1">Purpose</div>
+                                    <div className="text-xl font-bold text-white">{viewingApplication.loan_purpose}</div>
+                                </div>
+
+                                {viewingApplication.interest_rate && (
+                                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                        <div className="text-sm text-gray-400 mb-1">Interest Rate</div>
+                                        <div className="text-xl font-bold text-white">{viewingApplication.interest_rate}% p.a.</div>
+                                    </div>
+                                )}
+
+                                <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                    <div className="text-sm text-gray-400 mb-1">Applied On</div>
+                                    <div className="text-xl font-bold text-white">
+                                        {new Date(viewingApplication.created_at).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* KYC Status */}
+                            {viewingApplication.kyc_status && (
+                                <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
+                                    <div className="text-sm text-gray-400 mb-2">KYC Status</div>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        viewingApplication.kyc_status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                                        viewingApplication.kyc_status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-400' :
+                                        viewingApplication.kyc_status === 'BLOCKED' ? 'bg-red-500/20 text-red-400' :
+                                        'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                        {viewingApplication.kyc_status === 'COMPLETED' ? 'Completed' :
+                                         viewingApplication.kyc_status === 'IN_PROGRESS' ? 'In Progress' :
+                                         viewingApplication.kyc_status === 'BLOCKED' ? 'Blocked' : 'Pending'}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex gap-3 pt-4 border-t border-white/10">
+                                {viewingApplication.decision === 'APPROVED' && viewingApplication.kyc_status !== 'COMPLETED' && (
+                                    <button
+                                        onClick={() => {
+                                            setShowApplicationModal(false);
+                                            setSelectedApplicationId(viewingApplication.id);
+                                            setActiveSection('apply');
+                                        }}
+                                        className="flex-1 px-4 py-3 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg font-medium transition"
+                                    >
+                                        Complete KYC
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => {
+                                        setShowApplicationModal(false);
+                                        setViewingApplication(null);
+                                    }}
+                                    className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }
