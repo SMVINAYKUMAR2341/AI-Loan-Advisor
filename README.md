@@ -1,5 +1,4 @@
-# Secure Identity Hub & Loan Approval System
-
+# AI Powered Loan Eligibility Advisor
 This project contains a comprehensive banking system comprising a **Secure Identity Hub** frontend and a **Loan Approval Prediction** backend.
 
 ## Project Structure
