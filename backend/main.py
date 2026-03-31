@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import calendar
 from collections import defaultdict
@@ -72,6 +72,11 @@ from fastapi.exceptions import RequestValidationError
 # Custom exception handler to ensure CORS headers are always present
 from fastapi.responses import JSONResponse
 
+class APIException(HTTPException):
+    def __init__(self, status_code: int, detail: str, error_code: str):
+        super().__init__(status_code=status_code, detail=detail)
+        self.error_code = error_code
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Handle HTTP exceptions while preserving CORS headers"""
@@ -92,13 +97,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail},
+        content={"detail": exc.detail, "error_code": getattr(exc, "error_code", "GENERIC_ERROR")},
         headers={
             "Access-Control-Allow-Origin": cors_origin,
             "Access-Control-Allow-Credentials": "true",
             "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-        }
+            "Access-Control-Allow-Headers": "*",        }
     )
 
 @app.exception_handler(RequestValidationError)
@@ -591,7 +595,7 @@ async def request_application_deletion(
     try:
         app_uuid = uuid.UUID(application_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid application ID")
+        raise APIException(status_code=400, detail="Invalid application ID", error_code="INVALID_APPLICATION_ID")
     
     # Verify the application belongs to this user
     query = select(models.LoanApplication).where(
@@ -3237,6 +3241,7 @@ async def get_upcoming_emis(
 async def upload_document(
     application_id: str = Form(...),
     document_type: str = Form(...),
+    document_number: str = Form(None),
     file: UploadFile = File(...),
     current_user: models.User = Depends(auth.get_current_user),
     db: AsyncSession = Depends(database.get_db)
@@ -3273,59 +3278,96 @@ async def upload_document(
     if not prediction or prediction.decision != "APPROVED":
         raise HTTPException(status_code=400, detail="Documents can only be uploaded for approved loans")
     
+    # Validate document number if provided
+    from kyc_validator import validate_aadhaar, validate_pan
+    if document_type in ["AADHAAR_FRONT", "AADHAAR_BACK"] and document_number:
+        if not validate_aadhaar(document_number):
+            raise HTTPException(status_code=400, detail="Invalid Aadhaar number")
+    elif document_type == "PAN" and document_number:
+        if not validate_pan(document_number):
+            raise HTTPException(status_code=400, detail="Invalid PAN number")
+
     # Validate file type
     allowed_types = ["application/pdf", "image/jpeg", "image/png"]
     if file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: PDF, JPG, PNG")
+        raise APIException(status_code=400, detail=f"Invalid file type. Allowed: PDF, JPG, PNG", error_code="INVALID_FILE_TYPE")
     
     # Validate file size (max 5MB)
     file_content = await file.read()
     file_size = len(file_content)
     if file_size > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+        raise APIException(status_code=400, detail="File size exceeds 5MB limit", error_code="FILE_SIZE_EXCEEDED")
     
-    # Create upload directory
-    upload_dir = f"uploads/{current_user.id}/{application_id}"
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Generate unique filename
-    import uuid
-    ext = file.filename.split('.')[-1] if '.' in file.filename else 'pdf'
-    unique_filename = f"{document_type}_{uuid.uuid4().hex[:8]}.{ext}"
-    file_path = f"{upload_dir}/{unique_filename}"
-    
-    # Save file
-    async with aiofiles.open(file_path, 'wb') as f:
-        await f.write(file_content)
-    
-    # Create document record
-    doc = models.KYCDocument(
-        application_id=app_uuid,
-        user_id=current_user.id,
-        document_type=document_type,
-        file_name=unique_filename,
-        file_path=file_path,
-        file_size=file_size,
-        mime_type=file.content_type,
-        verification_status="PENDING"
-    )
-    
-    db.add(doc)
-    
-    # Log audit
-    await log_audit(
-        db, current_user.id,
-        models.AuditAction.DOCUMENT_UPLOADED,
-        "kyc_document",
-        doc.id,
-        f"Uploaded {document_type} document: {file.filename}",
-        metadata={"file_size": file_size, "document_type": document_type}
-    )
-    
-    await db.commit()
-    await db.refresh(doc)
-    
-    return schemas.KYCDocumentResponse.model_validate(doc)
+    # Image Validation
+    try:
+        from kyc_validator import validate_document_image
+        validation_results = validate_document_image(file_content)
+        if 'error' in validation_results:
+            raise APIException(status_code=400, detail=f"Image validation failed: {validation_results['error']}", error_code="IMAGE_VALIDATION_FAILED")
+        if validation_results.get('image_quality', {}).get('status') == 'POOR':
+            raise APIException(status_code=400, detail=f"Poor image quality detected. Please upload a clearer image. Quality score: {validation_results['image_quality']['score']:.2f}", error_code="POOR_IMAGE_QUALITY")
+    except ImportError:
+        validation_results = {'image_quality': {'score': 20, 'status': 'GOOD'}}
+
+    # Upload to Cloudinary and create document record in a transaction
+    try:
+        # Configure Cloudinary
+        import cloudinary
+        import cloudinary.uploader
+        import io as _io
+        cloudinary.config(
+            cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+            api_key=os.getenv("CLOUDINARY_API_KEY"),
+            api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+        )
+
+        # Start a transaction
+        async with db.begin():
+            # Upload to Cloudinary - use file_content bytes since file.read() already consumed the stream
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    _io.BytesIO(file_content),
+                    folder=f"kyc_documents/{current_user.id}/{application_id}",
+                    public_id=f"{document_type}_{uuid.uuid4().hex[:8]}",
+                    overwrite=True,
+                    resource_type="auto",
+                )
+            except Exception as e:
+                raise APIException(status_code=500, detail=f"Cloudinary upload failed: {str(e)}", error_code="CLOUDINARY_UPLOAD_FAILED")
+
+            # Create document record
+            doc = models.KYCDocument(
+                application_id=app_uuid,
+                user_id=current_user.id,
+                document_type=document_type,
+                file_name=upload_result.get("public_id"),
+                file_path=upload_result.get("secure_url"),
+                file_size=file_size,
+                mime_type=file.content_type,
+                verification_status="PENDING",
+                verification_details=validation_results
+            )
+            db.add(doc)
+
+            # Log audit
+            await log_audit(
+                db, current_user.id,
+                models.AuditAction.DOCUMENT_UPLOADED,
+                "kyc_document",
+                doc.id,
+                f"Uploaded {document_type} document: {file.filename}",
+                metadata={"file_size": file_size, "document_type": document_type}
+            )
+
+        await db.refresh(doc)
+        return schemas.KYCDocumentResponse.model_validate(doc)
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise APIException(status_code=500, detail=f"An unexpected error occurred: {str(e)}", error_code="UNEXPECTED_ERROR")
 
 
 @app.get("/documents/{application_id}", response_model=List[schemas.KYCDocumentResponse])
@@ -4023,7 +4065,7 @@ async def verify_kyc_eligibility(application_id: str, user_id, db: AsyncSession)
     application = app_result.scalars().first()
     
     if not application:
-        raise HTTPException(status_code=404, detail="Loan application not found")
+        raise APIException(status_code=404, detail="Loan application not found", error_code="APPLICATION_NOT_FOUND")
     
     # Get prediction
     pred_query = select(models.LoanPrediction).where(

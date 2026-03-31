@@ -31,13 +31,14 @@ export function isAuthenticated(): boolean {
 // Helper for authenticated requests
 async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const token = getToken();
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
+    const isFormData = options.body instanceof FormData;
+    const headers: Record<string, string> = {
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(options.headers as Record<string, string> || {}),
     };
 
     if (token) {
-        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+        headers['Authorization'] = `Bearer ${token}`;
     }
 
     return fetch(url, { ...options, headers });
@@ -393,9 +394,18 @@ export async function getUpcomingEMIs(): Promise<UpcomingEMI[]> {
 // DOCUMENTS
 // =============================================================================
 
-export async function uploadDocument(applicationId: string, documentType: string): Promise<KYCDocument> {
-    const response = await authFetch(`${API_BASE_URL}/documents/upload?application_id=${applicationId}&document_type=${documentType}`, {
+export async function uploadDocument(applicationId: string, documentType: string, file: File, documentNumber?: string): Promise<KYCDocument> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("application_id", applicationId);
+    formData.append("document_type", documentType);
+    if (documentNumber) {
+        formData.append("document_number", documentNumber);
+    }
+
+    const response = await authFetch(`${API_BASE_URL}/documents/upload`, {
         method: 'POST',
+        body: formData,
     });
     if (!response.ok) {
         const error: ApiError = await response.json();
