@@ -76,6 +76,3 @@ tzdata==2025.3
 urllib3==2.6.3
 uvicorn==0.40.0
 cloudinary==1.40.0
-aadhar==0.1.2
-pytesseract==0.3.10
-image-quality==1.2.3
