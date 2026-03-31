@@ -224,6 +224,7 @@ class KYCDocument(Base):
     # Verification
     verification_status = Column(String(20), default="PENDING")  # PENDING, VERIFIED, REJECTED
     verification_notes = Column(Text, nullable=True)
+    verification_details = Column(JSONB, nullable=True) # Stores results from image validation
     verified_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Timestamps

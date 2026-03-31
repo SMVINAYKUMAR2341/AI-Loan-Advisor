@@ -371,6 +371,7 @@ export default function Dashboard() {
     const [kycStep, setKycStep] = useState(1);
     const [kycError, setKycError] = useState('');
     const [kycSuccess, setKycSuccess] = useState('');
+    const [documentNumbers, setDocumentNumbers] = useState<{ [key: string]: string }>({});
     const [previousDocuments, setPreviousDocuments] = useState<any[]>([]);
     const [showPreviousDocs, setShowPreviousDocs] = useState(false);
     const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
@@ -2963,6 +2964,15 @@ export default function Dashboard() {
                                                     {!isUploaded && doc.code === "BANK_STATEMENT" && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-bold">FRESH REQUIRED</span>}
                                                 </div>
                                                 <p className={`text-xs ${doc.code === "BANK_STATEMENT" ? 'text-yellow-300 font-medium' : 'text-gray-400'}`}>{doc.desc}</p>
+                                        {["AADHAAR_FRONT", "AADHAAR_BACK", "PAN"].includes(doc.code) && (
+                                            <input
+                                                type="text"
+                                                placeholder={`Enter ${doc.label} Number`}
+                                                value={documentNumbers[doc.code] || ''}
+                                                onChange={(e) => setDocumentNumbers(prev => ({ ...prev, [doc.code]: e.target.value }))}
+                                                className="mt-2 w-full bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
+                                            />
+                                        )}
                                             </div>
                                         </button>
                                         <input
@@ -2972,7 +2982,7 @@ export default function Dashboard() {
                                             accept=".pdf,.jpg,.jpeg,.png"
                                             onChange={(e) => {
                                                 if (e.target.files && e.target.files[0]) {
-                                                    uploadDocument(applicationId, doc.type, doc.code);
+                                                    uploadDocument(applicationId, doc.type, e.target.files[0], documentNumbers[doc.code]);
                                                 }
                                             }}
                                         />
