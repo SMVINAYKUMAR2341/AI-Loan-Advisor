@@ -9,34 +9,52 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
-# Database URL from environment variable
-# Fallback to Neon DB for deployment support
+# Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_4qNVJct3Bwio@ep-ancient-smoke-a1z5yh5g-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 
-# Fix for asyncpg: convert sslmode to ssl parameter
+# Cloud Run + Cloud SQL configuration
+if not DATABASE_URL:
+    db_user = os.getenv("DB_USER", "loan_app_user")
+    db_password = os.getenv("DB_PASSWORD")
+    db_name = os.getenv("DB_NAME", "loan_app_db")
+    cloud_sql_connection = os.getenv("CLOUD_SQL_CONNECTION")
+
+    if not db_password:
+        raise RuntimeError("DB_PASSWORD is not configured")
+
+    if not cloud_sql_connection:
+        raise RuntimeError("CLOUD_SQL_CONNECTION is not configured")
+
+    DATABASE_URL = (
+        f"postgresql+asyncpg://{db_user}:{db_password}@/{db_name}"
+        f"?host=/cloudsql/{cloud_sql_connection}"
+    )
+
+# Fix for asyncpg when using sslmode in DATABASE_URL
 if DATABASE_URL and "sslmode=" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
 
-logger.info(f"Connecting to database (pool connection)...")
+logger.info("Connecting to database...")
 
-# Optimized pool configuration for Neon DB
+# Database engine
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,  # Verify connections before using
-    pool_recycle=300,     # Recycle connections after 5 minutes
-    pool_size=10,         # Increased from 5 for better concurrency
-    max_overflow=20,      # Increased overflow capacity
-    pool_timeout=30,      # Connection timeout
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
     connect_args={
-        "server_settings": {"application_name": "loan_approval_system"},
+        "server_settings": {
+            "application_name": "loan_approval_system"
+        },
         "command_timeout": 60,
         "timeout": 30,
     }
 )
 
+# Async session
 AsyncSessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -45,7 +63,9 @@ AsyncSessionLocal = sessionmaker(
     autoflush=False,
 )
 
+# Base model
 Base = declarative_base()
+
 
 async def get_db():
     async with AsyncSessionLocal() as session:
