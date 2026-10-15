@@ -1,6 +1,7 @@
 import os
 import sys
 import calendar
+import asyncio
 from collections import defaultdict
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) # Fix import paths
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, UploadFile, File, Form, Body
@@ -21,8 +22,41 @@ import database
 from database import get_db
 import auth
 import report_generator
+from starlette.concurrency import run_in_threadpool
 
 app = FastAPI(title="Loan Advisor API", version="1.0.0")
+
+def _get_env_int(name: str, default: int, min_value: int = 1) -> int:
+    try:
+        return max(min_value, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+def _get_env_float(name: str, default: float, min_value: float = 0.1) -> float:
+    try:
+        return max(min_value, float(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+PREDICTION_MAX_CONCURRENCY = _get_env_int("PREDICTION_MAX_CONCURRENCY", 100)
+PREDICTION_QUEUE_TIMEOUT_SECONDS = _get_env_float("PREDICTION_QUEUE_TIMEOUT_SECONDS", 2.0)
+prediction_semaphore = asyncio.Semaphore(PREDICTION_MAX_CONCURRENCY)
+
+async def run_prediction_with_backpressure(operation, *args, **kwargs):
+    acquired = False
+    try:
+        await asyncio.wait_for(prediction_semaphore.acquire(), timeout=PREDICTION_QUEUE_TIMEOUT_SECONDS)
+        acquired = True
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Prediction service is busy. Please retry in a few seconds."
+        )
+    try:
+        return await run_in_threadpool(operation, *args, **kwargs)
+    finally:
+        if acquired:
+            prediction_semaphore.release()
 
 # Loan Prediction Request/Response Models
 class LoanApplicationRequest(BaseModel):
@@ -1847,8 +1881,8 @@ async def predict_loan_eligibility(application: LoanApplicationRequest):
             'property_area': application.property_area,
         }
         
-        # Get prediction from trained model
-        result = predictor.predict(loan_data)
+        # Get prediction from trained model without blocking the event loop
+        result = await run_prediction_with_backpressure(predictor.predict, loan_data)
         
         return LoanPredictionResponse(
             status=result['status'],
@@ -2195,9 +2229,9 @@ async def submit_loan_application(
         db.add(db_application)
         await db.flush()  # Get the ID without committing
         
-        # 2. Run ML inference
+        # 2. Run ML inference without blocking the event loop
         advisor = get_advisor()
-        result = advisor.analyze(features)
+        result = await run_prediction_with_backpressure(advisor.analyze, features)
         
         # 3. Store ML outputs (loan_predictions table) - IMMUTABLE
         db_prediction = models.LoanPrediction(
