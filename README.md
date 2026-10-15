@@ -42,6 +42,11 @@ uvicorn backend.main:app --reload
 
 The API will be available at `http://localhost:8000`.
 
+For high-traffic deployments, set:
+- `WEB_CONCURRENCY` (multiple backend workers)
+- `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (database connection throughput)
+- `PREDICTION_MAX_CONCURRENCY` and `PREDICTION_QUEUE_TIMEOUT_SECONDS` (prediction backpressure under peak load)
+
 ### 3. Frontend Setup
 Open a new terminal, navigate to the frontend directory:
 
