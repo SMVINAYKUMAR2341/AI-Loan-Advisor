@@ -1,6 +1,6 @@
-"use client";
 import { useState, useEffect } from "react";
-import { API_BASE_URL, getMockBankTransactions, BankTransaction, BankTransactionsResponse } from "../services/api";
+import type { ComponentType, InputHTMLAttributes, ReactNode } from "react";
+import { API_BASE_URL } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { SmokeyBackground } from "@/components/ui/login-form";
 
@@ -9,34 +9,20 @@ import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { SecurityManagement } from "@/components/profile/SecurityManagement";
 import { ConsentPermissions } from "@/components/profile/ConsentPermissions";
 import { CommunicationPreferences } from "@/components/profile/CommunicationPreferences";
-import { ActivityLog } from "@/components/profile/ActivityLog";
-
-// Data & Types
-import { mockProfileData } from "@/data/mockProfileData";
 import { ProfileData } from "@/types/profile";
 
 import {
     Home, Wallet, FileText, TrendingUp, CreditCard, FolderOpen, Shield, History,
     HelpCircle, LogOut, Menu, X, ChevronRight, AlertCircle, Calendar, IndianRupee,
-    CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell,
-    Activity, CheckSquare, Search, AlertTriangle, Download, Plus,
+    CheckCircle, Clock, ArrowUpRight, Sparkles, User, Bell, Download, Plus,
     ShieldCheck, Landmark, PenTool, Lock, RefreshCw, Loader, Loader2, Trash2, Upload
 } from "lucide-react";
 
-// Charts - Professional visualization
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, RadialBarChart, RadialBar, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart, Line, CartesianGrid, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Legend, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, CartesianGrid } from 'recharts';
 
-// Section Types
 type SectionKey = "home" | "loans" | "apply" | "repayments" | "notifications" | "documents" | "security" | "activity" | "support";
 
-interface NavItem {
-    key: SectionKey;
-    label: string;
-    icon: typeof Home;
-    description: string;
-}
-
-const navItems: NavItem[] = [
+const navItems: { key: SectionKey; label: string; icon: typeof Home; description: string }[] = [
     { key: "home", label: "Home", icon: Home, description: "Dashboard overview" },
     { key: "loans", label: "My Loans", icon: Wallet, description: "View your loans" },
     { key: "apply", label: "Apply for Loan", icon: FileText, description: "New loan application" },
@@ -48,38 +34,212 @@ const navItems: NavItem[] = [
     { key: "support", label: "Support", icon: HelpCircle, description: "Get help" },
 ];
 
-// Mock data for dashboard
-const mockDashboardData = {
-    activeLoan: {
-        loanId: "LN-2024-001234",
-        type: "Personal Loan",
-        sanctionedAmount: 500000,
-        outstandingAmount: 342500,
-        nextEmiAmount: 12450,
-        nextEmiDate: "2025-01-05",
-        interestRate: 10.5,
-        tenure: 48,
-        paidEmis: 12,
-    },
-    creditScore: {
-        score: 752,
-        rating: "Good",
-        lastUpdated: "2024-12-20",
-        trend: "up",
-        maxScore: 900,
-    },
-    eligibility: {
-        preApprovedAmount: 800000,
-        confidence: 87,
-        eligibleProducts: ["Personal Loan", "Home Loan", "Vehicle Loan"],
-        lastChecked: "2024-12-24",
-    },
-    alerts: [
-        { id: 1, type: "warning", message: "EMI due in 3 days", action: "Pay Now" },
-        { id: 2, type: "info", message: "New loan offer available", action: "View" },
-        { id: 3, type: "success", message: "KYC verification complete", action: null },
-    ],
+// =========== TYPES ===========
+interface LoanAdvisorResult {
+    application_date: string;
+    decision: string;
+    decision_reason: string;
+    approval_probability: number;
+    credit_score: { min: number; max: number; rating: string; display: string };
+    interest_rate: { annual: number; monthly: number };
+    emi: { monthly: number; total_interest: number; total_repayment: number };
+    loan_details: { amount: number; duration_months: number; duration_years: number };
+    income_analysis: { monthly_income: number; annual_income: number; debt_to_income_ratio: number; emi_to_income_ratio: number };
+    coapplicant: { suggested: boolean; reason: string; provided: boolean };
+    explanations: Array<{ factor: string; impact: string; description: string; shap_value?: number }>;
+    kyc_required: boolean;
+    next_steps: string[];
+    application_id?: string;
+    tracking_id?: string;
+}
+interface LoanApplicationItem {
+    id: string; loan_amount: number; loan_purpose: string; decision: string; status: string;
+    interest_rate: number; approval_probability: number; created_at: string;
+    tracking_id?: string; kyc_status?: string; emi?: number; tenure?: number;
+}
+interface DisbursementItem {
+    id: string; application_id: string; amount: number; transaction_ref: string;
+    status: string; loan_purpose: string; processed_at: string;
+}
+interface RepaymentItem {
+    id: string; application_id: string; emi_number: number; due_date: string; emi_amount: number;
+    payment_status: string; payment_date?: string; payment_amount?: number; payment_reference?: string;
+}
+interface KYCDocumentItem {
+    id: string; document_type: string; file_name: string; verification_status: string; uploaded_at: string;
+    application_id?: string;
+}
+interface KYCStatus {
+    application_id: string; loan_status: string; kyc_eligible: boolean;
+    step_1_documents: string; step_1_docs_required: number; step_1_docs_uploaded: number; step_1_docs_verified: number;
+    step_2_bank_details: string; step_3_agreement: string; overall_status: string;
+    can_proceed_to_disbursement: boolean; documents: KYCDocumentItem[];
+}
+interface ReusableDocument { id: string; document_type: string; verified_at?: string | null }
+interface AdminBank {
+    id: string; bank_name: string; account_holder_name: string; account_number: string; ifsc_code: string; branch_name?: string;
+}
+interface LoanAgreement {
+    id: string; loan_amount: number; interest_rate: number; tenure_months: number; emi_amount: number;
+    processing_fee: number; total_payable: number; agreement_text: string; consent_given: boolean;
+    signed_at: string | null; status: string; agreement_version: string;
+}
+interface AccountData {
+    customer_id: string; title: string; first_name: string; middle_name?: string; last_name: string;
+    mobile_number: string; email: string; date_of_birth?: string; gender?: string; kyc_verified: boolean;
+    created_at: string; pan_number?: string; address_line1?: string; address_line2?: string; city?: string;
+    state?: string; pincode?: string; role?: string; terms_consent?: boolean; privacy_consent?: boolean; data_consent?: boolean;
+}
+interface ActivityEvent {
+    id: string; category?: string; action?: string; severity?: string; description: string;
+    timestamp: string; device?: string; location?: string; ip_address?: string;
+}
+interface ActivityData { events: ActivityEvent[]; total_events: number }
+interface SessionItem {
+    id: string; started_at: string; browser: string; os: string; location: string;
+    device_type?: string; is_active: boolean; is_new_device?: boolean; last_activity?: string;
+}
+interface Ticket {
+    id: string; ticket_id: string; subject: string; category: string; priority: string; status: string; created_at: string;
+    messages?: { id: string; sender_type: string; message: string; created_at: string }[];
+}
+interface NotificationItem { id: string; type: string; trigger: string; message: string; status: string; sent_at: string }
+type PaymentMethod = 'card' | 'upi' | 'netbanking' | 'wallet' | null;
+
+// =========== HELPERS ===========
+const getToken = () => localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+
+/** fetch against the API with the bearer token; JSON content-type is added for string bodies. */
+const authFetch = (path: string, init: RequestInit = {}) =>
+    fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+            Authorization: `Bearer ${getToken()}`,
+            ...(typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
+            ...(init.headers || {}),
+        },
+    });
+
+const errorDetail = async (res: Response, fallback: string) => {
+    const body = await res.json().catch(() => ({}));
+    return (body && body.detail) || fallback;
 };
+
+const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+const num = (value: unknown) => (typeof value === 'number' && isFinite(value) ? value : Number(value) || 0);
+
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num(amount));
+
+const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+};
+
+const kycLabel = (status?: string) =>
+    status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'In Progress' : status === 'BLOCKED' ? 'Blocked' : 'Pending';
+const kycBadge = (status?: string) =>
+    status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' : status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-400' :
+        status === 'BLOCKED' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400';
+
+const INITIAL_LOAN_FORM = {
+    gender: 'Male', age: '', employment_status: 'Employed', education_level: 'Bachelor', experience: '', job_tenure: '',
+    monthly_income: '', monthly_debt_payments: '', loan_amount: '', loan_duration: 60, loan_purpose: 'PERSONAL',
+    marital_status: 'Single', number_of_dependents: 0, home_ownership_status: 'Rent', property_area: 'Urban',
+    coapplicant_income: '', coapplicant_employment: '', coapplicant_relationship: '', cibil_score: '', previous_loan_defaults: 'No'
+};
+const EMPTY_PAYMENT_DATA = {
+    cardNumber: '', cardName: '', expiryMonth: '', expiryYear: '', cvv: '', upiId: '',
+    bankName: '', bankUserId: '', bankPassword: '', walletType: ''
+};
+const EMPTY_BANK_FORM = {
+    account_holder_name: '', bank_name: '', account_number: '', confirm_account_number: '', ifsc_code: '', account_type: 'SAVINGS'
+};
+
+/** Neutral profile built from the logged-in user; real values are filled in from /user/me. */
+const buildInitialProfile = (id: string, fullName: string): ProfileData => ({
+    user: { id, fullName, email: '', phone: '', accountStatus: 'kyc_pending', createdAt: new Date().toISOString() },
+    kyc: { status: 'not_started', verificationsCompleted: [] },
+    security: {
+        lastLogin: new Date().toISOString(),
+        lastLoginDevice: { browser: 'Unknown', os: 'Unknown' },
+        otpLoginEnabled: false,
+        activeSessions: [],
+    },
+    consents: [],
+    preferences: { smsNotifications: true, emailNotifications: true, paymentReminders: true, promotionalOffers: false, criticalAlerts: true },
+    financial: { creditHealth: 'medium' },
+    activityLog: [],
+});
+
+// =========== FORM FIELDS (module level so inputs keep focus across renders) ===========
+const darkInputStyle = { color: '#ffffff', backgroundColor: '#1f2937' };
+type Option = string | [string | number, string];
+
+const SelectField = ({ label, value, onChange, options }: {
+    label: string; value: string | number; onChange: (value: string) => void; options: Option[];
+}) => (
+    <div>
+        <label className="block text-gray-300 mb-2 text-sm">{label}</label>
+        <select value={value} onChange={(e) => onChange(e.target.value)} style={darkInputStyle}
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white">
+            {options.map((o) => {
+                const [v, l] = Array.isArray(o) ? o : [o, o];
+                return <option key={v} value={v}>{l}</option>;
+            })}
+        </select>
+    </div>
+);
+
+const NumberField = ({ label, value, onChange, placeholder, icon: Icon, min = "0", max, hint }: {
+    label: string; value: string; onChange: (value: string) => void; placeholder: string;
+    icon?: ComponentType<{ className?: string }>; min?: string; max?: string; hint?: string;
+}) => {
+    const input = (
+        <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()} placeholder={placeholder} style={darkInputStyle}
+            className={`w-full ${Icon ? 'pl-10 pr-4' : 'px-4'} py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400`} />
+    );
+    return (
+        <div>
+            <label className="block text-gray-300 mb-2 text-sm">{label}</label>
+            {Icon ? (
+                <div className="relative">
+                    <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    {input}
+                </div>
+            ) : input}
+            {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
+        </div>
+    );
+};
+
+const FormSection = ({ icon: Icon, title, grid, children }: {
+    icon: ComponentType<{ className?: string }>; title: string; grid: string; children: ReactNode;
+}) => (
+    <div className="mb-6">
+        <h4 className="text-white font-medium mb-4 flex items-center gap-2">
+            <Icon className="w-4 h-4" /> {title}
+        </h4>
+        <div className={`grid ${grid} gap-4`}>{children}</div>
+    </div>
+);
+
+/** Labeled text input used by the bank, card, password and PIN forms. */
+const TextField = ({ label, labelClass = "block text-gray-400 text-sm mb-2", className, ...props }: {
+    label: string; labelClass?: string; className: string;
+} & InputHTMLAttributes<HTMLInputElement>) => (
+    <div>
+        <label className={labelClass}>{label}</label>
+        <input {...props} className={className} />
+    </div>
+);
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -90,48 +250,8 @@ export default function Dashboard() {
     const [profileData, setProfileData] = useState<ProfileData | null>(null);
     const [securitySubSection, setSecuritySubSection] = useState<"account" | "profile" | "security" | "consent" | "communication">("account");
 
-    // Bank-Grade Loan Advisor State
-    const [loanFormData, setLoanFormData] = useState({
-        gender: 'Male',
-        age: '',
-        employment_status: 'Employed',
-        education_level: 'Bachelor',
-        experience: '',
-        job_tenure: '',
-        monthly_income: '',
-        monthly_debt_payments: '',
-        loan_amount: '',
-        loan_duration: 60,
-        loan_purpose: 'PERSONAL',
-        marital_status: 'Single',
-        number_of_dependents: 0,
-        home_ownership_status: 'Rent',
-        property_area: 'Urban',
-        coapplicant_income: '',
-        coapplicant_employment: '',
-        coapplicant_relationship: '',
-        cibil_score: '',
-        previous_loan_defaults: 'No'
-    });
-
-    interface LoanAdvisorResult {
-        application_date: string;
-        decision: string;
-        decision_reason: string;
-        approval_probability: number;
-        credit_score: { min: number; max: number; rating: string; display: string };
-        interest_rate: { annual: number; monthly: number };
-        emi: { monthly: number; total_interest: number; total_repayment: number };
-        loan_details: { amount: number; duration_months: number; duration_years: number };
-        income_analysis: { monthly_income: number; annual_income: number; debt_to_income_ratio: number; emi_to_income_ratio: number };
-        coapplicant: { suggested: boolean; reason: string; provided: boolean };
-        explanations: Array<{ factor: string; impact: string; description: string; shap_value?: number }>;
-        kyc_required: boolean;
-        next_steps: string[];
-        application_id?: string;  // Added for KYC workflow
-        tracking_id?: string;     // Unified human-readable ID
-    }
-
+    // Loan advisor
+    const [loanFormData, setLoanFormData] = useState(INITIAL_LOAN_FORM);
     const [advisorResult, setAdvisorResult] = useState<LoanAdvisorResult | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -139,281 +259,35 @@ export default function Dashboard() {
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const [showQrCode, setShowQrCode] = useState(false);
 
-    // MY LOANS STATE (Real DB data)
-    interface LoanApplicationItem {
-        id: string;
-        loan_amount: number;
-        loan_purpose: string;
-        decision: string;
-        status: string; // Mapped from decision
-        interest_rate: number;
-        approval_probability: number;
-        created_at: string;
-        tracking_id?: string;
-        kyc_status?: string; // KYC status: NOT_STARTED, IN_PROGRESS, COMPLETED, BLOCKED
-    }
+    // Loans, disbursements, repayments
     const [loanApplications, setLoanApplications] = useState<LoanApplicationItem[]>([]);
     const [loanApplicationsLoading, setLoanApplicationsLoading] = useState(false);
     const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
     const [viewingApplication, setViewingApplication] = useState<LoanApplicationItem | null>(null);
     const [showApplicationModal, setShowApplicationModal] = useState(false);
-
-    // DISBURSEMENTS STATE - Bank transfers received
-    interface DisbursementItem {
-        id: string;
-        application_id: string;
-        amount: number;
-        transaction_ref: string;
-        status: string;
-        loan_purpose: string;
-        processed_at: string;
-    }
     const [disbursements, setDisbursements] = useState<DisbursementItem[]>([]);
-
-    // REPAYMENTS STATE
-    interface RepaymentItem {
-        id: string;
-        application_id: string;
-        emi_number: number;
-        due_date: string;
-        emi_amount: number;
-        payment_status: string;
-        payment_date?: string;
-        payment_amount?: number;
-        payment_reference?: string;
-    }
     const [repayments, setRepayments] = useState<RepaymentItem[]>([]);
     const [repaymentsLoading, setRepaymentsLoading] = useState(false);
 
-    const fetchRepayments = async () => {
-        setRepaymentsLoading(true);
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/repayments/me`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setRepayments(data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch repayments:", error);
-        }
-        setRepaymentsLoading(false);
-    };
-
-    const [paymentProcessing, setPaymentProcessing] = useState(false);
-
-    const handleMakePayment = async (repayment: RepaymentItem) => {
-        setPaymentProcessing(true);
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/repayments`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    application_id: repayment.application_id,
-                    amount: repayment.emi_amount,
-                    payment_method: 'UPI',
-                    transaction_ref: `PYMT-${Date.now()}`,
-                    emi_number: repayment.emi_number
-                })
-            });
-
-            if (response.ok) {
-                alert("Payment Successful!");
-                fetchRepayments();
-                fetchLoanApplications();
-            } else {
-                const error = await response.json();
-                alert(`Payment Failed: ${error.detail || 'Unknown error'}`);
-            }
-        } catch (error) {
-            console.error("Payment error:", error);
-            alert("Payment error occurred.");
-        }
-        setPaymentProcessing(false);
-    };
-
-    const fetchLoanApplications = async () => {
-        setLoanApplicationsLoading(true);
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/loan-applications`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setLoanApplications(data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch loan applications:", error);
-        }
-        setLoanApplicationsLoading(false);
-    };
-
-    const handleViewApplication = async (applicationId: string) => {
-        const application = loanApplications.find(app => app.id === applicationId);
-        if (application) {
-            setViewingApplication(application);
-            setShowApplicationModal(true);
-        }
-    };
-
-    const handleRequestDelete = async (applicationId: string) => {
-        if (!confirm('Are you sure you want to request deletion of this application?\n\nAn admin will review your request.')) {
-            return;
-        }
-        
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/loan-applications/${applicationId}/request-delete`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    reason: 'User requested deletion'
-                })
-            });
-            
-            if (response.ok) {
-                alert('Delete request submitted successfully!\n\nAn admin will review your request shortly.');
-                fetchLoanApplications(); // Refresh the list
-            } else {
-                const error = await response.json();
-                alert(`Failed to submit delete request: ${error.detail || 'Unknown error'}`);
-            }
-        } catch (error) {
-            console.error("Failed to request delete:", error);
-            alert('Network error - please try again');
-        }
-    };
-
-    const fetchDisbursements = async () => {
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/disbursements/me`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setDisbursements(data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch disbursements:", error);
-        }
-    };
-
-    // KYC WORKFLOW STATE
-    interface KYCDocumentItem {
-        id: string;
-        document_type: string;
-        file_name: string;
-        verification_status: string;
-        uploaded_at: string;
-    }
-
-    interface KYCStatus {
-        application_id: string;
-        loan_status: string;
-        kyc_eligible: boolean;
-        step_1_documents: string;
-        step_1_docs_required: number;
-        step_1_docs_uploaded: number;
-        step_1_docs_verified: number;
-        step_2_bank_details: string;
-        step_3_agreement: string;
-        overall_status: string;
-        can_proceed_to_disbursement: boolean;
-        documents: KYCDocumentItem[];
-    }
-
-    interface BankDetails {
-        id: string;
-        account_holder_name: string;
-        bank_name: string;
-        account_number_masked: string;
-        ifsc_code: string;
-        is_verified: boolean;
-    }
-
-    interface AdminBank {
-        id: string;
-        bank_name: string;
-        account_holder_name: string;
-        account_number: string;
-        ifsc_code: string;
-        branch_name?: string;
-    }
-
-    interface LoanAgreement {
-        id: string;
-        loan_amount: number;
-        interest_rate: number;
-        tenure_months: number;
-        emi_amount: number;
-        processing_fee: number;
-        total_payable: number;
-        agreement_text: string;
-        consent_given: boolean;
-        signed_at: string | null;
-        status: string;
-        agreement_version: string;
-    }
-
+    // KYC workflow
     const [kycStatus, setKycStatus] = useState<KYCStatus | null>(null);
     const [kycLoading, setKycLoading] = useState(false);
     const [kycStep, setKycStep] = useState(1);
     const [kycError, setKycError] = useState('');
     const [kycSuccess, setKycSuccess] = useState('');
     const [documentNumbers, setDocumentNumbers] = useState<{ [key: string]: string }>({});
-    const [previousDocuments, setPreviousDocuments] = useState<any[]>([]);
+    const [previousDocuments, setPreviousDocuments] = useState<ReusableDocument[]>([]);
     const [showPreviousDocs, setShowPreviousDocs] = useState(false);
-    const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
     const [agreement, setAgreement] = useState<LoanAgreement | null>(null);
-    const [bankForm, setBankForm] = useState({
-        account_holder_name: '',
-        bank_name: '',
-        account_number: '',
-        confirm_account_number: '',
-        ifsc_code: '',
-        account_type: 'SAVINGS'
-    });
+    const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
     const [agreementConsent, setAgreementConsent] = useState(false);
-    const [electronicConsent, setElectronicConsent] = useState(false);
     const [signatureText, setSignatureText] = useState<string>("");
     const [signingInProgress, setSigningInProgress] = useState(false);
+    const [adminBanks, setAdminBanks] = useState<AdminBank[]>([]);
+    const [userDocuments, setUserDocuments] = useState<KYCDocumentItem[]>([]);
+    const [userDocumentsLoading, setUserDocumentsLoading] = useState(false);
 
-    interface AccountData {
-        customer_id: string;
-        title: string;
-        first_name: string;
-        middle_name?: string;
-        last_name: string;
-        mobile_number: string;
-        email: string;
-        date_of_birth?: string;
-        gender?: string;
-        kyc_verified: boolean;
-        created_at: string;
-        pan_number?: string;
-        address_line1?: string;
-        address_line2?: string;
-        city?: string;
-        state?: string;
-        pincode?: string;
-        role?: string;
-        terms_consent?: boolean;
-        privacy_consent?: boolean;
-        data_consent?: boolean;
-    }
-
-    // Account & Security State (moved here to comply with Rules of Hooks)
+    // Account & security
     const [accountData, setAccountData] = useState<AccountData | null>(null);
     const [accountLoading, setAccountLoading] = useState(false);
     const [passwordForm, setPasswordForm] = useState({ current: '', new_password: '', confirm: '' });
@@ -421,46 +295,74 @@ export default function Dashboard() {
     const [changeError, setChangeError] = useState('');
     const [changeSuccess, setChangeSuccess] = useState('');
 
-    // PAYMENT GATEWAY STATE - Must be declared at top level
+    // Payment gateway
     const [showPaymentGateway, setShowPaymentGateway] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'netbanking' | 'wallet' | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
     const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'processing' | 'success'>('method');
     const [netBankingStep, setNetBankingStep] = useState<'select' | 'login'>('select');
+    const [paymentData, setPaymentData] = useState(EMPTY_PAYMENT_DATA);
+    const [paymentResult, setPaymentResult] = useState<{ amount: number; reference: string } | null>(null);
 
-    // BANK TRANSACTIONS STATE
-    const [bankTransactions, setBankTransactions] = useState<BankTransactionsResponse | null>(null);
-    const [loadingTransactions, setLoadingTransactions] = useState(false);
-    const [paymentData, setPaymentData] = useState({
-        cardNumber: '',
-        cardName: '',
-        expiryMonth: '',
-        expiryYear: '',
-        cvv: '',
-        upiId: '',
-        bankName: '',
-        bankUserId: '',
-        bankPassword: '',
-        walletType: ''
-    });
+    // Activity, sessions, tickets, notifications
+    const [activityTab, setActivityTab] = useState<"all" | "security" | "loans" | "kyc" | "payments" | "profile" | "sessions">("all");
+    const [activityData, setActivityData] = useState<ActivityData>({ events: [], total_events: 0 });
+    const [activityLoading, setActivityLoading] = useState(false);
+    const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [ticketsLoading, setTicketsLoading] = useState(false);
+    const [showTicketModal, setShowTicketModal] = useState(false);
+    const [ticketForm, setTicketForm] = useState({ subject: '', category: 'General', priority: 'Medium', message: '' });
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [notificationsLoading, setNotificationsLoading] = useState(false);
 
-    // Account & Security Functions (Moved to top level)
+    // =========== DATA LOADING ===========
+    /** GET a list endpoint into state; non-array or failed responses leave an empty list. */
+    const loadList = async <T,>(path: string, setter: (items: T[]) => void, setLoading?: (b: boolean) => void) => {
+        setLoading?.(true);
+        try {
+            const res = await authFetch(path);
+            if (res.ok) setter(asArray<T>(await res.json()));
+        } catch (error) {
+            console.error(`Failed to fetch ${path}:`, error);
+        } finally {
+            setLoading?.(false);
+        }
+    };
+
+    const fetchLoanApplications = () => loadList<LoanApplicationItem>('/loan-applications', setLoanApplications, setLoanApplicationsLoading);
+    const fetchRepayments = () => loadList<RepaymentItem>('/repayments/me', setRepayments, setRepaymentsLoading);
+    const fetchDisbursements = () => loadList<DisbursementItem>('/disbursements/me', setDisbursements);
+    const fetchNotifications = () => loadList<NotificationItem>('/notifications/me', setNotifications, setNotificationsLoading);
+    const fetchTickets = () => loadList<Ticket>('/tickets', setTickets, setTicketsLoading);
+    const fetchAdminBanks = () => loadList<AdminBank>('/admin/bank-details', setAdminBanks);
+
+    /** Documents across all of the user's applications, newest first. */
+    const fetchUserDocuments = async (apps: LoanApplicationItem[]) => {
+        setUserDocumentsLoading(true);
+        try {
+            const lists = await Promise.all(apps.map(async (app) => {
+                const res = await authFetch(`/documents/${app.id}`).catch(() => null);
+                return res && res.ok ? asArray<KYCDocumentItem>(await res.json()) : [];
+            }));
+            setUserDocuments(lists.flat().sort((a, b) => +new Date(b.uploaded_at) - +new Date(a.uploaded_at)));
+        } catch (error) {
+            console.error("Failed to fetch documents:", error);
+        } finally {
+            setUserDocumentsLoading(false);
+        }
+    };
+
     const fetchAccountData = async () => {
         setAccountLoading(true);
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/user/me`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.status === 401) {
+            const res = await authFetch('/user/me');
+            if (res.status === 401) {
                 handleLogout();
                 return;
             }
-
-            if (response.ok) {
-                const data = await response.json();
+            if (res.ok) {
+                const data: AccountData = await res.json();
                 setAccountData(data);
-                // Update profileData with real user info to fix ProfileOverview showing mock data
                 setProfileData(prev => prev ? {
                     ...prev,
                     user: {
@@ -476,257 +378,77 @@ export default function Dashboard() {
             }
         } catch (error) {
             console.error("Failed to fetch account:", error);
-        }
-        setAccountLoading(false);
-    };
-
-    // Fetch loans and disbursements when loans section is active
-    useEffect(() => {
-        if (activeSection === "loans") {
-            fetchLoanApplications();
-            fetchDisbursements();
-        } else if (activeSection === "repayments") {
-            fetchRepayments();
-            fetchLoanApplications();
-        }
-    }, [activeSection]);
-
-    useEffect(() => {
-        if (activeSection === "security") {
-            if (!accountData) fetchAccountData();
-            if (securitySubSection === "security") fetchActivityData("sessions");
-        }
-    }, [activeSection, securitySubSection]);
-
-    const handleChangePassword = async () => {
-        setChangeError('');
-        setChangeSuccess('');
-        if (passwordForm.new_password !== passwordForm.confirm) {
-            setChangeError('New passwords do not match');
-            return;
-        }
-        if (passwordForm.new_password.length < 8) {
-            setChangeError('Password must be at least 8 characters');
-            return;
-        }
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/user/password`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    current_password: passwordForm.current,
-                    new_password: passwordForm.new_password
-                })
-            });
-            if (response.ok) {
-                setChangeSuccess('Password changed successfully!');
-                setPasswordForm({ current: '', new_password: '', confirm: '' });
-            } else {
-                const error = await response.json();
-                setChangeError(error.detail || 'Failed to change password');
-            }
-        } catch (error) {
-            setChangeError('Network error - please try again');
-        }
-    };
-
-    const handleChangePin = async () => {
-        setChangeError('');
-        setChangeSuccess('');
-        if (pinForm.new_pin !== pinForm.confirm) {
-            setChangeError('New PINs do not match');
-            return;
-        }
-        if (!/^\d{6}$/.test(pinForm.new_pin)) {
-            setChangeError('PIN must be exactly 6 digits');
-            return;
-        }
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/user/pin`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    current_pin: pinForm.current,
-                    new_pin: pinForm.new_pin
-                })
-            });
-            if (response.ok) {
-                setChangeSuccess('PIN changed successfully!');
-                setPinForm({ current: '', new_pin: '', confirm: '' });
-            } else {
-                const error = await response.json();
-                setChangeError(error.detail || 'Failed to change PIN');
-            }
-        } catch (error) {
-            setChangeError('Network error - please try again');
-        }
-    };
-
-    // ACTIVITY LOG STATE & FUNCTIONS (Moved to top level)
-    interface ActivityEvent {
-        id: string;
-        category?: string;
-        action?: string;
-        severity?: string;
-        description: string;
-        timestamp: string;
-        device?: string;
-        location?: string;
-        ip_address?: string;
-    }
-
-    interface ActivityData {
-        events: ActivityEvent[];
-        total_events: number;
-    }
-
-    interface SessionItem {
-        id: string;
-        started_at: string;
-        browser: string;
-        os: string;
-        location: string;
-        device_type?: string;
-        is_active: boolean;
-        is_new_device?: boolean;
-        last_activity?: string;
-    }
-
-    // SUPPORT TICKET INTERFACES
-    interface TicketMessage {
-        id: string;
-        sender_type: string;
-        message: string;
-        created_at: string;
-    }
-
-    interface Ticket {
-        id: string;
-        ticket_id: string;
-        subject: string;
-        category: string;
-        priority: string;
-        status: string;
-        created_at: string;
-        messages?: TicketMessage[];
-    }
-
-    const [activityTab, setActivityTab] = useState<"all" | "security" | "loans" | "kyc" | "payments" | "profile" | "sessions">("all");
-    const [activityData, setActivityData] = useState<ActivityData>({ events: [], total_events: 0 });
-    const [activityLoading, setActivityLoading] = useState(false);
-    const [sessions, setSessions] = useState<SessionItem[]>([]);
-
-    // SUPPORT TICKET STATE
-    const [tickets, setTickets] = useState<Ticket[]>([]);
-    const [ticketsLoading, setTicketsLoading] = useState(false);
-    const [showTicketModal, setShowTicketModal] = useState(false);
-    const [ticketForm, setTicketForm] = useState({ subject: '', category: 'General', priority: 'Medium', message: '' });
-
-    // ADMIN BANK STATE
-    const [adminBanks, setAdminBanks] = useState<AdminBank[]>([]);
-    const [loadingAdminBanks, setLoadingAdminBanks] = useState(false);
-
-    // NOTIFICATIONS STATE
-    interface NotificationItem {
-        id: string;
-        type: string;
-        trigger: string;
-        message: string;
-        status: string;
-        sent_at: string;
-    }
-    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-    const [notificationsLoading, setNotificationsLoading] = useState(false);
-
-    const fetchNotifications = async () => {
-        setNotificationsLoading(true);
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/notifications/me`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setNotifications(data);
-            }
-        } catch (error) {
-            console.error("Fetch notifications error:", error);
         } finally {
-            setNotificationsLoading(false);
+            setAccountLoading(false);
         }
     };
 
     const fetchActivityData = async (category: string) => {
         setActivityLoading(true);
         try {
-            const token = localStorage.getItem('access_token');
-            const endpoint = category === "all" ? "/activity" :
-                category === "sessions" ? "/sessions" :
-                    `/activity/${category}`;
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            if (category === "sessions") {
-                setSessions(data.sessions || []);
-            } else {
-                setActivityData(data);
-            }
+            const endpoint = category === "all" ? "/activity" : category === "sessions" ? "/sessions" : `/activity/${category}`;
+            const res = await authFetch(endpoint);
+            const data = res.ok ? await res.json() : {};
+            if (category === "sessions") setSessions(asArray<SessionItem>(data?.sessions));
+            else setActivityData({ events: asArray<ActivityEvent>(data?.events), total_events: num(data?.total_events) });
         } catch (error) {
             console.error("Failed to fetch activity:", error);
+        } finally {
+            setActivityLoading(false);
         }
-        setActivityLoading(false);
     };
 
-    useEffect(() => {
-        if (activeSection === "activity") {
-            fetchActivityData(activityTab);
-        }
-    }, [activeSection, activityTab]);
-
-    // SUPPORT TICKET FUNCTIONS
-    const fetchTickets = async () => {
-        setTicketsLoading(true);
+    const terminateSession = async (sessionId: string) => {
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/tickets`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setTickets(data);
-            }
+            await authFetch(`/sessions/${sessionId}`, { method: 'DELETE' });
+            fetchActivityData("sessions");
         } catch (error) {
-            console.error("Failed to fetch tickets:", error);
+            console.error("Failed to terminate session:", error);
         }
-        setTicketsLoading(false);
     };
 
-    useEffect(() => {
-        if (activeSection === "support") {
-            fetchTickets();
+    // =========== ACCOUNT ACTIONS ===========
+    const submitCredentialChange = async (path: string, body: object, success: string, fallback: string, reset: () => void) => {
+        try {
+            const res = await authFetch(path, { method: 'PUT', body: JSON.stringify(body) });
+            if (res.ok) {
+                setChangeSuccess(success);
+                reset();
+            } else {
+                setChangeError(await errorDetail(res, fallback));
+            }
+        } catch {
+            setChangeError('Network error - please try again');
         }
-    }, [activeSection]);
+    };
+
+    const handleChangePassword = () => {
+        setChangeError('');
+        setChangeSuccess('');
+        if (passwordForm.new_password !== passwordForm.confirm) return setChangeError('New passwords do not match');
+        if (passwordForm.new_password.length < 8) return setChangeError('Password must be at least 8 characters');
+        submitCredentialChange('/user/password',
+            { current_password: passwordForm.current, new_password: passwordForm.new_password },
+            'Password changed successfully!', 'Failed to change password',
+            () => setPasswordForm({ current: '', new_password: '', confirm: '' }));
+    };
+
+    const handleChangePin = () => {
+        setChangeError('');
+        setChangeSuccess('');
+        if (pinForm.new_pin !== pinForm.confirm) return setChangeError('New PINs do not match');
+        if (!/^\d{6}$/.test(pinForm.new_pin)) return setChangeError('PIN must be exactly 6 digits');
+        submitCredentialChange('/user/pin',
+            { current_pin: pinForm.current, new_pin: pinForm.new_pin },
+            'PIN changed successfully!', 'Failed to change PIN',
+            () => setPinForm({ current: '', new_pin: '', confirm: '' }));
+    };
 
     const handleCreateTicket = async () => {
         if (!ticketForm.subject || !ticketForm.message) return;
-
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/tickets`, {
+            const res = await authFetch('/tickets', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     subject: ticketForm.subject,
                     category: ticketForm.category,
@@ -734,8 +456,7 @@ export default function Dashboard() {
                     initial_message: ticketForm.message
                 })
             });
-
-            if (response.ok) {
+            if (res.ok) {
                 setShowTicketModal(false);
                 setTicketForm({ subject: '', category: 'General', priority: 'Medium', message: '' });
                 fetchTickets();
@@ -745,155 +466,252 @@ export default function Dashboard() {
         }
     };
 
-    // KYC API Functions
+    // =========== LOAN APPLICATION ACTIONS ===========
+    const handleViewApplication = (applicationId: string) => {
+        const application = loanApplications.find(app => app.id === applicationId);
+        if (application) {
+            setViewingApplication(application);
+            setShowApplicationModal(true);
+        }
+    };
+
+    const handleRequestDelete = async (applicationId: string) => {
+        if (!confirm('Are you sure you want to request deletion of this application?\n\nAn admin will review your request.')) return;
+        try {
+            const res = await authFetch(`/loan-applications/${applicationId}/request-delete`, {
+                method: 'POST',
+                body: JSON.stringify({ reason: 'User requested deletion' })
+            });
+            if (res.ok) {
+                alert('Delete request submitted successfully!\n\nAn admin will review your request shortly.');
+                fetchLoanApplications();
+            } else {
+                alert(`Failed to submit delete request: ${await errorDetail(res, 'Unknown error')}`);
+            }
+        } catch (error) {
+            console.error("Failed to request delete:", error);
+            alert('Network error - please try again');
+        }
+    };
+
+    const NUMERIC_FIELDS = ['age', 'experience', 'job_tenure', 'monthly_income', 'monthly_debt_payments', 'loan_amount', 'number_of_dependents', 'coapplicant_income', 'cibil_score'];
+
+    const handleLoanFormChange = (field: string, value: string | number) => {
+        if (NUMERIC_FIELDS.includes(field)) {
+            // Block negative values but allow clearing the field
+            if (value.toString().includes('-')) return;
+            const numValue = Number(value);
+            if (value !== '' && !isNaN(numValue) && numValue < 0) return;
+        }
+        setLoanFormData(prev => ({ ...prev, [field]: value }));
+        setFormError('');
+    };
+
+    const handleLoanSubmit = async () => {
+        const f = loanFormData;
+        if (!f.age || parseInt(f.age) < 18) return setFormError('Please enter a valid age (18+)');
+        if (!f.monthly_income || parseFloat(f.monthly_income) <= 0) return setFormError('Please enter your monthly income');
+        if (!f.loan_amount || parseFloat(f.loan_amount) <= 0) return setFormError('Please enter the loan amount');
+        if (!f.cibil_score) return setFormError('Please enter your CIBIL score');
+        const cibilScore = parseInt(f.cibil_score);
+        if (isNaN(cibilScore) || cibilScore < 300 || cibilScore > 900) return setFormError('CIBIL score must be between 300 and 900');
+
+        setIsSubmitting(true);
+        setFormError('');
+        setAdvisorResult(null);
+        setKycStatus(null);
+
+        try {
+            const res = await authFetch('/loan-application', {
+                method: 'POST',
+                body: JSON.stringify({
+                    gender: f.gender,
+                    age: parseInt(f.age),
+                    employment_status: f.employment_status,
+                    education_level: f.education_level,
+                    experience: parseInt(f.experience) || 0,
+                    job_tenure: parseInt(f.job_tenure) || 0,
+                    monthly_income: parseFloat(f.monthly_income),
+                    monthly_debt_payments: parseFloat(f.monthly_debt_payments) || 0,
+                    loan_amount: parseFloat(f.loan_amount),
+                    loan_duration: f.loan_duration,
+                    loan_purpose: f.loan_purpose,
+                    marital_status: f.marital_status,
+                    number_of_dependents: f.number_of_dependents,
+                    home_ownership_status: f.home_ownership_status,
+                    property_area: f.property_area,
+                    coapplicant_income: parseFloat(f.coapplicant_income) || 0,
+                    coapplicant_employment: f.coapplicant_employment || null,
+                    coapplicant_relationship: f.coapplicant_relationship || null,
+                    cibil_score: cibilScore,
+                    previous_loan_defaults: f.previous_loan_defaults
+                })
+            });
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('Session expired. Please log in again.');
+                throw new Error(await errorDetail(res, 'Loan analysis failed'));
+            }
+            const result = await res.json();
+            // Normalise every numeric field so the results page never calls toFixed/toLocaleString on undefined
+            const income = parseFloat(f.monthly_income);
+            const emi = num(result.emi);
+            const durationMonths = Number(f.loan_duration);
+            setAdvisorResult({
+                application_date: result.created_at,
+                application_id: result.id,
+                tracking_id: result.tracking_id,
+                decision: result.decision || 'PENDING_REVIEW',
+                decision_reason: result.decision_reason || '',
+                approval_probability: num(result.approval_probability),
+                credit_score: { min: 0, max: 0, rating: result.credit_rating || '', display: result.credit_score_band || '' },
+                interest_rate: { annual: num(result.interest_rate), monthly: num(result.interest_rate) / 12 },
+                emi: { monthly: emi, total_interest: num(result.total_interest), total_repayment: num(result.total_repayment) },
+                loan_details: { amount: parseFloat(f.loan_amount), duration_months: durationMonths, duration_years: durationMonths / 12 },
+                income_analysis: {
+                    monthly_income: income,
+                    annual_income: income * 12,
+                    debt_to_income_ratio: (parseFloat(f.monthly_debt_payments) || 0) / income * 100,
+                    emi_to_income_ratio: emi / income * 100
+                },
+                coapplicant: { suggested: false, reason: '', provided: parseFloat(f.coapplicant_income) > 0 },
+                explanations: asArray(result.shap_summary),
+                kyc_required: !!result.kyc_required,
+                next_steps: asArray<string>(result.next_steps)
+            });
+            if (result.coapplicant?.suggested && !result.coapplicant?.provided) setShowCoApplicant(true);
+        } catch (error) {
+            setFormError((error as Error).message || 'Unable to analyze loan. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDownloadReport = async (appId: string) => {
+        if (!appId) return;
+        try {
+            const res = await authFetch(`/loan-application/${appId}/report`);
+            if (!res.ok) throw new Error('report failed');
+            downloadBlob(await res.blob(), `Loan_Report_${appId.slice(-6)}.pdf`);
+        } catch (error) {
+            console.error("Error downloading report:", error);
+            alert("Could not generate report. Please try again.");
+        }
+    };
+
+    const handleDownloadAgreement = async (appId: string) => {
+        try {
+            const res = await authFetch(`/kyc/${appId}/agreement/download`);
+            if (!res.ok) throw new Error('Download failed');
+            downloadBlob(await res.blob(), `LoanAgreement_${appId.slice(0, 8)}.pdf`);
+        } catch (err) {
+            console.error("Download error:", err);
+            alert("Failed to download agreement. Please try again.");
+        }
+    };
+
+    const handleGenerateQRCode = async (appId: string) => {
+        if (!appId) return;
+        try {
+            const res = await authFetch(`/loan-application/${appId}/report-qr`);
+            if (!res.ok) throw new Error('qr failed');
+            if (qrCodeUrl) window.URL.revokeObjectURL(qrCodeUrl);
+            setQrCodeUrl(window.URL.createObjectURL(await res.blob()));
+            setShowQrCode(true);
+        } catch (error) {
+            console.error("Error generating QR code:", error);
+            alert("Could not generate QR code. Please try again.");
+        }
+    };
+
+    const resetQrCode = () => {
+        setShowQrCode(false);
+        if (qrCodeUrl) window.URL.revokeObjectURL(qrCodeUrl);
+        setQrCodeUrl(null);
+    };
+
+    // =========== KYC ACTIONS ===========
     const fetchKycStatus = async (appId: string) => {
         setKycLoading(true);
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/status`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
+            const res = await authFetch(`/kyc/${appId}/status`);
+            if (res.ok) {
+                const data: KYCStatus = await res.json();
+                data.documents = asArray<KYCDocumentItem>(data.documents);
                 setKycStatus(data);
-                setKycError(''); // Clear any previous errors
-                // Set current step based on status
+                setKycError('');
                 if (data.step_3_agreement === 'COMPLETED') setKycStep(4);
                 else if (data.step_2_bank_details === 'COMPLETED') setKycStep(3);
                 else if (data.step_1_docs_uploaded >= 2) setKycStep(2);
                 else setKycStep(1);
-            } else if (response.status === 403 || response.status === 404) {
-                const error = await response.json().catch(() => ({ detail: 'Loan application not found or not eligible for KYC' }));
-                setKycStatus(null); // Not eligible
-                setKycError(error.detail || 'This loan application is not eligible for KYC. Please ensure you have an approved loan application.');
-                setAdvisorResult(null); // Reset to start fresh
+            } else if (res.status === 403 || res.status === 404) {
+                setKycStatus(null);
+                setKycError(await errorDetail(res, 'This loan application is not eligible for KYC. Please ensure you have an approved loan application.'));
+                setAdvisorResult(null);
+            } else {
+                // Any other failure must set an error, otherwise the auto-fetch would retry forever
+                setKycStatus(null);
+                setKycError(await errorDetail(res, 'Unable to fetch KYC status. Please try again.'));
             }
         } catch (error) {
             console.error("KYC fetch error:", error);
             setKycError('Unable to fetch KYC status. Please try creating a new loan application.');
             setKycStatus(null);
             setAdvisorResult(null);
+        } finally {
+            setKycLoading(false);
         }
-        setKycLoading(false);
     };
 
-    const uploadDocument = async (appId: string, docType: string, docCategory: string) => {
+    const uploadDocument = async (appId: string, docType: string, docCategory: string, file: File, input?: HTMLInputElement) => {
         setKycError('');
         setKycSuccess('');
-        
-        console.log('Upload started:', { appId, docType, docCategory });
-        
-        // Get the file from input
-        const input = document.getElementById(`file-upload-${docCategory}`) as HTMLInputElement;
-        if (!input || !input.files || input.files.length === 0) {
-            setKycError('Please select a file to upload');
-            console.error('No file selected');
-            return;
-        }
-        
-        const file = input.files[0];
-        console.log('File selected:', file.name, file.type, file.size);
-        
-        // Validate file size (5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            setKycError('File size must be less than 5MB');
-            return;
-        }
-        
-        // Validate file type
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-        if (!allowedTypes.includes(file.type)) {
-            setKycError('File must be PDF, JPG, or PNG');
-            return;
-        }
-        
+        if (file.size > 5 * 1024 * 1024) return setKycError('File size must be less than 5MB');
+        if (!['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) return setKycError('File must be PDF, JPG, or PNG');
+        if (!getToken()) return setKycError('You must be logged in to upload documents');
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', docType);
+        formData.append('document_category', docCategory);
         try {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                setKycError('You must be logged in to upload documents');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('document_type', docType);
-            formData.append('document_category', docCategory);
-            
-            console.log('Sending upload request to:', `${API_BASE_URL}/kyc/${appId}/documents`);
-            
-            const response = await fetch(
-                `${API_BASE_URL}/kyc/${appId}/documents`,
-                {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                }
-            );
-            
-            console.log('Upload response status:', response.status);
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log('Upload success:', result);
+            const res = await authFetch(`/kyc/${appId}/documents`, { method: 'POST', body: formData });
+            if (res.ok) {
+                const result = await res.json();
                 setKycSuccess(`${docCategory} document uploaded successfully! (${result.total_uploaded}/4 documents)`);
                 fetchKycStatus(appId);
-                // Clear the file input
-                input.value = '';
             } else {
-                const error = await response.json();
-                console.error('Upload error:', error);
-                setKycError(error.detail || 'Upload failed');
+                setKycError(await errorDetail(res, 'Upload failed'));
             }
         } catch (error) {
             console.error('Upload exception:', error);
             setKycError('Network error uploading document');
+        } finally {
+            if (input) input.value = '';
         }
     };
 
     const deleteDocument = async (appId: string, documentId: string) => {
-        if (!confirm('Are you sure you want to delete this document?')) {
-            return;
-        }
-
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(
-                `${API_BASE_URL}/kyc/${appId}/documents/${documentId}`,
-                {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
-            );
-
-            if (response.ok) {
+            const res = await authFetch(`/kyc/${appId}/documents/${documentId}`, { method: 'DELETE' });
+            if (res.ok) {
                 setKycSuccess('Document deleted successfully');
                 fetchKycStatus(appId);
             } else {
-                const error = await response.json();
-                setKycError(error.detail || 'Failed to delete document');
+                setKycError(await errorDetail(res, 'Failed to delete document'));
             }
-        } catch (error) {
+        } catch {
             setKycError('Network error deleting document');
         }
     };
 
     const fetchPreviousDocuments = async (excludeApplicationId?: string) => {
         try {
-            const token = localStorage.getItem('access_token');
-            const url = excludeApplicationId 
-                ? `${API_BASE_URL}/kyc/user-verified-documents?exclude_application_id=${excludeApplicationId}`
-                : `${API_BASE_URL}/kyc/user-verified-documents`;
-            
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setPreviousDocuments(data.reusable_documents || []);
-                return data.reusable_documents || [];
+            const query = excludeApplicationId ? `?exclude_application_id=${encodeURIComponent(excludeApplicationId)}` : '';
+            const res = await authFetch(`/kyc/user-verified-documents${query}`);
+            if (res.ok) {
+                const docs = asArray<ReusableDocument>((await res.json())?.reusable_documents);
+                setPreviousDocuments(docs);
+                return docs;
             }
         } catch (error) {
             console.error('Error fetching previous documents:', error);
@@ -903,72 +721,44 @@ export default function Dashboard() {
 
     const linkPreviousDocument = async (appId: string, sourceDocumentId: string) => {
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(
-                `${API_BASE_URL}/kyc/${appId}/link-previous-document`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ source_document_id: sourceDocumentId })
-                }
-            );
-
-            if (response.ok) {
-                const result = await response.json();
+            const res = await authFetch(`/kyc/${appId}/link-previous-document`, {
+                method: 'POST',
+                body: JSON.stringify({ source_document_id: sourceDocumentId })
+            });
+            if (res.ok) {
+                const result = await res.json();
                 setKycSuccess(`${result.document_type} linked successfully! (${result.total_uploaded}/4 documents)`);
                 fetchKycStatus(appId);
                 setShowPreviousDocs(false);
             } else {
-                const error = await response.json();
-                setKycError(error.detail || 'Failed to link document');
+                setKycError(await errorDetail(res, 'Failed to link document'));
             }
-        } catch (error) {
+        } catch {
             setKycError('Network error linking document');
         }
     };
 
     const submitBankDetails = async (appId: string) => {
         setKycError('');
-        if (bankForm.account_number !== bankForm.confirm_account_number) {
-            setKycError('Account numbers do not match');
-            return;
-        }
+        if (bankForm.account_number !== bankForm.confirm_account_number) return setKycError('Account numbers do not match');
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/bank-details`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bankForm)
-            });
-            if (response.ok) {
+            const res = await authFetch(`/kyc/${appId}/bank-details`, { method: 'POST', body: JSON.stringify(bankForm) });
+            if (res.ok) {
                 setKycSuccess('Bank details submitted successfully!');
                 fetchKycStatus(appId);
                 setKycStep(3);
             } else {
-                const error = await response.json();
-                setKycError(error.detail || 'Submission failed');
+                setKycError(await errorDetail(res, 'Submission failed'));
             }
-        } catch (error) {
+        } catch {
             setKycError('Network error submitting bank details');
         }
     };
 
     const fetchAgreement = async (appId: string) => {
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/agreement`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setAgreement(data.agreement);
-            }
+            const res = await authFetch(`/kyc/${appId}/agreement`);
+            if (res.ok) setAgreement((await res.json())?.agreement ?? null);
         } catch (error) {
             console.error("Agreement fetch error:", error);
         }
@@ -976,25 +766,13 @@ export default function Dashboard() {
 
     const signAgreement = async (appId: string) => {
         setKycError('');
-        if (!agreementConsent) {
-            setKycError('You must accept the terms to proceed');
-            return;
-        }
-        if (!signatureText.trim() || signatureText.length < 3) {
-            setKycError('Please enter your full name as digital signature');
-            return;
-        }
-        
+        if (!agreementConsent) return setKycError('You must accept the terms to proceed');
+        if (!signatureText.trim() || signatureText.length < 3) return setKycError('Please enter your full name as digital signature');
+
         setSigningInProgress(true);
-        
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/agreement/sign`, {
+            const res = await authFetch(`/kyc/${appId}/agreement/sign`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     consent_checkbox: true,
                     consent_text_acknowledged: `I, ${signatureText}, have read and agree to all terms and conditions of this loan agreement. Signed on ${new Date().toLocaleString()}.`,
@@ -1002,149 +780,260 @@ export default function Dashboard() {
                     signature_timestamp: new Date().toISOString()
                 })
             });
-            if (response.ok) {
-                setKycSuccess('✓ Agreement signed and authenticated successfully!');
+            if (res.ok) {
+                setKycSuccess('âœ“ Agreement signed and authenticated successfully!');
                 setSignatureText('');
                 setAgreementConsent(false);
                 fetchKycStatus(appId);
                 setKycStep(4);
-                
-                // Show success animation
-                setTimeout(() => {
-                    setKycSuccess('');
-                }, 5000);
+                setTimeout(() => setKycSuccess(''), 5000);
             } else {
-                const error = await response.json();
-                setKycError(error.detail || 'Signing failed');
+                setKycError(await errorDetail(res, 'Signing failed'));
             }
-        } catch (error) {
+        } catch {
             setKycError('Network error signing agreement');
         } finally {
             setSigningInProgress(false);
         }
     };
 
-    const fetchAdminBanks = async () => {
-        setLoadingAdminBanks(true);
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/admin/bank-details`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setAdminBanks(data);
-            }
-        } catch (error) {
-            console.error("Fetch admin banks error:", error);
-        } finally {
-            setLoadingAdminBanks(false);
-        }
-    };
-
     const completeKyc = async (appId: string) => {
         setKycError('');
         try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/kyc/${appId}/complete`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                setKycSuccess('🎉 KYC completed! Disbursement will be processed within 24-48 hours.');
+            const res = await authFetch(`/kyc/${appId}/complete`, { method: 'POST' });
+            if (res.ok) {
+                setKycSuccess('ðŸŽ‰ KYC completed! Disbursement will be processed within 24-48 hours.');
                 fetchKycStatus(appId);
             } else {
-                const error = await response.json();
-                setKycError(error.detail || 'Completion failed');
+                setKycError(await errorDetail(res, 'Completion failed'));
             }
-        } catch (error) {
+        } catch {
             setKycError('Network error completing KYC');
         }
     };
 
-    // Authentication Guard
+    // =========== DERIVED DATA (from real API data) ===========
+    const unpaidRepayments = repayments
+        .filter(r => r.payment_status !== 'PAID')
+        .sort((a, b) => +new Date(a.due_date) - +new Date(b.due_date));
+    const nextDueEmi = unpaidRepayments[0] || null;
+    const activeLoan = loanApplications.find(l => l.decision === 'DISBURSED') || null;
+    const activeLoanUnpaid = activeLoan ? unpaidRepayments.filter(r => r.application_id === activeLoan.id) : [];
+    const activeLoanHasSchedule = !!activeLoan && repayments.some(r => r.application_id === activeLoan.id);
+    const activeLoanOutstanding = activeLoan
+        ? (activeLoanHasSchedule ? activeLoanUnpaid.reduce((sum, r) => sum + num(r.emi_amount), 0) : activeLoan.loan_amount)
+        : 0;
+    const activeLoanNextEmi = activeLoanUnpaid[0] || null;
+    const latestApproved = loanApplications.find(l => l.decision === 'APPROVED') || null;
+
+    // =========== PAYMENT GATEWAY ===========
+    const handlePayNow = () => {
+        if (!nextDueEmi) {
+            alert('No pending EMI to pay.');
+            return;
+        }
+        setShowPaymentGateway(true);
+        setPaymentStep('method');
+        setPaymentMethod(null);
+        setNetBankingStep('select');
+        setPaymentResult(null);
+    };
+
+    const handlePaymentMethodSelect = (method: PaymentMethod) => {
+        setPaymentMethod(method);
+        setPaymentStep('details');
+        if (method === 'netbanking') setNetBankingStep('select');
+    };
+
+    const handleBankSelect = (bank: string) => {
+        setPaymentData(prev => ({ ...prev, bankName: bank }));
+        setNetBankingStep('login');
+    };
+
+    /** Records the EMI payment through the repayments API. Card/bank credentials are never sent. */
+    const processPayment = async () => {
+        if (!nextDueEmi) return;
+        const emi = nextDueEmi;
+        const reference = `PYMT-${Date.now()}`;
+        const methodCode = { card: 'CARD', upi: 'UPI', netbanking: 'NETBANKING', wallet: 'WALLET' }[paymentMethod || 'upi'];
+        setPaymentStep('processing');
+        try {
+            const res = await authFetch('/repayments', {
+                method: 'POST',
+                body: JSON.stringify({
+                    application_id: emi.application_id,
+                    emi_number: emi.emi_number,
+                    amount: emi.emi_amount,
+                    payment_method: methodCode,
+                    payment_reference: reference
+                })
+            });
+            if (!res.ok) {
+                alert(`Payment Failed: ${await errorDetail(res, 'Unknown error')}`);
+                setPaymentStep('details');
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            setPaymentResult({ amount: num(data.amount) || emi.emi_amount, reference: data.payment_reference || reference });
+            setPaymentStep('success');
+            fetchRepayments();
+            fetchLoanApplications();
+        } catch (error) {
+            console.error("Payment error:", error);
+            alert("Payment error occurred.");
+            setPaymentStep('details');
+        }
+    };
+
+    const closePaymentGateway = () => {
+        setShowPaymentGateway(false);
+        setPaymentStep('method');
+        setPaymentMethod(null);
+        setNetBankingStep('select');
+        setPaymentData(EMPTY_PAYMENT_DATA);
+    };
+
+    // =========== EFFECTS ===========
+    // Authentication guard
     useEffect(() => {
         const userId = localStorage.getItem("user_id") || sessionStorage.getItem("user_id");
-        // Also check if we have a customer ID (semantic ID)
         const customerId = localStorage.getItem("customer_id") || sessionStorage.getItem("customer_id");
-
         if (!userId && !customerId) {
             setIsAuthenticated(false);
             navigate("/login", { replace: true });
-        } else {
-            setIsAuthenticated(true);
-            const storedName = localStorage.getItem("first_name") || sessionStorage.getItem("first_name");
-            const enhancedData = {
-                ...mockProfileData,
-                user: {
-                    ...mockProfileData.user,
-                    // Prioritize customer_id (LA...) over user_id (UUID) for display
-                    id: customerId || userId || mockProfileData.user.id,
-                    fullName: storedName ? `${storedName} (Customer)` : mockProfileData.user.fullName,
-                }
-            };
-            setProfileData(enhancedData);
+            return;
         }
+        const storedName = localStorage.getItem("first_name") || sessionStorage.getItem("first_name");
+        setProfileData(buildInitialProfile(customerId || userId || '', storedName || 'Customer'));
+        setIsAuthenticated(true);
     }, [navigate]);
 
-    // Handle responsive sidebar
+    // Responsive sidebar
     useEffect(() => {
         const checkMobile = () => {
-            setIsMobile(window.innerWidth < 1024);
-            if (window.innerWidth < 1024) setSidebarOpen(false);
-            else setSidebarOpen(true);
+            const mobile = window.innerWidth < 1024;
+            setIsMobile(mobile);
+            setSidebarOpen(!mobile);
         };
         checkMobile();
         window.addEventListener("resize", checkMobile);
         return () => window.removeEventListener("resize", checkMobile);
     }, []);
 
-    // Fetch account data on initial load to populate ProfileOverview with real data
+    // Account details populate the profile header everywhere
     useEffect(() => {
-        if (isAuthenticated && !accountData) {
-            fetchAccountData();
-            fetchNotifications();
-        }
+        if (isAuthenticated) fetchAccountData();
     }, [isAuthenticated]);
 
-    // Auto-fetch KYC status when entering KYC section (via 'apply' section with selectedApplicationId)
+    // Single place that loads data for the visible section
     useEffect(() => {
-        const appId = selectedApplicationId || advisorResult?.application_id;
-        if (activeSection === 'apply' && appId && !kycStatus && !kycLoading) {
-            console.log('Auto-fetching KYC status for:', appId);
-            fetchKycStatus(appId);
+        if (!isAuthenticated) return;
+        switch (activeSection) {
+            case "home":
+                fetchNotifications();
+                fetchLoanApplications();
+                fetchRepayments();
+                break;
+            case "loans":
+                fetchLoanApplications();
+                fetchDisbursements();
+                fetchAdminBanks();
+                break;
+            case "repayments":
+                fetchRepayments();
+                fetchLoanApplications();
+                break;
+            case "notifications":
+                fetchNotifications();
+                break;
+            case "documents":
+                fetchLoanApplications();
+                break;
+            case "support":
+                fetchTickets();
+                break;
         }
-    }, [activeSection, selectedApplicationId, advisorResult?.application_id]);
+    }, [activeSection, isAuthenticated]);
+
+    // Documents are listed per application, so reload them when the application list changes
+    useEffect(() => {
+        if (activeSection === "documents") fetchUserDocuments(loanApplications);
+    }, [activeSection, loanApplications]);
+
+    useEffect(() => {
+        if (activeSection === "security" && securitySubSection === "security") fetchActivityData("sessions");
+    }, [activeSection, securitySubSection]);
+
+    useEffect(() => {
+        if (activeSection === "activity") fetchActivityData(activityTab);
+    }, [activeSection, activityTab]);
+
+    // KYC opened from "My Loans": load its status once (errors stop the retry)
+    useEffect(() => {
+        if (activeSection === 'apply' && selectedApplicationId && !kycStatus && !kycLoading && !kycError) {
+            fetchKycStatus(selectedApplicationId);
+        }
+    }, [activeSection, selectedApplicationId, kycStatus, kycLoading, kycError]);
+
+    // Release the QR blob URL when leaving the page
+    useEffect(() => () => {
+        if (qrCodeUrl) window.URL.revokeObjectURL(qrCodeUrl);
+    }, [qrCodeUrl]);
 
     const handleLogout = () => {
-        localStorage.removeItem("user_id");
-        localStorage.removeItem("customer_id");
-        localStorage.removeItem("first_name");
-        sessionStorage.removeItem("user_id");
-        sessionStorage.removeItem("customer_id");
-        sessionStorage.removeItem("first_name");
+        ["user_id", "customer_id", "first_name", "access_token"].forEach((key) => {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+        });
         navigate("/login", { replace: true });
     };
 
     const handleSectionChange = (key: SectionKey) => {
+        // Opening "Apply for Loan" from the menu starts from the form, not a stale KYC screen
+        if (key === 'apply' && selectedApplicationId) {
+            setSelectedApplicationId(null);
+            setKycStatus(null);
+            setKycError('');
+        }
         setActiveSection(key);
-        if (key === 'home') {
-            fetchNotifications();
-        }
-        if (key === 'loans') {
-            fetchLoanApplications();
-            fetchDisbursements();
-            fetchAdminBanks();
-        }
-        if (key === 'repayments') {
-            fetchRepayments();
-            fetchLoanApplications(); // Need loan details for EMI amounts
-        }
         if (isMobile) setSidebarOpen(false);
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+    const openKycFor = (applicationId: string) => {
+        setKycStatus(null);
+        setKycError('');
+        setSelectedApplicationId(applicationId);
+        setActiveSection('apply');
+    };
+
+    const getRealSecurityData = () => {
+        if (sessions.length === 0) return profileData!.security;
+        const sorted = [...sessions].sort((a, b) => +new Date(b.started_at) - +new Date(a.started_at));
+        const latest = sorted[0];
+        return {
+            lastLogin: latest.started_at,
+            lastLoginDevice: { browser: latest.browser || "Unknown", os: latest.os || "Unknown", location: latest.location || "Unknown" },
+            otpLoginEnabled: false,
+            activeSessions: sorted.map((s, index) => ({
+                id: s.id,
+                device: `${s.browser || 'Unknown'} on ${s.os || 'Unknown'}`,
+                location: s.location || "Unknown",
+                lastActive: s.last_activity || s.started_at,
+                isCurrent: index === 0
+            }))
+        };
+    };
+
+    const getRealConsentData = () => {
+        if (!accountData) return profileData!.consents;
+        const acceptedAt = accountData.created_at || new Date().toISOString();
+        return ([
+            [accountData.terms_consent, "terms-1", "v2.1", "Terms of Service", "terms"],
+            [accountData.privacy_consent, "privacy-1", "v1.8", "Privacy Policy", "privacy"],
+            [accountData.data_consent, "credit-1", "v1.0", "Credit Bureau Data Access", "credit_bureau"],
+        ] as const)
+            .filter(([given]) => given)
+            .map(([, id, version, purpose, consentType]) => ({ id, version, purpose, acceptedAt, consentType }));
     };
 
     // Loading state
@@ -1163,7 +1052,33 @@ export default function Dashboard() {
     // =========== SECTION RENDERERS ===========
 
     // HOME SECTION - Main Dashboard
-    const renderHomeSection = () => (
+    const renderHomeSection = () => {
+        // Credit snapshot comes from the latest AI assessment in this session (score band such as "710-760")
+        const scoreMatch = advisorResult?.credit_score.display.match(/\d{3}/g);
+        const creditScore = scoreMatch ? Math.max(...scoreMatch.map(Number)) : null;
+        const maxScore = 900;
+        const creditRating = advisorResult?.credit_score.rating || '';
+        const paidPercent = activeLoan && activeLoan.loan_amount > 0
+            ? Math.min(100, Math.max(0, ((activeLoan.loan_amount - activeLoanOutstanding) / activeLoan.loan_amount) * 100))
+            : 0;
+
+        // Alerts derived from the user's real repayments and applications
+        const today = new Date();
+        const alerts: { id: string; type: 'warning' | 'info' | 'success'; message: string; action?: string; onAction?: () => void }[] = [];
+        unpaidRepayments.forEach((r) => {
+            const days = Math.ceil((+new Date(r.due_date) - +today) / 86400000);
+            if (r.payment_status === 'OVERDUE' || days < 0) {
+                alerts.push({ id: `od-${r.id}`, type: 'warning', message: `EMI #${r.emi_number} is overdue (${formatCurrency(r.emi_amount)})`, action: 'Pay Now', onAction: () => setActiveSection('repayments') });
+            } else if (days <= 7) {
+                alerts.push({ id: `due-${r.id}`, type: 'warning', message: `EMI due in ${days} day${days === 1 ? '' : 's'}`, action: 'Pay Now', onAction: () => setActiveSection('repayments') });
+            }
+        });
+        loanApplications
+            .filter(a => a.decision === 'APPROVED' && a.kyc_status !== 'COMPLETED')
+            .forEach(a => alerts.push({ id: `kyc-${a.id}`, type: 'info', message: `Complete KYC for application ${a.tracking_id || a.id.slice(0, 8)}`, action: 'View', onAction: () => openKycFor(a.id) }));
+        if (accountData?.kyc_verified) alerts.push({ id: 'kyc-verified', type: 'success', message: 'KYC verification complete' });
+
+        return (
         <div className="space-y-6">
             {/* Welcome Banner */}
             <div className="p-6 bg-gradient-to-r from-teal-500/20 to-blue-500/20 rounded-2xl border border-teal-500/30">
@@ -1188,39 +1103,40 @@ export default function Dashboard() {
                             <Wallet className="w-5 h-5 text-teal-400" />
                             Active Loan
                         </h3>
-                        <span className="text-xs text-gray-400">{mockDashboardData.activeLoan.loanId}</span>
+                        {activeLoan && <span className="text-xs text-gray-400">{activeLoan.tracking_id || activeLoan.id.slice(0, 8)}</span>}
                     </div>
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Sanctioned Amount</span>
-                            <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.sanctionedAmount)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Outstanding</span>
-                            <span className="text-yellow-400 font-semibold">{formatCurrency(mockDashboardData.activeLoan.outstandingAmount)}</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full"
-                                style={{ width: `${((mockDashboardData.activeLoan.sanctionedAmount - mockDashboardData.activeLoan.outstandingAmount) / mockDashboardData.activeLoan.sanctionedAmount) * 100}%` }}
-                            />
-                        </div>
-                        <div className="pt-2 border-t border-white/10">
+                    {activeLoan ? (
+                        <div className="space-y-4">
                             <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-gray-400 text-sm">Next EMI</p>
-                                    <p className="text-white font-bold text-lg">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-gray-400 text-sm">Due Date</p>
-                                    <p className="text-teal-400 font-medium flex items-center gap-1">
-                                        <Calendar className="w-4 h-4" />
-                                        {new Date(mockDashboardData.activeLoan.nextEmiDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                    </p>
+                                <span className="text-gray-400">Sanctioned Amount</span>
+                                <span className="text-white font-semibold">{formatCurrency(activeLoan.loan_amount)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-400">Outstanding</span>
+                                <span className="text-yellow-400 font-semibold">{formatCurrency(activeLoanOutstanding)}</span>
+                            </div>
+                            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full" style={{ width: `${paidPercent}%` }} />
+                            </div>
+                            <div className="pt-2 border-t border-white/10">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Next EMI</p>
+                                        <p className="text-white font-bold text-lg">{activeLoanNextEmi ? formatCurrency(activeLoanNextEmi.emi_amount) : '-'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-gray-400 text-sm">Due Date</p>
+                                        <p className="text-teal-400 font-medium flex items-center gap-1">
+                                            <Calendar className="w-4 h-4" />
+                                            {activeLoanNextEmi ? new Date(activeLoanNextEmi.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '-'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <p className="text-gray-400 text-sm">No active loan yet. Disbursed loans will appear here.</p>
+                    )}
                 </div>
 
                 {/* Credit Score Snapshot */}
@@ -1230,47 +1146,51 @@ export default function Dashboard() {
                             <TrendingUp className="w-5 h-5 text-teal-400" />
                             Credit Score
                         </h3>
-                        <span className="text-xs text-gray-400">Updated {mockDashboardData.creditScore.lastUpdated}</span>
+                        {advisorResult?.application_date && (
+                            <span className="text-xs text-gray-400">Updated {new Date(advisorResult.application_date).toLocaleDateString()}</span>
+                        )}
                     </div>
-                    <div className="flex items-center gap-6">
-                        <div className="relative w-28 h-28">
-                            <svg className="w-28 h-28 transform -rotate-90">
-                                <circle cx="56" cy="56" r="48" stroke="#374151" strokeWidth="8" fill="none" />
-                                <circle
-                                    cx="56" cy="56" r="48"
-                                    stroke="url(#scoreGradient)"
-                                    strokeWidth="8"
-                                    fill="none"
-                                    strokeLinecap="round"
-                                    strokeDasharray={`${(mockDashboardData.creditScore.score / mockDashboardData.creditScore.maxScore) * 301} 301`}
-                                />
-                                <defs>
-                                    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#14b8a6" />
-                                        <stop offset="100%" stopColor="#22d3ee" />
-                                    </linearGradient>
-                                </defs>
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-2xl font-bold text-white">{mockDashboardData.creditScore.score}</span>
-                                <span className="text-xs text-gray-400">/ {mockDashboardData.creditScore.maxScore}</span>
+                    {creditScore !== null ? (
+                        <div className="flex items-center gap-6">
+                            <div className="relative w-28 h-28">
+                                <svg className="w-28 h-28 transform -rotate-90">
+                                    <circle cx="56" cy="56" r="48" stroke="#374151" strokeWidth="8" fill="none" />
+                                    <circle
+                                        cx="56" cy="56" r="48"
+                                        stroke="url(#scoreGradient)"
+                                        strokeWidth="8"
+                                        fill="none"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${(creditScore / maxScore) * 301} 301`}
+                                    />
+                                    <defs>
+                                        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#14b8a6" />
+                                            <stop offset="100%" stopColor="#22d3ee" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span className="text-2xl font-bold text-white">{creditScore}</span>
+                                    <span className="text-xs text-gray-400">/ {maxScore}</span>
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${creditRating === 'Good' || creditRating === 'Excellent'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'bg-yellow-500/20 text-yellow-400'
+                                        }`}>
+                                        {creditRating || advisorResult?.credit_score.display}
+                                    </span>
+                                    {(creditRating === 'Good' || creditRating === 'Excellent') && <ArrowUpRight className="w-4 h-4 text-green-400" />}
+                                </div>
+                                <p className="text-gray-400 text-sm">Based on your latest AI loan assessment. Keep maintaining timely payments.</p>
                             </div>
                         </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${mockDashboardData.creditScore.rating === 'Good'
-                                    ? 'bg-green-500/20 text-green-400'
-                                    : 'bg-yellow-500/20 text-yellow-400'
-                                    }`}>
-                                    {mockDashboardData.creditScore.rating}
-                                </span>
-                                {mockDashboardData.creditScore.trend === 'up' && (
-                                    <ArrowUpRight className="w-4 h-4 text-green-400" />
-                                )}
-                            </div>
-                            <p className="text-gray-400 text-sm">Your credit score is in good standing. Keep maintaining timely payments.</p>
-                        </div>
-                    </div>
+                    ) : (
+                        <p className="text-gray-400 text-sm">No credit assessment yet. Run an AI loan analysis to see your credit score band.</p>
+                    )}
                 </div>
 
                 {/* ML Eligibility Status */}
@@ -1283,20 +1203,26 @@ export default function Dashboard() {
                         <span className="px-2 py-1 bg-purple-500/20 rounded text-purple-400 text-xs">ML Powered</span>
                     </div>
                     <div className="space-y-4">
-                        <div>
-                            <p className="text-gray-400 text-sm mb-1">Pre-Approved Amount</p>
-                            <p className="text-3xl font-bold text-white">{formatCurrency(mockDashboardData.eligibility.preApprovedAmount)}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
-                                    style={{ width: `${mockDashboardData.eligibility.confidence}%` }}
-                                />
-                            </div>
-                            <span className="text-purple-400 font-medium">{mockDashboardData.eligibility.confidence}%</span>
-                        </div>
-                        <p className="text-gray-400 text-sm">Confidence score based on your financial profile</p>
+                        {latestApproved ? (
+                            <>
+                                <div>
+                                    <p className="text-gray-400 text-sm mb-1">Pre-Approved Amount</p>
+                                    <p className="text-3xl font-bold text-white">{formatCurrency(latestApproved.loan_amount)}</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
+                                            style={{ width: `${Math.min(100, num(latestApproved.approval_probability))}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-purple-400 font-medium">{num(latestApproved.approval_probability).toFixed(0)}%</span>
+                                </div>
+                                <p className="text-gray-400 text-sm">Confidence score based on your financial profile</p>
+                            </>
+                        ) : (
+                            <p className="text-gray-400 text-sm">No approved application yet. Apply to get an instant AI eligibility decision.</p>
+                        )}
                         <button
                             onClick={() => setActiveSection("apply")}
                             className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-xl text-white font-semibold transition-all flex items-center justify-center gap-2"
@@ -1315,7 +1241,7 @@ export default function Dashboard() {
                         </h3>
                     </div>
                     <div className="space-y-3">
-                        {mockDashboardData.alerts.map((alert) => (
+                        {alerts.map((alert) => (
                             <div
                                 key={alert.id}
                                 className={`p-4 rounded-xl border flex items-center justify-between ${alert.type === 'warning'
@@ -1332,47 +1258,50 @@ export default function Dashboard() {
                                     <span className="text-white text-sm">{alert.message}</span>
                                 </div>
                                 {alert.action && (
-                                    <button className="text-teal-400 text-sm font-medium hover:text-teal-300 transition">
+                                    <button onClick={alert.onAction} className="text-teal-400 text-sm font-medium hover:text-teal-300 transition">
                                         {alert.action}
                                     </button>
                                 )}
                             </div>
                         ))}
                         {/* Real Notifications from Admin */}
-                        {notifications.slice(0, 3).map((notif) => (
-                            <div
-                                key={notif.id}
-                                className={`p-4 rounded-xl border flex items-center justify-between ${notif.trigger.includes('overdue') ? 'bg-red-500/10 border-red-500/30' :
-                                    notif.trigger.includes('due') ? 'bg-yellow-500/10 border-yellow-500/30' :
-                                        notif.trigger.includes('disburs') ? 'bg-green-500/10 border-green-500/30' :
-                                            'bg-blue-500/10 border-blue-500/30'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    {notif.trigger.includes('overdue') && <AlertCircle className="w-5 h-5 text-red-400" />}
-                                    {notif.trigger.includes('due') && !notif.trigger.includes('overdue') && <Clock className="w-5 h-5 text-yellow-400" />}
-                                    {notif.trigger.includes('disburs') && <CheckCircle className="w-5 h-5 text-green-400" />}
-                                    {!notif.trigger.includes('due') && !notif.trigger.includes('disburs') && <Bell className="w-5 h-5 text-blue-400" />}
-                                    <div>
-                                        <span className="text-white text-sm">{notif.message}</span>
-                                        <p className="text-xs text-gray-500">{new Date(notif.sent_at).toLocaleDateString()}</p>
+                        {notifications.slice(0, 3).map((notif) => {
+                            const trigger = notif.trigger || '';
+                            return (
+                                <div
+                                    key={notif.id}
+                                    className={`p-4 rounded-xl border flex items-center justify-between ${trigger.includes('overdue') ? 'bg-red-500/10 border-red-500/30' :
+                                        trigger.includes('due') ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                            trigger.includes('disburs') ? 'bg-green-500/10 border-green-500/30' :
+                                                'bg-blue-500/10 border-blue-500/30'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {trigger.includes('overdue') && <AlertCircle className="w-5 h-5 text-red-400" />}
+                                        {trigger.includes('due') && !trigger.includes('overdue') && <Clock className="w-5 h-5 text-yellow-400" />}
+                                        {trigger.includes('disburs') && <CheckCircle className="w-5 h-5 text-green-400" />}
+                                        {!trigger.includes('due') && !trigger.includes('disburs') && <Bell className="w-5 h-5 text-blue-400" />}
+                                        <div>
+                                            <span className="text-white text-sm">{notif.message}</span>
+                                            <p className="text-xs text-gray-500">{new Date(notif.sent_at).toLocaleDateString()}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
+                        {alerts.length === 0 && notifications.length === 0 && (
+                            <p className="text-gray-400 text-sm">No alerts right now. You're all caught up!</p>
+                        )}
                     </div>
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     // MY LOANS SECTION
     const renderLoansSection = () => {
-        // Trigger fetch when this section is rendered (via useEffect in parent)
-        if (loanApplications.length === 0 && !loanApplicationsLoading) {
-            fetchLoanApplications();
-        }
-
+        // Data is loaded by the section effect; fetching here during render looped forever when the list was empty
         return (
             <div className="space-y-6">
                 <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
@@ -1410,7 +1339,7 @@ export default function Dashboard() {
                                             <td className="py-4 px-4 text-white font-mono text-sm text-center">{app.tracking_id || app.id.slice(0, 8)}</td>
                                             <td className="py-4 px-4 text-white text-center">{app.loan_purpose}</td>
                                             <td className="py-4 px-4 text-white text-right">{formatCurrency(app.loan_amount)}</td>
-                                            <td className="py-4 px-4 text-teal-400 text-center">{app.approval_probability.toFixed(1)}%</td>
+                                            <td className="py-4 px-4 text-teal-400 text-center">{num(app.approval_probability).toFixed(1)}%</td>
                                             <td className="py-4 px-4 text-center">
                                                 <span className={`px-3 py-1 rounded-full text-sm ${app.decision === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
                                                     app.decision === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
@@ -1421,15 +1350,8 @@ export default function Dashboard() {
                                             </td>
                                             <td className="py-4 px-4 text-center">
                                                 {app.decision === 'APPROVED' ? (
-                                                    <span className={`px-3 py-1 rounded-full text-xs inline-block ${
-                                                        app.kyc_status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                                                        app.kyc_status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-400' :
-                                                        app.kyc_status === 'BLOCKED' ? 'bg-red-500/20 text-red-400' :
-                                                        'bg-yellow-500/20 text-yellow-400'
-                                                    }`}>
-                                                        {app.kyc_status === 'COMPLETED' ? 'Completed' :
-                                                         app.kyc_status === 'IN_PROGRESS' ? 'In Progress' :
-                                                         app.kyc_status === 'BLOCKED' ? 'Blocked' : 'Pending'}
+                                                    <span className={`px-3 py-1 rounded-full text-xs inline-block ${kycBadge(app.kyc_status)}`}>
+                                                        {kycLabel(app.kyc_status)}
                                                     </span>
                                                 ) : (
                                                     <span className="text-gray-500 text-xs">N/A</span>
@@ -1440,11 +1362,7 @@ export default function Dashboard() {
                                                 <div className="flex items-center justify-center gap-2 flex-wrap">
                                                     {app.decision === 'APPROVED' && app.kyc_status !== 'COMPLETED' && (
                                                         <button
-                                                            onClick={() => {
-                                                                console.log('Complete KYC clicked for:', app.id);
-                                                                setSelectedApplicationId(app.id);
-                                                                setActiveSection('apply');
-                                                            }}
+                                                            onClick={() => openKycFor(app.id)}
                                                             className="px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg text-sm font-medium transition whitespace-nowrap"
                                                         >
                                                             Complete KYC
@@ -1535,210 +1453,6 @@ export default function Dashboard() {
             </div>
         );
     };
-
-    // Loan form handlers
-    const handleLoanFormChange = (field: string, value: string | number) => {
-        // Validation for non-negative numbers
-        const numericFields = [
-            'age', 'experience', 'job_tenure', 'monthly_income',
-            'monthly_debt_payments', 'loan_amount', 'number_of_dependents',
-            'coapplicant_income', 'cibil_score'
-        ];
-
-        if (numericFields.includes(field)) {
-            // Strictly block negative signs
-            if (value.toString().includes('-')) {
-                return;
-            }
-            const numValue = Number(value);
-            // Allow empty string to let user delete content, but reject negatives
-            if (value !== '' && (!isNaN(numValue) && numValue < 0)) {
-                return;
-            }
-        }
-        setLoanFormData(prev => ({ ...prev, [field]: value }));
-        setFormError('');
-    };
-
-    const handleLoanSubmit = async () => {
-        // Validate required fields
-        if (!loanFormData.age || parseInt(loanFormData.age) < 18) {
-            setFormError('Please enter a valid age (18+)');
-            return;
-        }
-        if (!loanFormData.monthly_income || parseFloat(loanFormData.monthly_income) <= 0) {
-            setFormError('Please enter your monthly income');
-            return;
-        }
-        if (!loanFormData.loan_amount || parseFloat(loanFormData.loan_amount) <= 0) {
-            setFormError('Please enter the loan amount');
-            return;
-        }
-        if (!loanFormData.cibil_score) {
-            setFormError('Please enter your CIBIL score');
-            return;
-        }
-        const cibilScore = parseInt(loanFormData.cibil_score);
-        if (isNaN(cibilScore) || cibilScore < 300 || cibilScore > 900) {
-            setFormError('CIBIL score must be between 300 and 900');
-            return;
-        }
-
-        setIsSubmitting(true);
-        setFormError('');
-        setAdvisorResult(null);
-        setKycStatus(null);
-
-        try {
-            const token = localStorage.getItem('access_token');
-
-            // Call /loan-application which saves to database and returns application_id
-            const response = await fetch(`${API_BASE_URL}/loan-application`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    gender: loanFormData.gender,
-                    age: parseInt(loanFormData.age),
-                    employment_status: loanFormData.employment_status,
-                    education_level: loanFormData.education_level,
-                    experience: parseInt(loanFormData.experience) || 0,
-                    job_tenure: parseInt(loanFormData.job_tenure) || 0,
-                    monthly_income: parseFloat(loanFormData.monthly_income),
-                    monthly_debt_payments: parseFloat(loanFormData.monthly_debt_payments) || 0,
-                    loan_amount: parseFloat(loanFormData.loan_amount),
-                    loan_duration: loanFormData.loan_duration,
-                    loan_purpose: loanFormData.loan_purpose,
-                    marital_status: loanFormData.marital_status,
-                    number_of_dependents: loanFormData.number_of_dependents,
-                    home_ownership_status: loanFormData.home_ownership_status,
-                    property_area: loanFormData.property_area,
-                    coapplicant_income: parseFloat(loanFormData.coapplicant_income) || 0,
-                    coapplicant_employment: loanFormData.coapplicant_employment || null,
-                    coapplicant_relationship: loanFormData.coapplicant_relationship || null,
-                    cibil_score: loanFormData.cibil_score ? parseInt(loanFormData.cibil_score) : null,
-                    previous_loan_defaults: loanFormData.previous_loan_defaults
-                })
-            });
-
-            if (!response.ok) {
-                if (response.status === 401) {
-                    throw new Error('Session expired. Please log in again.');
-                }
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Loan analysis failed');
-            }
-            const result = await response.json();
-
-            // Transform response to match LoanAdvisorResult interface
-            setAdvisorResult({
-                application_date: result.created_at,
-                application_id: result.id,  // Store the application ID for KYC
-                tracking_id: result.tracking_id, // Store tracking ID
-                decision: result.decision,
-                decision_reason: result.decision_reason,
-                approval_probability: result.approval_probability,
-                credit_score: {
-                    min: 0, max: 0,
-                    rating: result.credit_rating,
-                    display: result.credit_score_band
-                },
-                interest_rate: {
-                    annual: result.interest_rate,
-                    monthly: result.interest_rate / 12
-                },
-                emi: {
-                    monthly: result.emi,
-                    total_interest: result.total_interest,
-                    total_repayment: result.total_repayment
-                },
-                loan_details: {
-                    amount: parseFloat(loanFormData.loan_amount),
-                    duration_months: loanFormData.loan_duration,
-                    duration_years: loanFormData.loan_duration / 12
-                },
-                income_analysis: {
-                    monthly_income: parseFloat(loanFormData.monthly_income),
-                    annual_income: parseFloat(loanFormData.monthly_income) * 12,
-                    debt_to_income_ratio: (parseFloat(loanFormData.monthly_debt_payments) || 0) / parseFloat(loanFormData.monthly_income) * 100,
-                    emi_to_income_ratio: result.emi / parseFloat(loanFormData.monthly_income) * 100
-                },
-                coapplicant: {
-                    suggested: false,
-                    reason: '',
-                    provided: parseFloat(loanFormData.coapplicant_income) > 0
-                },
-                explanations: result.shap_summary || [],
-                kyc_required: result.kyc_required,
-                next_steps: result.next_steps || []
-            });
-
-            // Show co-applicant section if suggested
-            if (result.coapplicant?.suggested && !result.coapplicant?.provided) {
-                setShowCoApplicant(true);
-            }
-        } catch (error) {
-            setFormError(error.message || 'Unable to analyze loan. Please try again.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    // Download Report Handler
-    const handleDownloadReport = async (appId: string) => {
-        if (!appId) return;
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/loan-application/${appId}/report`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Loan_Report_${appId.slice(-6)}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                console.error("Failed to download report");
-                alert("Could not generate report. Please try again.");
-            }
-        } catch (error) {
-            console.error("Error downloading report:", error);
-            alert("Error downloading report.");
-        }
-    };
-
-    // Generate QR Code Handler
-    const handleGenerateQRCode = async (appId: string) => {
-        if (!appId) return;
-        try {
-            const token = localStorage.getItem('access_token');
-            const response = await fetch(`${API_BASE_URL}/loan-application/${appId}/report-qr`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                setQrCodeUrl(url);
-                setShowQrCode(true);
-            } else {
-                console.error("Failed to generate QR code");
-                alert("Could not generate QR code. Please try again.");
-            }
-        } catch (error) {
-            console.error("Error generating QR code:", error);
-            alert("Error generating QR code.");
-        }
-    };
-
 
     // APPLY FOR LOAN SECTION - Bank-Grade AI Loan Advisor
 
@@ -2065,8 +1779,10 @@ export default function Dashboard() {
                                             <Legend
                                                 verticalAlign="bottom"
                                                 iconType="circle"
-                                                formatter={(value: string, entry: { payload: { value: number } }) => {
-                                                    const percent = ((entry.payload.value / advisorResult.emi.total_repayment) * 100).toFixed(0);
+                                                formatter={(value: string, entry) => {
+                                                    const slice = num((entry?.payload as { value?: number } | undefined)?.value);
+                                                    const total = advisorResult.emi.total_repayment;
+                                                    const percent = total > 0 ? ((slice / total) * 100).toFixed(0) : '0';
                                                     return <span style={{ color: '#D1D5DB' }}>{value}: {percent}%</span>;
                                                 }}
                                             />
@@ -2231,8 +1947,7 @@ export default function Dashboard() {
                                 setAdvisorResult(null);
                                 setKycStatus(null);
                                 setKycStep(1);
-                                setShowQrCode(false);
-                                setQrCodeUrl(null);
+                                resetQrCode();
                             }}
                             className="flex-1 py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-semibold transition"
                         >
@@ -2294,13 +2009,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => {
-                                        setShowQrCode(false);
-                                        if (qrCodeUrl) {
-                                            window.URL.revokeObjectURL(qrCodeUrl);
-                                            setQrCodeUrl(null);
-                                        }
-                                    }}
+                                    onClick={resetQrCode}
                                     className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition"
                                 >
                                     Hide QR Code
@@ -2347,338 +2056,54 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {/* Personal & Employment Section */}
-                    <div className="mb-6">
-                        <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                            <User className="w-4 h-4" /> Personal & Employment
-                        </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Gender *</label>
-                                <select
-                                    value={loanFormData.gender}
-                                    onChange={(e) => handleLoanFormChange('gender', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Age *</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={loanFormData.age}
-                                    onChange={(e) => handleLoanFormChange('age', e.target.value)}
-                                    onWheel={(e) => e.currentTarget.blur()}
-                                    placeholder="e.g., 30"
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Employment *</label>
-                                <select
-                                    value={loanFormData.employment_status}
-                                    onChange={(e) => handleLoanFormChange('employment_status', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="Employed">Employed</option>
-                                    <option value="Self-Employed">Self-Employed</option>
-                                    <option value="Unemployed">Unemployed</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Education</label>
-                                <select
-                                    value={loanFormData.education_level}
-                                    onChange={(e) => handleLoanFormChange('education_level', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="High School">High School</option>
-                                    <option value="Associate">Associate</option>
-                                    <option value="Bachelor">Bachelor</option>
-                                    <option value="Master">Master</option>
-                                    <option value="PhD">PhD</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Experience (years)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={loanFormData.experience}
-                                    onChange={(e) => handleLoanFormChange('experience', e.target.value)}
-                                    onWheel={(e) => e.currentTarget.blur()}
-                                    placeholder="e.g., 5"
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Job Tenure (years)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={loanFormData.job_tenure}
-                                    onChange={(e) => handleLoanFormChange('job_tenure', e.target.value)}
-                                    onWheel={(e) => e.currentTarget.blur()}
-                                    placeholder="e.g., 3"
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Marital Status</label>
-                                <select
-                                    value={loanFormData.marital_status}
-                                    onChange={(e) => handleLoanFormChange('marital_status', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Divorced">Divorced</option>
-                                    <option value="Widowed">Widowed</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <FormSection icon={User} title="Personal & Employment" grid="grid-cols-2 md:grid-cols-4">
+                        <SelectField label="Gender *" value={loanFormData.gender} onChange={(v) => handleLoanFormChange('gender', v)} options={['Male', 'Female']} />
+                        <NumberField label="Age *" value={loanFormData.age} onChange={(v) => handleLoanFormChange('age', v)} placeholder="e.g., 30" />
+                        <SelectField label="Employment *" value={loanFormData.employment_status} onChange={(v) => handleLoanFormChange('employment_status', v)} options={['Employed', 'Self-Employed', 'Unemployed']} />
+                        <SelectField label="Education" value={loanFormData.education_level} onChange={(v) => handleLoanFormChange('education_level', v)} options={['High School', 'Associate', 'Bachelor', 'Master', 'PhD']} />
+                        <NumberField label="Experience (years)" value={loanFormData.experience} onChange={(v) => handleLoanFormChange('experience', v)} placeholder="e.g., 5" />
+                        <NumberField label="Job Tenure (years)" value={loanFormData.job_tenure} onChange={(v) => handleLoanFormChange('job_tenure', v)} placeholder="e.g., 3" />
+                        <SelectField label="Marital Status" value={loanFormData.marital_status} onChange={(v) => handleLoanFormChange('marital_status', v)} options={['Single', 'Married', 'Divorced', 'Widowed']} />
+                    </FormSection>
 
-                    {/* Financial Section */}
-                    <div className="mb-6">
-                        <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                            <IndianRupee className="w-4 h-4" /> Financial Details
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Monthly Income (₹) *</label>
-                                <div className="relative">
-                                    <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={loanFormData.monthly_income}
-                                        onChange={(e) => handleLoanFormChange('monthly_income', e.target.value)}
-                                        onWheel={(e) => e.currentTarget.blur()}
-                                        placeholder="e.g., 50000"
-                                        style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Monthly Debt Payments (₹)</label>
-                                <div className="relative">
-                                    <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={loanFormData.monthly_debt_payments}
-                                        onChange={(e) => handleLoanFormChange('monthly_debt_payments', e.target.value)}
-                                        onWheel={(e) => e.currentTarget.blur()}
-                                        placeholder="Existing EMIs, loans, etc."
-                                        style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">CIBIL Score *</label>
-                                <div className="relative">
-                                    <TrendingUp className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="number"
-                                        min="300"
-                                        max="900"
-                                        value={loanFormData.cibil_score}
-                                        onChange={(e) => handleLoanFormChange('cibil_score', e.target.value)}
-                                        onWheel={(e) => e.currentTarget.blur()}
-                                        placeholder="e.g., 750 (300-900)"
-                                        style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                    />
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">Enter your CIBIL score (300-900)</p>
-                            </div>
-                        </div>
-                    </div>
+                    <FormSection icon={IndianRupee} title="Financial Details" grid="grid-cols-1 md:grid-cols-3">
+                        <NumberField label="Monthly Income (₹) *" icon={IndianRupee} value={loanFormData.monthly_income} onChange={(v) => handleLoanFormChange('monthly_income', v)} placeholder="e.g., 50000" />
+                        <NumberField label="Monthly Debt Payments (₹)" icon={IndianRupee} value={loanFormData.monthly_debt_payments} onChange={(v) => handleLoanFormChange('monthly_debt_payments', v)} placeholder="Existing EMIs, loans, etc." />
+                        <NumberField label="CIBIL Score *" icon={TrendingUp} min="300" max="900" value={loanFormData.cibil_score} onChange={(v) => handleLoanFormChange('cibil_score', v)} placeholder="e.g., 750 (300-900)" hint="Enter your CIBIL score (300-900)" />
+                    </FormSection>
 
-                    {/* Loan Details Section */}
-                    <div className="mb-6">
-                        <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                            <FileText className="w-4 h-4" /> Loan Details
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Loan Amount (₹) *</label>
-                                <div className="relative">
-                                    <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={loanFormData.loan_amount}
-                                        onChange={(e) => handleLoanFormChange('loan_amount', e.target.value)}
-                                        onWheel={(e) => e.currentTarget.blur()}
-                                        placeholder="e.g., 500000"
-                                        style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Duration</label>
-                                <select
-                                    value={loanFormData.loan_duration}
-                                    onChange={(e) => handleLoanFormChange('loan_duration', parseInt(e.target.value))}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value={12}>1 Year (12 months)</option>
-                                    <option value={24}>2 Years (24 months)</option>
-                                    <option value={36}>3 Years (36 months)</option>
-                                    <option value={60}>5 Years (60 months)</option>
-                                    <option value={84}>7 Years (84 months)</option>
-                                    <option value={120}>10 Years (120 months)</option>
-                                    <option value={180}>15 Years (180 months)</option>
-                                    <option value={240}>20 Years (240 months)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Purpose</label>
-                                <select
-                                    value={loanFormData.loan_purpose}
-                                    onChange={(e) => handleLoanFormChange('loan_purpose', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="PERSONAL">Personal</option>
-                                    <option value="EDUCATION">Education</option>
-                                    <option value="MEDICAL">Medical</option>
-                                    <option value="VENTURE">Business / Venture</option>
-                                    <option value="HOMEIMPROVEMENT">Home Improvement</option>
-                                    <option value="DEBTCONSOLIDATION">Debt Consolidation</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Previous Loan Defaults?</label>
-                                <select
-                                    value={loanFormData.previous_loan_defaults}
-                                    onChange={(e) => handleLoanFormChange('previous_loan_defaults', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="No">No - Never Defaulted</option>
-                                    <option value="Yes">Yes - Has Previous Defaults</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <FormSection icon={FileText} title="Loan Details" grid="grid-cols-1 md:grid-cols-3">
+                        <NumberField label="Loan Amount (₹) *" icon={IndianRupee} value={loanFormData.loan_amount} onChange={(v) => handleLoanFormChange('loan_amount', v)} placeholder="e.g., 500000" />
+                        <SelectField label="Duration" value={loanFormData.loan_duration} onChange={(v) => handleLoanFormChange('loan_duration', parseInt(v))}
+                            options={[[12, '1 Year (12 months)'], [24, '2 Years (24 months)'], [36, '3 Years (36 months)'], [60, '5 Years (60 months)'], [84, '7 Years (84 months)'], [120, '10 Years (120 months)'], [180, '15 Years (180 months)'], [240, '20 Years (240 months)']]} />
+                        <SelectField label="Purpose" value={loanFormData.loan_purpose} onChange={(v) => handleLoanFormChange('loan_purpose', v)}
+                            options={[['PERSONAL', 'Personal'], ['EDUCATION', 'Education'], ['MEDICAL', 'Medical'], ['VENTURE', 'Business / Venture'], ['HOMEIMPROVEMENT', 'Home Improvement'], ['DEBTCONSOLIDATION', 'Debt Consolidation']]} />
+                        <SelectField label="Previous Loan Defaults?" value={loanFormData.previous_loan_defaults} onChange={(v) => handleLoanFormChange('previous_loan_defaults', v)}
+                            options={[['No', 'No - Never Defaulted'], ['Yes', 'Yes - Has Previous Defaults']]} />
+                    </FormSection>
 
-                    {/* Household Section */}
-                    <div className="mb-6">
-                        <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                            <Home className="w-4 h-4" /> Household
-                        </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Dependents</label>
-                                <select
-                                    value={loanFormData.number_of_dependents}
-                                    onChange={(e) => handleLoanFormChange('number_of_dependents', parseInt(e.target.value))}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    {[0, 1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Home Ownership</label>
-                                <select
-                                    value={loanFormData.home_ownership_status}
-                                    onChange={(e) => handleLoanFormChange('home_ownership_status', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="Rent">Rent</option>
-                                    <option value="Own">Own</option>
-                                    <option value="Mortgage">Mortgage</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-300 mb-2 text-sm">Property Area *</label>
-                                <select
-                                    value={loanFormData.property_area}
-                                    onChange={(e) => handleLoanFormChange('property_area', e.target.value)}
-                                    style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                >
-                                    <option value="Urban">Urban</option>
-                                    <option value="Semi-Urban">Semi-Urban</option>
-                                    <option value="Rural">Rural</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <FormSection icon={Home} title="Household" grid="grid-cols-2 md:grid-cols-3">
+                        <SelectField label="Dependents" value={loanFormData.number_of_dependents} onChange={(v) => handleLoanFormChange('number_of_dependents', parseInt(v))}
+                            options={[0, 1, 2, 3, 4, 5].map((n): Option => [n, String(n)])} />
+                        <SelectField label="Home Ownership" value={loanFormData.home_ownership_status} onChange={(v) => handleLoanFormChange('home_ownership_status', v)} options={['Rent', 'Own', 'Mortgage', 'Other']} />
+                        <SelectField label="Property Area *" value={loanFormData.property_area} onChange={(v) => handleLoanFormChange('property_area', v)} options={['Urban', 'Semi-Urban', 'Rural']} />
+                    </FormSection>
 
                     {/* Co-Applicant Section (Conditional) */}
-                    {
-                        showCoApplicant && (
-                            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                                <h4 className="text-yellow-400 font-medium mb-4 flex items-center gap-2">
-                                    <User className="w-4 h-4" /> Co-Applicant Details (Optional)
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-gray-300 mb-2 text-sm">Relationship</label>
-                                        <select
-                                            value={loanFormData.coapplicant_relationship}
-                                            onChange={(e) => handleLoanFormChange('coapplicant_relationship', e.target.value)}
-                                            style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                            className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                        >
-                                            <option value="">Select...</option>
-                                            <option value="Spouse">Spouse</option>
-                                            <option value="Parent">Parent</option>
-                                            <option value="Sibling">Sibling</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-300 mb-2 text-sm">Employment</label>
-                                        <select
-                                            value={loanFormData.coapplicant_employment}
-                                            onChange={(e) => handleLoanFormChange('coapplicant_employment', e.target.value)}
-                                            style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                            className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white"
-                                        >
-                                            <option value="">Select...</option>
-                                            <option value="Employed">Employed</option>
-                                            <option value="Self-Employed">Self-Employed</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-300 mb-2 text-sm">Monthly Income (₹)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={loanFormData.coapplicant_income}
-                                            onChange={(e) => handleLoanFormChange('coapplicant_income', e.target.value)}
-                                            onWheel={(e) => e.currentTarget.blur()}
-                                            placeholder="e.g., 30000"
-                                            style={{ color: '#ffffff', backgroundColor: '#1f2937' }}
-                                            className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400"
-                                        />
-                                    </div>
-                                </div>
+                    {showCoApplicant && (
+                        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                            <h4 className="text-yellow-400 font-medium mb-4 flex items-center gap-2">
+                                <User className="w-4 h-4" /> Co-Applicant Details (Optional)
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <SelectField label="Relationship" value={loanFormData.coapplicant_relationship} onChange={(v) => handleLoanFormChange('coapplicant_relationship', v)}
+                                    options={[['', 'Select...'], 'Spouse', 'Parent', 'Sibling', 'Other']} />
+                                <SelectField label="Employment" value={loanFormData.coapplicant_employment} onChange={(v) => handleLoanFormChange('coapplicant_employment', v)}
+                                    options={[['', 'Select...'], 'Employed', 'Self-Employed']} />
+                                <NumberField label="Monthly Income (₹)" value={loanFormData.coapplicant_income} onChange={(v) => handleLoanFormChange('coapplicant_income', v)} placeholder="e.g., 30000" />
                             </div>
-                        )
-                    }
+                        </div>
+                    )}
 
                     {/* What We Don't Ask */}
                     <div className="p-4 bg-gray-800 border-2 border-teal-500 rounded-xl mb-6">
@@ -2715,12 +2140,7 @@ export default function Dashboard() {
     const renderKYCSection = (applicationId: string) => {
         if (!applicationId) return null;
 
-        // Auto-fetch KYC status if not already loaded
-        if (!kycStatus && !kycLoading && !kycError) {
-            fetchKycStatus(applicationId);
-        }
-
-        // Show loading state
+        // Show loading state (status is fetched by an effect, never during render)
         if (kycLoading && !kycStatus) {
             return (
                 <div className="mt-8 p-6 bg-gray-900 rounded-2xl border border-green-500/30">
@@ -2777,7 +2197,14 @@ export default function Dashboard() {
             <div className="mt-8 p-6 bg-gray-900 rounded-2xl border border-green-500/30">
                 {/* Back Button */}
                 <button
-                    onClick={() => setKycStatus(null)}
+                    onClick={() => {
+                        setKycStatus(null);
+                        // Opened from "My Loans": go back there instead of re-opening the same KYC screen
+                        if (selectedApplicationId) {
+                            setSelectedApplicationId(null);
+                            setActiveSection('loans');
+                        }
+                    }}
                     className="flex items-center gap-2 text-gray-400 hover:text-white transition mb-6"
                 >
                     <ChevronRight className="w-4 h-4 rotate-180" />
@@ -2914,7 +2341,7 @@ export default function Dashboard() {
                                 { label: "PAN Card", type: "ID_PROOF", code: "PAN", icon: FileText, desc: "Identity - Can reuse from previous application", reusable: true },
                                 { label: "Bank Statement", type: "ADDRESS_PROOF", code: "BANK_STATEMENT", icon: CreditCard, desc: "⚠️ REQUIRED FRESH - Last 3-6 months", reusable: false },
                                 { label: "Passport (Optional)", type: "ADDRESS_PROOF", code: "PASSPORT", icon: Shield, desc: "Additional identity proof", reusable: true }
-                            ].map((doc, idx) => {
+                            ].map((doc) => {
                                 const Icon = doc.icon;
                                 const isUploaded = kycStatus?.documents.some(d => d.document_type.includes(doc.code));
 
@@ -2981,9 +2408,8 @@ export default function Dashboard() {
                                             className="hidden"
                                             accept=".pdf,.jpg,.jpeg,.png"
                                             onChange={(e) => {
-                                                if (e.target.files && e.target.files[0]) {
-                                                    uploadDocument(applicationId, doc.type, e.target.files[0], documentNumbers[doc.code]);
-                                                }
+                                                const file = e.target.files?.[0];
+                                                if (file) uploadDocument(applicationId, doc.type, doc.code, file, e.target);
                                             }}
                                         />
                                     </div>
@@ -3015,6 +2441,7 @@ export default function Dashboard() {
                                         const docTypeInfo = [
                                             { label: "Aadhaar Card", type: "ADDRESS_PROOF", code: "AADHAAR" },
                                             { label: "PAN Card", type: "ID_PROOF", code: "PAN" },
+                                            { label: "Bank Statement", type: "ADDRESS_PROOF", code: "BANK_STATEMENT" },
                                             { label: "Passport", type: "ADDRESS_PROOF", code: "PASSPORT" },
                                             { label: "Driving License", type: "ID_PROOF", code: "DRIVING_LICENSE" }
                                         ].find(d => doc.document_type.includes(d.code));
@@ -3047,9 +2474,8 @@ export default function Dashboard() {
                                                         className="hidden"
                                                         accept=".pdf,.jpg,.jpeg,.png"
                                                         onChange={(e) => {
-                                                            if (e.target.files && e.target.files[0] && docTypeInfo) {
-                                                                uploadDocument(applicationId, docTypeInfo.type, docTypeInfo.code);
-                                                            }
+                                                            const file = e.target.files?.[0];
+                                                            if (file && docTypeInfo) uploadDocument(applicationId, docTypeInfo.type, docTypeInfo.code, file, e.target);
                                                         }}
                                                     />
                                                     {/* Delete Button */}
@@ -3097,57 +2523,19 @@ export default function Dashboard() {
                             Step 2: Bank Account for Disbursement
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Account Holder Name</label>
-                                <input
-                                    type="text"
-                                    value={bankForm.account_holder_name}
-                                    onChange={(e) => setBankForm({ ...bankForm, account_holder_name: e.target.value })}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white"
-                                    placeholder="As per bank records"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Bank Name</label>
-                                <input
-                                    type="text"
-                                    value={bankForm.bank_name}
-                                    onChange={(e) => setBankForm({ ...bankForm, bank_name: e.target.value })}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white"
-                                    placeholder="e.g., State Bank of India"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Account Number</label>
-                                <input
-                                    type="text"
-                                    value={bankForm.account_number}
-                                    onChange={(e) => setBankForm({ ...bankForm, account_number: e.target.value.replace(/\D/g, '') })}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white"
-                                    placeholder="9-18 digit account number"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Confirm Account Number</label>
-                                <input
-                                    type="text"
-                                    value={bankForm.confirm_account_number}
-                                    onChange={(e) => setBankForm({ ...bankForm, confirm_account_number: e.target.value.replace(/\D/g, '') })}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white"
-                                    placeholder="Re-enter account number"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">IFSC Code</label>
-                                <input
-                                    type="text"
-                                    value={bankForm.ifsc_code}
-                                    onChange={(e) => setBankForm({ ...bankForm, ifsc_code: e.target.value.toUpperCase() })}
-                                    className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white"
-                                    placeholder="e.g., ABCD0123456"
-                                    maxLength={11}
-                                />
-                            </div>
+                            {([
+                                ['account_holder_name', 'Account Holder Name', 'As per bank records', (v: string) => v],
+                                ['bank_name', 'Bank Name', 'e.g., State Bank of India', (v: string) => v],
+                                ['account_number', 'Account Number', '9-18 digit account number', (v: string) => v.replace(/\D/g, '')],
+                                ['confirm_account_number', 'Confirm Account Number', 'Re-enter account number', (v: string) => v.replace(/\D/g, '')],
+                                ['ifsc_code', 'IFSC Code', 'e.g., ABCD0123456', (v: string) => v.toUpperCase()],
+                            ] as const).map(([key, label, placeholder, clean]) => (
+                                <TextField key={key} label={label} type="text" placeholder={placeholder}
+                                    maxLength={key === 'ifsc_code' ? 11 : undefined}
+                                    value={bankForm[key]}
+                                    onChange={(e) => setBankForm({ ...bankForm, [key]: clean(e.target.value) })}
+                                    className="w-full px-4 py-3 bg-gray-800 border border-white/20 rounded-xl text-white" />
+                            ))}
                             <div>
                                 <label className="block text-gray-400 text-sm mb-2">Account Type</label>
                                 <select
@@ -3442,26 +2830,7 @@ export default function Dashboard() {
                                                         )}
                                                     </button>
                                                     <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-                                                                const response = await fetch(`${API_BASE_URL}/kyc/${applicationId}/agreement/download`, {
-                                                                    headers: { 'Authorization': `Bearer ${token}` }
-                                                                });
-                                                                if (!response.ok) throw new Error('Download failed');
-                                                                const blob = await response.blob();
-                                                                const url = window.URL.createObjectURL(blob);
-                                                                const a = document.createElement('a');
-                                                                a.href = url;
-                                                                a.download = `LoanAgreement_${applicationId.slice(0, 8)}.pdf`;
-                                                                document.body.appendChild(a);
-                                                                a.click();
-                                                                window.URL.revokeObjectURL(url);
-                                                            } catch (err) {
-                                                                console.error("Download error:", err);
-                                                                alert("Failed to download agreement. Please try again.");
-                                                            }
-                                                        }}
+                                                        onClick={() => handleDownloadAgreement(applicationId)}
                                                         className="px-6 bg-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all border border-white/10 group"
                                                         title="Download Official Agreement"
                                                     >
@@ -3633,64 +3002,14 @@ export default function Dashboard() {
 
 
 
-    // PAYMENT GATEWAY HANDLERS
-    const handlePayNow = () => {
-        setShowPaymentGateway(true);
-        setPaymentStep('method');
-        setPaymentMethod(null);
-        setNetBankingStep('select');
-    };
-
-    const handlePaymentMethodSelect = (method: typeof paymentMethod) => {
-        setPaymentMethod(method);
-        setPaymentStep('details');
-        if (method === 'netbanking') {
-            setNetBankingStep('select');
-        }
-    };
-
-    const handleBankSelect = (bank: string) => {
-        setPaymentData({ ...paymentData, bankName: bank });
-        setNetBankingStep('login');
-    };
-
-    const processPayment = () => {
-        setPaymentStep('processing');
-        setTimeout(() => {
-            setPaymentStep('success');
-        }, 3000);
-    };
-
-    const closePaymentGateway = () => {
-        setShowPaymentGateway(false);
-        setPaymentStep('method');
-        setPaymentMethod(null);
-        setNetBankingStep('select');
-        setPaymentData({
-            cardNumber: '',
-            cardName: '',
-            expiryMonth: '',
-            expiryYear: '',
-            cvv: '',
-            upiId: '',
-            bankName: '',
-            bankUserId: '',
-            bankPassword: '',
-            walletType: ''
-        });
-    };
-
     // REPAYMENTS SECTION
     const renderRepaymentsSection = () => {
-        // Calculate stats from real data
-        const totalPaidEmis = repayments.filter(r => r.payment_status === 'PAID').length;
-        const nextEmi = repayments.find(r => r.payment_status === 'PENDING') || repayments[0]; // Simple logic for now
-        const nextEmiDate = nextEmi ? new Date(nextEmi.due_date) : new Date();
-        const nextEmiAmount = nextEmi ? nextEmi.emi_amount : 0;
-
-        // Derive interest rate from active loan (if available) or fallback
-        const activeLoan = loanApplications.find(l => l.status === 'APPROVED' || l.status === 'DISBURSED');
-        const interestRate = activeLoan?.interest_rate || 0;
+        const totalPaidEmis = repayments.length - unpaidRepayments.length;
+        const nextEmiAmount = nextDueEmi?.emi_amount ?? 0;
+        const payableAmount = paymentResult?.amount ?? nextEmiAmount;
+        const loanForRate = (nextDueEmi && loanApplications.find(l => l.id === nextDueEmi.application_id))
+            || loanApplications.find(l => l.status === 'APPROVED' || l.status === 'DISBURSED');
+        const interestRate = loanForRate?.interest_rate || 0;
 
         return (
             <div className="space-y-6">
@@ -3711,7 +3030,7 @@ export default function Dashboard() {
                                     <p className="text-2xl font-bold text-white mt-1">{formatCurrency(nextEmiAmount)}</p>
                                     <p className="text-yellow-400 text-sm mt-1 flex items-center gap-1">
                                         <Calendar className="w-4 h-4" />
-                                        {nextEmiDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        {nextDueEmi ? new Date(nextDueEmi.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'All EMIs paid'}
                                     </p>
                                 </div>
                                 <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
@@ -3761,124 +3080,12 @@ export default function Dashboard() {
 
                             <button
                                 onClick={handlePayNow}
-                                className="w-full mt-6 py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
+                                disabled={!nextDueEmi}
+                                className="w-full mt-6 py-3 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold transition"
                             >
                                 Pay Now
                             </button>
                         </>
-                    )}
-                </div>
-
-                {/* BANK TRANSACTIONS SECTION */}
-                <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-white">Bank Transactions</h3>
-                        <button
-                            onClick={async () => {
-                                setLoadingTransactions(true);
-                                try {
-                                    const data = await getMockBankTransactions();
-                                    setBankTransactions(data);
-                                } catch (error) {
-                                    console.error('Failed to load transactions:', error);
-                                } finally {
-                                    setLoadingTransactions(false);
-                                }
-                            }}
-                            className="px-4 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg text-sm font-medium transition"
-                        >
-                            {loadingTransactions ? 'Loading...' : bankTransactions ? 'Refresh' : 'Load Transactions'}
-                        </button>
-                    </div>
-
-                    {bankTransactions ? (
-                        <div className="space-y-4">
-                            {/* Account Info */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-900/50 rounded-xl">
-                                <div>
-                                    <p className="text-gray-500 text-xs">Account Holder</p>
-                                    <p className="text-white font-medium">{bankTransactions.account_holder}</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 text-xs">Account</p>
-                                    <p className="text-white font-medium">{bankTransactions.account_number}</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 text-xs">Bank</p>
-                                    <p className="text-white font-medium">{bankTransactions.bank_name}</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 text-xs">IFSC</p>
-                                    <p className="text-white font-medium">{bankTransactions.ifsc}</p>
-                                </div>
-                            </div>
-
-                            {/* Summary */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                                    <p className="text-gray-400 text-xs">Total Credits</p>
-                                    <p className="text-green-400 font-bold">₹{bankTransactions.summary.total_credits.toLocaleString()}</p>
-                                </div>
-                                <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                                    <p className="text-gray-400 text-xs">Total Debits</p>
-                                    <p className="text-red-400 font-bold">₹{bankTransactions.summary.total_debits.toLocaleString()}</p>
-                                </div>
-                                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                                    <p className="text-gray-400 text-xs">Opening Balance</p>
-                                    <p className="text-blue-400 font-bold">₹{bankTransactions.summary.opening_balance.toLocaleString()}</p>
-                                </div>
-                                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                                    <p className="text-gray-400 text-xs">Closing Balance</p>
-                                    <p className="text-purple-400 font-bold">₹{bankTransactions.summary.closing_balance.toLocaleString()}</p>
-                                </div>
-                                <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                                    <p className="text-gray-400 text-xs">Avg Balance</p>
-                                    <p className="text-amber-400 font-bold">₹{bankTransactions.summary.average_balance.toLocaleString()}</p>
-                                </div>
-                            </div>
-
-                            {/* Transactions Table */}
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-700">
-                                            <th className="text-left py-3 px-2 text-gray-400 font-medium">Date</th>
-                                            <th className="text-left py-3 px-2 text-gray-400 font-medium">Description</th>
-                                            <th className="text-left py-3 px-2 text-gray-400 font-medium">Mode</th>
-                                            <th className="text-right py-3 px-2 text-gray-400 font-medium">Amount</th>
-                                            <th className="text-right py-3 px-2 text-gray-400 font-medium">Balance</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {bankTransactions.transactions.slice(0, 10).map((txn) => (
-                                            <tr key={txn.id} className="border-b border-gray-800 hover:bg-gray-700/30">
-                                                <td className="py-3 px-2 text-gray-300">{new Date(txn.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
-                                                <td className="py-3 px-2">
-                                                    <p className="text-white text-xs truncate max-w-[200px]">{txn.description}</p>
-                                                    <p className="text-gray-500 text-[10px]">{txn.category}</p>
-                                                </td>
-                                                <td className="py-3 px-2">
-                                                    <span className="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-gray-300">{txn.mode}</span>
-                                                </td>
-                                                <td className={`py-3 px-2 text-right font-medium ${txn.type === 'CREDIT' ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {txn.type === 'CREDIT' ? '+' : '-'}₹{txn.amount.toLocaleString()}
-                                                </td>
-                                                <td className="py-3 px-2 text-right text-gray-300">₹{txn.balance.toLocaleString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {bankTransactions.transactions.length > 10 && (
-                                <p className="text-gray-500 text-xs text-center">Showing 10 of {bankTransactions.transactions.length} transactions</p>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <Wallet className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                            <p className="text-gray-400">Click "Load Transactions" to view your bank statement</p>
-                            <p className="text-gray-500 text-xs mt-1">Simulates Account Aggregator data fetch</p>
-                        </div>
                     )}
                 </div>
 
@@ -3890,7 +3097,7 @@ export default function Dashboard() {
                             <div className="p-6 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-900">
                                 <div>
                                     <h2 className="text-2xl font-bold text-white">Secure Payment Gateway</h2>
-                                    <p className="text-gray-400 text-sm">Amount: {formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</p>
+                                    <p className="text-gray-400 text-sm">Amount: {formatCurrency(payableAmount)}</p>
                                 </div>
                                 <button onClick={closePaymentGateway} className="text-gray-400 hover:text-white">
                                     <X className="w-6 h-6" />
@@ -3902,68 +3109,28 @@ export default function Dashboard() {
                                 {paymentStep === 'method' && (
                                     <div className="space-y-4">
                                         <h3 className="text-lg font-semibold text-white mb-4">Choose Payment Method</h3>
-
-                                        {/* Credit/Debit Card */}
-                                        <button
-                                            onClick={() => handlePaymentMethodSelect('card')}
-                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                        >
-                                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                                <CreditCard className="w-6 h-6 text-white" />
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <p className="text-white font-semibold">Credit / Debit Card</p>
-                                                <p className="text-gray-400 text-sm">Visa, Mastercard, RuPay, Amex</p>
-                                            </div>
-                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                        </button>
-
-                                        {/* UPI */}
-                                        <button
-                                            onClick={() => handlePaymentMethodSelect('upi')}
-                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                        >
-                                            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                                                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
-                                                </svg>
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <p className="text-white font-semibold">UPI</p>
-                                                <p className="text-gray-400 text-sm">Google Pay, PhonePe, Paytm, BHIM</p>
-                                            </div>
-                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                        </button>
-
-                                        {/* Net Banking */}
-                                        <button
-                                            onClick={() => handlePaymentMethodSelect('netbanking')}
-                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                        >
-                                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center">
-                                                <Wallet className="w-6 h-6 text-white" />
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <p className="text-white font-semibold">Net Banking</p>
-                                                <p className="text-gray-400 text-sm">All major banks supported</p>
-                                            </div>
-                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                        </button>
-
-                                        {/* Wallets */}
-                                        <button
-                                            onClick={() => handlePaymentMethodSelect('wallet')}
-                                            className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
-                                        >
-                                            <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
-                                                <Sparkles className="w-6 h-6 text-white" />
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <p className="text-white font-semibold">Digital Wallets</p>
-                                                <p className="text-gray-400 text-sm">Paytm, Amazon Pay, PhonePe</p>
-                                            </div>
-                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
-                                        </button>
+                                        {([
+                                            ['card', 'Credit / Debit Card', 'Visa, Mastercard, RuPay, Amex', 'from-blue-500 to-purple-600', <CreditCard className="w-6 h-6 text-white" />],
+                                            ['upi', 'UPI', 'Google Pay, PhonePe, Paytm, BHIM', 'from-orange-500 to-red-600',
+                                                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" /></svg>],
+                                            ['netbanking', 'Net Banking', 'All major banks supported', 'from-green-500 to-teal-600', <Wallet className="w-6 h-6 text-white" />],
+                                            ['wallet', 'Digital Wallets', 'Paytm, Amazon Pay, PhonePe', 'from-pink-500 to-rose-600', <Sparkles className="w-6 h-6 text-white" />],
+                                        ] as const).map(([method, title, subtitle, gradient, icon]) => (
+                                            <button
+                                                key={method}
+                                                onClick={() => handlePaymentMethodSelect(method)}
+                                                className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-teal-500 rounded-xl flex items-center gap-4 transition group"
+                                            >
+                                                <div className={`w-12 h-12 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center`}>
+                                                    {icon}
+                                                </div>
+                                                <div className="flex-1 text-left">
+                                                    <p className="text-white font-semibold">{title}</p>
+                                                    <p className="text-gray-400 text-sm">{subtitle}</p>
+                                                </div>
+                                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-400" />
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
 
@@ -3976,67 +3143,30 @@ export default function Dashboard() {
                                         <h3 className="text-lg font-semibold text-white mb-4">Enter Card Details</h3>
 
                                         <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Card Number</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="1234 5678 9012 3456"
-                                                    maxLength={19}
-                                                    value={paymentData.cardNumber}
-                                                    onChange={(e) => setPaymentData({ ...paymentData, cardNumber: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Cardholder Name</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="JOHN DOE"
-                                                    value={paymentData.cardName}
-                                                    onChange={(e) => setPaymentData({ ...paymentData, cardName: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Month</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="MM"
-                                                        maxLength={2}
-                                                        value={paymentData.expiryMonth}
-                                                        onChange={(e) => setPaymentData({ ...paymentData, expiryMonth: e.target.value })}
-                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Year</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="YY"
-                                                        maxLength={2}
-                                                        value={paymentData.expiryYear}
-                                                        onChange={(e) => setPaymentData({ ...paymentData, expiryYear: e.target.value })}
-                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">CVV</label>
-                                                    <input
-                                                        type="password"
-                                                        placeholder="123"
-                                                        maxLength={3}
-                                                        value={paymentData.cvv}
-                                                        onChange={(e) => setPaymentData({ ...paymentData, cvv: e.target.value })}
-                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500"
-                                                    />
-                                                </div>
-                                            </div>
+                                            {(() => {
+                                                const label = "block text-sm font-medium text-gray-300 mb-2";
+                                                const input = "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-teal-500";
+                                                const field = (key: keyof typeof paymentData, text: string, placeholder: string, maxLength?: number, type = "text") => (
+                                                    <TextField key={key} label={text} labelClass={label} className={input} type={type} placeholder={placeholder} maxLength={maxLength}
+                                                        value={paymentData[key]} onChange={(e) => setPaymentData({ ...paymentData, [key]: e.target.value })} />
+                                                );
+                                                return (
+                                                    <>
+                                                        {field('cardNumber', 'Card Number', '1234 5678 9012 3456', 19)}
+                                                        {field('cardName', 'Cardholder Name', 'JOHN DOE')}
+                                                        <div className="grid grid-cols-3 gap-4">
+                                                            {field('expiryMonth', 'Month', 'MM', 2)}
+                                                            {field('expiryYear', 'Year', 'YY', 2)}
+                                                            {field('cvv', 'CVV', '123', 3, 'password')}
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                             <button
                                                 onClick={processPayment}
                                                 className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition mt-6"
                                             >
-                                                Pay {formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}
+                                                Pay {formatCurrency(payableAmount)}
                                             </button>
                                         </div>
                                     </div>
@@ -4157,7 +3287,7 @@ export default function Dashboard() {
                                                             <div>
                                                                 <p className="text-yellow-400 text-sm font-medium mb-1">Security Notice</p>
                                                                 <p className="text-yellow-300/80 text-xs">
-                                                                    This is a mock payment gateway. Your actual bank credentials are never stored or transmitted.
+                                                                    Your bank credentials are never stored or transmitted.
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -4166,7 +3296,7 @@ export default function Dashboard() {
                                                     <div className="p-3 bg-gray-800 rounded-xl border border-gray-700">
                                                         <div className="flex justify-between text-sm mb-1">
                                                             <span className="text-gray-400">Payment Amount</span>
-                                                            <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</span>
+                                                            <span className="text-white font-semibold">{formatCurrency(payableAmount)}</span>
                                                         </div>
                                                         <div className="flex justify-between text-sm">
                                                             <span className="text-gray-400">Payee</span>
@@ -4232,11 +3362,11 @@ export default function Dashboard() {
                                             <CheckCircle className="w-10 h-10 text-green-400" />
                                         </div>
                                         <h3 className="text-2xl font-bold text-white mb-2">Payment Successful!</h3>
-                                        <p className="text-gray-400 mb-6">Transaction ID: TXN{Date.now().toString().slice(-10)}</p>
+                                        <p className="text-gray-400 mb-6">Transaction ID: {paymentResult?.reference}</p>
                                         <div className="p-4 bg-gray-800 rounded-xl mb-6 text-left max-w-sm mx-auto">
                                             <div className="flex justify-between mb-2">
                                                 <span className="text-gray-400">Amount Paid</span>
-                                                <span className="text-white font-semibold">{formatCurrency(mockDashboardData.activeLoan.nextEmiAmount)}</span>
+                                                <span className="text-white font-semibold">{formatCurrency(payableAmount)}</span>
                                             </div>
                                             <div className="flex justify-between mb-2">
                                                 <span className="text-gray-400">Payment Method</span>
@@ -4271,113 +3401,47 @@ export default function Dashboard() {
         );
     };
 
-    // DOCUMENTS SECTION
+    // DOCUMENTS SECTION - KYC documents uploaded across the user's applications
     const renderDocumentsSection = () => (
         <div className="space-y-6">
             <div className="p-6 bg-gray-800 rounded-2xl border border-gray-700">
                 <h3 className="text-xl font-semibold text-white mb-6">Documents</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                        { name: "PAN Card", status: "Verified", date: "2024-01-15" },
-                        { name: "Aadhaar Card", status: "Verified", date: "2024-01-15" },
-                        { name: "Income Proof", status: "Pending", date: null },
-                        { name: "Bank Statements", status: "Pending", date: null },
-                    ].map((doc, index) => (
-                        <div key={index} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <FolderOpen className="w-5 h-5 text-teal-400" />
-                                <div>
-                                    <p className="text-white font-medium">{doc.name}</p>
-                                    {doc.date && <p className="text-gray-500 text-xs">Uploaded: {doc.date}</p>}
+                {userDocumentsLoading ? (
+                    <p className="text-gray-400">Loading documents...</p>
+                ) : userDocuments.length === 0 ? (
+                    <p className="text-gray-400">No documents uploaded yet. Documents are uploaded during KYC for an approved application.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {userDocuments.map((doc) => (
+                            <div key={doc.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <FolderOpen className="w-5 h-5 text-teal-400" />
+                                    <div>
+                                        <p className="text-white font-medium">{(doc.document_type || doc.file_name || '').replace(/_/g, ' ')}</p>
+                                        {doc.uploaded_at && <p className="text-gray-500 text-xs">Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}</p>}
+                                    </div>
                                 </div>
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${doc.verification_status === 'VERIFIED'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : doc.verification_status === 'REJECTED'
+                                        ? 'bg-red-500/20 text-red-400'
+                                        : 'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                    {doc.verification_status === 'VERIFIED' ? 'Verified' : doc.verification_status === 'REJECTED' ? 'Rejected' : 'Pending'}
+                                </span>
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${doc.status === 'Verified'
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                {doc.status}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-                <button className="mt-4 w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition">
+                        ))}
+                    </div>
+                )}
+                <button
+                    onClick={() => setActiveSection('loans')}
+                    className="mt-4 w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition"
+                >
                     + Upload Document
                 </button>
             </div>
         </div>
     );
-
-    // Account & Security Functions
-
-
-    // Account & Security Functions (Moved to top)
-    const getRealSecurityData = () => {
-        if (sessions && sessions.length > 0) {
-            // Sort by started_at desc if not already
-            const sortedSessions = [...sessions].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
-            const latestSession = sortedSessions[0];
-
-            return {
-                lastLogin: latestSession.started_at,
-                lastLoginDevice: {
-                    browser: latestSession.browser || "Unknown",
-                    os: latestSession.os || "Unknown",
-                    location: latestSession.location || "Unknown"
-                },
-                otpLoginEnabled: false, // Default
-                activeSessions: sortedSessions.map((s, index) => ({
-                    id: s.id,
-                    device: `${s.browser || 'Unknown'} on ${s.os || 'Unknown'}`,
-                    location: s.location || "Unknown",
-                    lastActive: s.last_activity || s.started_at,
-                    isCurrent: index === 0 // Approximation
-                }))
-            };
-        }
-        return profileData?.security || mockProfileData.security;
-    };
-
-    const getRealConsentData = () => {
-        if (!accountData) return profileData?.consents || mockProfileData.consents;
-
-        const consentDate = accountData.created_at || new Date().toISOString();
-        const baseConsents = [];
-
-        if (accountData.terms_consent) {
-            baseConsents.push({
-                id: "terms-1",
-                version: "v2.1",
-                purpose: "Terms of Service",
-                acceptedAt: consentDate,
-                consentType: "terms"
-            });
-        }
-        if (accountData.privacy_consent) {
-            baseConsents.push({
-                id: "privacy-1",
-                version: "v1.8",
-                purpose: "Privacy Policy",
-                acceptedAt: consentDate,
-                consentType: "privacy"
-            });
-        }
-        if (accountData.data_consent) {
-            baseConsents.push({
-                id: "credit-1",
-                version: "v1.0",
-                purpose: "Credit Bureau Data Access",
-                acceptedAt: consentDate,
-                consentType: "credit_bureau"
-            });
-        }
-
-        // Always include Marketing as accepted for now if account exists, or omit
-        // using mock defaults if array is empty to avoid broken UI
-        if (baseConsents.length === 0) return profileData?.consents || mockProfileData.consents;
-
-        return baseConsents;
-    };
-
 
     // SECURITY & SETTINGS SECTION (Combined)
     const renderSecuritySection = () => (
@@ -4498,36 +3562,16 @@ export default function Dashboard() {
                             Change Password
                         </h3>
                         <div className="space-y-4 max-w-md">
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Current Password</label>
-                                <input
-                                    type="password"
-                                    value={passwordForm.current}
-                                    onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
-                                    placeholder="Enter current password"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">New Password</label>
-                                <input
-                                    type="password"
-                                    value={passwordForm.new_password}
-                                    onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
-                                    placeholder="Enter new password (min 8 characters)"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Confirm New Password</label>
-                                <input
-                                    type="password"
-                                    value={passwordForm.confirm}
-                                    onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
-                                    placeholder="Confirm new password"
-                                />
-                            </div>
+                            {([
+                                ['current', 'Current Password', 'Enter current password'],
+                                ['new_password', 'New Password', 'Enter new password (min 8 characters)'],
+                                ['confirm', 'Confirm New Password', 'Confirm new password'],
+                            ] as const).map(([key, label, placeholder]) => (
+                                <TextField key={key} label={label} type="password" placeholder={placeholder}
+                                    value={passwordForm[key]}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, [key]: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500" />
+                            ))}
                             <button
                                 onClick={handleChangePassword}
                                 className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
@@ -4544,42 +3588,16 @@ export default function Dashboard() {
                             Change PIN
                         </h3>
                         <div className="space-y-4 max-w-md">
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Current PIN</label>
-                                <input
-                                    type="password"
-                                    inputMode="numeric"
-                                    maxLength={6}
-                                    value={pinForm.current}
-                                    onChange={(e) => setPinForm({ ...pinForm, current: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 tracking-widest"
-                                    placeholder="••••••"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">New PIN (6 digits)</label>
-                                <input
-                                    type="password"
-                                    inputMode="numeric"
-                                    maxLength={6}
-                                    value={pinForm.new_pin}
-                                    onChange={(e) => setPinForm({ ...pinForm, new_pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 tracking-widest"
-                                    placeholder="••••••"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-400 text-sm mb-2">Confirm New PIN</label>
-                                <input
-                                    type="password"
-                                    inputMode="numeric"
-                                    maxLength={6}
-                                    value={pinForm.confirm}
-                                    onChange={(e) => setPinForm({ ...pinForm, confirm: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 tracking-widest"
-                                    placeholder="••••••"
-                                />
-                            </div>
+                            {([
+                                ['current', 'Current PIN'],
+                                ['new_pin', 'New PIN (6 digits)'],
+                                ['confirm', 'Confirm New PIN'],
+                            ] as const).map(([key, label]) => (
+                                <TextField key={key} label={label} type="password" inputMode="numeric" maxLength={6} placeholder="••••••"
+                                    value={pinForm[key]}
+                                    onChange={(e) => setPinForm({ ...pinForm, [key]: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 tracking-widest" />
+                            ))}
                             <button
                                 onClick={handleChangePin}
                                 className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl text-white font-semibold transition"
@@ -4612,12 +3630,7 @@ export default function Dashboard() {
         </div>
     );
 
-    // ACTIVITY LOG SECTION - REAL API INTEGRATION
-
-    // ACTIVITY LOG SECTION (Functions moved to top)
-
-
-    const getSeverityColor = (severity: string) => {
+    const getSeverityColor = (severity?: string) => {
         switch (severity) {
             case "CRITICAL": return "bg-red-500/20 text-red-400 border-red-500/30";
             case "WARNING": return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
@@ -4625,26 +3638,13 @@ export default function Dashboard() {
         }
     };
 
-    const getCategoryIcon = (category: string) => {
+    const getCategoryIcon = (category?: string) => {
         switch (category) {
             case "SECURITY": return <Shield className="w-4 h-4" />;
             case "LOAN": return <FileText className="w-4 h-4" />;
             case "KYC": return <FolderOpen className="w-4 h-4" />;
             case "PAYMENT": return <CreditCard className="w-4 h-4" />;
             default: return <User className="w-4 h-4" />;
-        }
-    };
-
-    const terminateSession = async (sessionId: string) => {
-        try {
-            const token = localStorage.getItem('access_token');
-            await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchActivityData("sessions");
-        } catch (error) {
-            console.error("Failed to terminate session:", error);
         }
     };
 
@@ -5280,9 +4280,9 @@ export default function Dashboard() {
                                 }`}>
                                     {viewingApplication.decision}
                                 </div>
-                                {viewingApplication.approval_probability && (
+                                {num(viewingApplication.approval_probability) > 0 && (
                                     <div className="text-sm text-gray-400 mt-1">
-                                        Approval Probability: {viewingApplication.approval_probability.toFixed(1)}%
+                                        Approval Probability: {num(viewingApplication.approval_probability).toFixed(1)}%
                                     </div>
                                 )}
                             </div>
@@ -5291,7 +4291,7 @@ export default function Dashboard() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
                                     <div className="text-sm text-gray-400 mb-1">Loan Amount</div>
-                                    <div className="text-xl font-bold text-white">₹{viewingApplication.loan_amount.toLocaleString()}</div>
+                                    <div className="text-xl font-bold text-white">₹{num(viewingApplication.loan_amount).toLocaleString()}</div>
                                 </div>
 
                                 <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
@@ -5299,7 +4299,7 @@ export default function Dashboard() {
                                     <div className="text-xl font-bold text-white">{viewingApplication.loan_purpose}</div>
                                 </div>
 
-                                {viewingApplication.interest_rate && (
+                                {num(viewingApplication.interest_rate) > 0 && (
                                     <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
                                         <div className="text-sm text-gray-400 mb-1">Interest Rate</div>
                                         <div className="text-xl font-bold text-white">{viewingApplication.interest_rate}% p.a.</div>
@@ -5318,15 +4318,8 @@ export default function Dashboard() {
                             {viewingApplication.kyc_status && (
                                 <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5">
                                     <div className="text-sm text-gray-400 mb-2">KYC Status</div>
-                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                        viewingApplication.kyc_status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                                        viewingApplication.kyc_status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-400' :
-                                        viewingApplication.kyc_status === 'BLOCKED' ? 'bg-red-500/20 text-red-400' :
-                                        'bg-yellow-500/20 text-yellow-400'
-                                    }`}>
-                                        {viewingApplication.kyc_status === 'COMPLETED' ? 'Completed' :
-                                         viewingApplication.kyc_status === 'IN_PROGRESS' ? 'In Progress' :
-                                         viewingApplication.kyc_status === 'BLOCKED' ? 'Blocked' : 'Pending'}
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${kycBadge(viewingApplication.kyc_status)}`}>
+                                        {kycLabel(viewingApplication.kyc_status)}
                                     </span>
                                 </div>
                             )}
@@ -5337,8 +4330,7 @@ export default function Dashboard() {
                                     <button
                                         onClick={() => {
                                             setShowApplicationModal(false);
-                                            setSelectedApplicationId(viewingApplication.id);
-                                            setActiveSection('apply');
+                                            openKycFor(viewingApplication.id);
                                         }}
                                         className="flex-1 px-4 py-3 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 rounded-lg font-medium transition"
                                     >

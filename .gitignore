@@ -45,3 +45,17 @@ htmlcov/
 .next
 out/
 build/
+
+# Local development artifacts and generated credentials
+ADMIN_PAGE_GUIDE.md
+ALL_CREDENTIALS.md
+FINAL_CREDENTIALS.txt
+backend/credentials_summary.txt
+backend/main.py.bak
+backend/main.py.before_cleanup
+backend/main_cleaned.py
+backend/cleanup_main.py
+backend/create_complete_user.py
+backend/get_users.py
+backend/setup_admin_login.py
+backend/uploads/
