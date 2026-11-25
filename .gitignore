@@ -58,4 +58,6 @@ backend/cleanup_main.py
 backend/create_complete_user.py
 backend/get_users.py
 backend/setup_admin_login.py
+backend/inspect_review_schema.py
+backend/test_officer_review_flow.py
 backend/uploads/

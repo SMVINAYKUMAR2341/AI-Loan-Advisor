@@ -1,4 +1,5 @@
 import os
+import logging
 import sys
 import calendar
 import asyncio
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import func  # Import func for SQLAlchemy aggregate functions
 from datetime import datetime, timedelta, date, timezone
 from pydantic import BaseModel
@@ -22,7 +24,10 @@ import database
 from database import get_db
 import auth
 import report_generator
+import officer_review_schema
 from starlette.concurrency import run_in_threadpool
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Loan Advisor API", version="1.0.0")
 
@@ -194,6 +199,12 @@ async def startup():
     # Initialise DB (in production, use Alembic for migrations)
     async with database.engine.begin() as conn:
         await conn.run_sync(models.Base.metadata.create_all)
+        await officer_review_schema.migrate_officer_review_foreign_key(conn)
+
+    # Optional, environment-driven, idempotent admin seeding. No credentials
+    # are created unless all DEFAULT_ADMIN_* variables are explicitly set.
+    async with database.AsyncSessionLocal() as db:
+        await officer_review_schema.ensure_admin_user_from_env(db)
 
 def generate_customer_id() -> str:
     """Generate a unique customer ID like LA20250001"""
@@ -824,108 +835,107 @@ async def update_application_decision(
     application_id: UUID,
     decision: str,  # APPROVED, REJECTED, DOCUMENTS_REQUIRED
     justification: str,
-    current_admin = Depends(auth.get_current_admin),
+    current_admin: models.AdminUser = Depends(auth.get_current_review_officer),
     db: AsyncSession = Depends(database.get_db)
 ):
-    """
-    Admin decision on loan application. Updates application status and creates review record.
-    """
-    # Validate decision value
-    valid_decisions = ["APPROVED", "REJECTED", "DOCUMENTS_REQUIRED"]
-    if decision.upper() not in valid_decisions:
+    """Record an authenticated bank officer's final application decision."""
+    normalized_decision = decision.strip().upper()
+    valid_decisions = {"APPROVED", "REJECTED", "DOCUMENTS_REQUIRED"}
+    if normalized_decision not in valid_decisions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid decision. Must be one of: {valid_decisions}"
+            detail="Invalid decision. Choose APPROVED, REJECTED, or DOCUMENTS_REQUIRED.",
         )
-    
-    if not justification or len(justification.strip()) < 10:
+
+    normalized_justification = (justification or "").strip()
+    if len(normalized_justification) < 10:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Justification is required and must be at least 10 characters"
+            detail="Justification is required and must be at least 10 characters.",
         )
-    
-    # Fetch the application and its prediction
-    app_query = select(models.LoanApplication).where(models.LoanApplication.id == application_id)
-    result = await db.execute(app_query)
-    application = result.scalars().first()
-    
-    if not application:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found"
-        )
-    
-    # Fetch prediction to update decision
-    pred_query = select(models.LoanPrediction).where(models.LoanPrediction.application_id == application_id)
-    result = await db.execute(pred_query)
-    prediction = result.scalars().first()
-    
-    if prediction:
-        prediction.decision = decision.upper()
-    
-    # Create officer review record
-    # Get admin's id - handle both AdminUser and User models
-    admin_id = current_admin.id
-    
-    # Check if review already exists
-    existing_review_query = select(models.OfficerReview).where(
-        models.OfficerReview.application_id == application_id
-    )
-    result = await db.execute(existing_review_query)
-    existing_review = result.scalars().first()
-    
-    if existing_review:
-        # Update existing review
-        existing_review.final_decision = decision.upper()
-        existing_review.justification = justification
-        existing_review.reviewed_at = datetime.now()
-    else:
-        # Create new review - need to use a valid user_id from users table
-        # First check if admin has a corresponding user entry
-        user_query = select(models.User).where(models.User.email == current_admin.email)
-        user_result = await db.execute(user_query)
-        user = user_result.scalars().first()
-        
-        if user:
-            officer_id = user.id
-        else:
-            # Use admin id as fallback (may need to create a user entry for proper FK)
-            officer_id = admin_id
-        
-        new_review = models.OfficerReview(
-            application_id=application_id,
-            officer_id=officer_id,
-            final_decision=decision.upper(),
-            justification=justification
-        )
-        db.add(new_review)
-    
-    await db.commit()
-    
-    # Create notification for customer
+
     try:
-        # Fetch user to notify
-        user_query = select(models.User).where(models.User.id == application.user_id)
-        result = await db.execute(user_query)
-        customer = result.scalars().first()
-        
-        if customer:
-            notification_msg = f"Your loan application has been {decision.upper()}. Reason: {justification}"
-            notification = models.Notification(
-                user_id=customer.id,
-                type="LOAN_DECISION",
-                trigger=f"LOAN_{decision.upper()}",
-                message=notification_msg
+        application = await db.scalar(
+            select(models.LoanApplication).where(
+                models.LoanApplication.id == application_id
             )
-            db.add(notification)
-            await db.commit()
-    except Exception as e:
-        print(f"Failed to create notification: {e}")
-    
+        )
+        if application is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found.",
+            )
+
+        prediction = await db.scalar(
+            select(models.LoanPrediction).where(
+                models.LoanPrediction.application_id == application_id
+            )
+        )
+        if prediction is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This application has no eligibility decision to review.",
+            )
+        prediction.decision = normalized_decision
+
+        review = await db.scalar(
+            select(models.OfficerReview).where(
+                models.OfficerReview.application_id == application_id
+            )
+        )
+        if review is None:
+            review = models.OfficerReview(
+                application_id=application_id,
+                officer_id=current_admin.id,
+                final_decision=normalized_decision,
+                justification=normalized_justification,
+            )
+            db.add(review)
+        else:
+            review.officer_id = current_admin.id
+            review.final_decision = normalized_decision
+            review.justification = normalized_justification
+            review.reviewed_at = datetime.now(timezone.utc)
+
+        customer = await db.scalar(
+            select(models.User).where(models.User.id == application.user_id)
+        )
+        if customer is not None:
+            db.add(models.Notification(
+                user_id=customer.id,
+                application_id=application.id,
+                type="LOAN_DECISION",
+                trigger=f"LOAN_{normalized_decision}",
+                message=(
+                    f"Your loan application has been {normalized_decision}. "
+                    f"Reason: {normalized_justification}"
+                ),
+            ))
+
+        await db.commit()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except IntegrityError:
+        await db.rollback()
+        logger.exception("Unable to persist officer review for %s", application_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The officer review could not be saved because its related records are invalid.",
+        )
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error while saving officer review for %s", application_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The officer review could not be saved. Please try again.",
+        )
+
     return {
-        "message": f"Application {decision.upper()} successfully",
-        "decision": decision.upper(),
-        "application_id": str(application_id)
+        "message": f"Application {normalized_decision} successfully.",
+        "decision": normalized_decision,
+        "application_id": str(application_id),
+        "officer_id": str(current_admin.id),
     }
 
 

@@ -136,10 +136,12 @@ const downloadBlob = (blob: Blob, filename: string) => {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    a.remove();
+    // Give the browser time to start the download before releasing the object URL.
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 };
 
 const kycLabel = (status?: string) =>
@@ -599,13 +601,20 @@ export default function Dashboard() {
     };
 
     const handleDownloadAgreement = async (appId: string) => {
+        if (!appId) return;
         try {
             const res = await authFetch(`/kyc/${appId}/agreement/download`);
-            if (!res.ok) throw new Error('Download failed');
-            downloadBlob(await res.blob(), `LoanAgreement_${appId.slice(0, 8)}.pdf`);
+            if (!res.ok) {
+                throw new Error(await errorDetail(res, 'The official agreement could not be downloaded.'));
+            }
+            const blob = await res.blob();
+            if (blob.size === 0) {
+                throw new Error('The agreement PDF was empty. Please try again.');
+            }
+            downloadBlob(blob, `LoanAgreement_${appId.slice(0, 8)}.pdf`);
         } catch (err) {
             console.error("Download error:", err);
-            alert("Failed to download agreement. Please try again.");
+            alert(err instanceof Error ? err.message : "Failed to download agreement. Please try again.");
         }
     };
 

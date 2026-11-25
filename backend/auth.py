@@ -307,3 +307,22 @@ def require_admin():
     return admin_checker
 
 
+async def get_current_review_officer(
+    current_admin = Depends(get_current_admin),
+):
+    """Return the authenticated AdminUser allowed to make loan decisions."""
+    import models
+
+    if not isinstance(current_admin, models.AdminUser):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="An active bank officer account is required for loan reviews",
+        )
+    if not current_admin.can_approve_loans:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This officer is not authorized to approve or reject loans",
+        )
+    return current_admin
+
+

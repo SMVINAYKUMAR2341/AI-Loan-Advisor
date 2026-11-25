@@ -14,20 +14,27 @@ export const getAuthHeaders = () => {
 
 // Generic fetch wrapper with error handling
 export async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers: {
-            ...getAuthHeaders(),
-            ...(options?.headers || {})
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            headers: {
+                ...getAuthHeaders(),
+                ...(options?.headers || {})
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'The server rejected the request.' }));
+            throw new Error(error.detail || 'The server rejected the request.');
         }
-    });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Network error' }));
-        throw new Error(error.detail || 'Request failed');
+        return response.json();
+    } catch (error) {
+        if (error instanceof TypeError) {
+            throw new Error('Unable to connect to the loan service. Check that the backend is running and try again.');
+        }
+        throw error;
     }
-
-    return response.json();
 }
 
 // Helper for file downloads
@@ -53,18 +60,25 @@ export async function downloadFile(endpoint: string, filename: string) {
 export const adminApi = {
     // Auth
     // Auth
-    login: (credentials: { email: string; password: string; pin: string; admin_id: string }) =>
-        fetch(`${API_BASE_URL}/admin/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(credentials)
-        }).then(async res => {
+    login: async (credentials: { email: string; password: string; pin: string; admin_id: string }) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(credentials)
+            });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: 'Login failed' }));
-                throw new Error(err.detail || 'Login failed');
+                const err = await res.json().catch(() => ({ detail: 'Login failed. Please check your credentials.' }));
+                throw new Error(err.detail || 'Login failed. Please check your credentials.');
             }
             return res.json();
-        }),
+        } catch (error) {
+            if (error instanceof TypeError) {
+                throw new Error('Unable to connect to the loan service. Check that the backend is running and try again.');
+            }
+            throw error;
+        }
+    },
 
     // Dashboard
     getStats: () => apiFetch<{

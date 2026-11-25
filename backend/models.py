@@ -64,7 +64,6 @@ class User(Base):
     
     # Relationships
     loan_applications = relationship("LoanApplication", back_populates="user")
-    officer_reviews = relationship("OfficerReview", back_populates="officer", foreign_keys="OfficerReview.officer_id")
 
 
 class AdminUser(Base):
@@ -100,6 +99,14 @@ class AdminUser(Base):
     last_login = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Bank officers own human review records. This relationship intentionally
+    # points to admin_users, not the customer users table.
+    officer_reviews = relationship(
+        "OfficerReview",
+        back_populates="officer",
+        foreign_keys="OfficerReview.officer_id",
+    )
 
 
 
@@ -189,7 +196,7 @@ class OfficerReview(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     application_id = Column(UUID(as_uuid=True), ForeignKey("loan_applications.id"), nullable=False, index=True)
-    officer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    officer_id = Column(UUID(as_uuid=True), ForeignKey("admin_users.id"), nullable=False, index=True)
     
     # Human decision (only for PENDING_REVIEW cases)
     final_decision = Column(String(20), nullable=False)  # APPROVED, REJECTED
@@ -200,7 +207,7 @@ class OfficerReview(Base):
     
     # Relationships
     application = relationship("LoanApplication", back_populates="officer_review")
-    officer = relationship("User", back_populates="officer_reviews", foreign_keys=[officer_id])
+    officer = relationship("AdminUser", back_populates="officer_reviews", foreign_keys=[officer_id])
 
 
 class KYCDocument(Base):
