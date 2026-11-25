@@ -89,6 +89,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://ai-loan-advisor-three.vercel.app",
@@ -118,6 +120,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     allowed_origins = [
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://ai-loan-advisor-three.vercel.app",
